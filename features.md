@@ -2,7 +2,7 @@
 
 Complete guide to all features and modules in PreyUI.
 
----
+----
 
 ## Table of Contents
 
