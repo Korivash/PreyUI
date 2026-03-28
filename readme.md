@@ -1,4 +1,4 @@
-# PreyUI Command Deck
+# PreyUI 
 
 PreyUI is a World of Warcraft Retail UI addon suite focused on clean presentation, strong usability, and a modern layout built for real gameplay. It is designed for players who want their interface to feel sharp, efficient, and powerful without turning their screen into clutter.
 
