@@ -38,6 +38,16 @@ The Command Deck is a major part of that experience. Instead of treating setting
 - AddOn Folder: `PreyUI`
 - Slash Command: `/prey`
 
+## Example Layout
+
+The screenshots below show **one example of how PreyUI can look in actual use**. PreyUI is built to be configured in multiple ways, and this layout reflects **my personal setup**, not a fixed or required way to use the addon.
+
+Different players will want different placements, modules, visibility rules, scaling, and overall presentation depending on role, content, monitor setup, and preference. The goal of PreyUI is to give you a strong default experience while still letting you shape the UI into what works best for you.
+
+[![PreyUI Example Layout 1](https://i.imgur.com/RoEc5oG.png)](https://imgur.com/RoEc5oG)
+
+[![PreyUI Example Layout 2](https://i.imgur.com/W7YMWVJ.png)](https://imgur.com/W7YMWVJ)
+
 ## What PreyUI Includes
 
 PreyUI is more than a single window or a small collection of tweaks. It is a full addon suite built to improve the complete gameplay experience.
