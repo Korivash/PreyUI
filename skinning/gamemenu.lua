@@ -237,35 +237,23 @@ local function InjectPreyUIButton()
 
     if not GameMenuFrame or not GameMenuFrame.buttonPool then return end
 
-    -- Find the Macros button to insert after
-    local macrosIndex = nil
     for button in GameMenuFrame.buttonPool:EnumerateActive() do
-        if button:GetText() == MACROS then
-            macrosIndex = button.layoutIndex
-            break
+        if button:GetText() == "PreyUI" then
+            return
         end
     end
 
-    if macrosIndex then
-        -- Shift buttons after Macros down by 1
-        for button in GameMenuFrame.buttonPool:EnumerateActive() do
-            if button.layoutIndex and button.layoutIndex > macrosIndex then
-                button.layoutIndex = button.layoutIndex + 1
-            end
+    -- Avoid mutating Blizzard layout metadata such as layoutIndex.
+    -- Those fields are used by secure layout code and can taint unrelated UI.
+    GameMenuFrame:AddButton("PreyUI", function()
+        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
+        HideUIPanel(GameMenuFrame)
+        local PREY = _G.PreyUI
+        if PREY and PREY.GUI then
+            PREY.GUI:Show()
         end
-
-        -- Add PreyUI button
-        local preyButton = GameMenuFrame:AddButton("PreyUI", function()
-            PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
-            HideUIPanel(GameMenuFrame)
-            local PREY = _G.PreyUI
-            if PREY and PREY.GUI then
-                PREY.GUI:Show()
-            end
-        end)
-        preyButton.layoutIndex = macrosIndex + 1
-        GameMenuFrame:MarkDirty()
-    end
+    end)
+    GameMenuFrame:MarkDirty()
 end
 
 ---------------------------------------------------------------------------

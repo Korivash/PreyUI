@@ -6,7 +6,7 @@
 ## AddonCompartmentFuncOnLeave: PreyUI_CompartmentOnLeave
 ## Notes: Fully rebuilt modular UI suite for PreyUI
 ## Author: PreyUI Team
-## Version: 3.0.10
+## Version: 3.0.11
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
 ## SavedVariables: PreyUI_DB, PreyUIDB

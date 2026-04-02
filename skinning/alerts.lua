@@ -141,8 +141,7 @@ local function StyleIcon(icon, parent, qualityColor)
     icon:SetTexCoord(unpack(ICON_TEX_COORDS))
     icon:SetDrawLayer("ARTWORK")
 
-    local border = CreateIconBorder(icon, parent, qualityColor)
-    icon:SetParent(border)
+    CreateIconBorder(icon, parent, qualityColor)
 end
 
 --- Kill (hide) a frame or texture
@@ -312,8 +311,7 @@ local function SkinLootUpgradeAlert(frame)
         end
     end
 
-    local border = CreateIconBorder(frame.Icon, frame, qualityColor)
-    frame.Icon:SetParent(border)
+    CreateIconBorder(frame.Icon, frame, qualityColor)
 
     -- Create backdrop
     if not frame.preyBackdrop and frame.Icon.preyBorder then
@@ -436,8 +434,7 @@ local function SkinNewRecipeLearnedAlert(frame)
         frame.Icon:ClearAllPoints()
         frame.Icon:SetPoint("LEFT", frame.preyBackdrop, 9, 0)
 
-        local border = CreateIconBorder(frame.Icon, frame)
-        frame.Icon:SetParent(border)
+        CreateIconBorder(frame.Icon, frame)
     end
 
     frame.preySkinned = true
@@ -475,8 +472,7 @@ local function SkinDungeonCompletionAlert(frame)
         frame.dungeonTexture:ClearAllPoints()
         frame.dungeonTexture:SetPoint("LEFT", frame, 7, 0)
 
-        local border = CreateIconBorder(frame.dungeonTexture, frame)
-        frame.dungeonTexture:SetParent(border)
+        CreateIconBorder(frame.dungeonTexture, frame)
     end
 
     frame.preySkinned = true
@@ -515,8 +511,7 @@ local function SkinScenarioAlert(frame)
         frame.dungeonTexture:SetPoint("LEFT", frame.preyBackdrop, 9, 0)
         frame.dungeonTexture:SetDrawLayer("OVERLAY")
 
-        local border = CreateIconBorder(frame.dungeonTexture, frame)
-        frame.dungeonTexture:SetParent(border)
+        CreateIconBorder(frame.dungeonTexture, frame)
     end
 
     frame.preySkinned = true
@@ -541,8 +536,7 @@ local function SkinWorldQuestCompleteAlert(frame)
         frame.QuestTexture:SetTexCoord(unpack(ICON_TEX_COORDS))
         frame.QuestTexture:SetDrawLayer("ARTWORK")
 
-        local border = CreateIconBorder(frame.QuestTexture, frame)
-        frame.QuestTexture:SetParent(border)
+        CreateIconBorder(frame.QuestTexture, frame)
     end
 
     frame.preySkinned = true
@@ -576,7 +570,6 @@ local function SkinLegendaryItemAlert(frame, itemLink)
         frame.Icon:SetDrawLayer("ARTWORK")
 
         local border = CreateIconBorder(frame.Icon, frame)
-        frame.Icon:SetParent(border)
 
         -- Color border by item quality
         if itemLink then
@@ -628,16 +621,15 @@ local function SkinMiscAlert(frame)
         frame.Icon:SetTexCoord(unpack(ICON_TEX_COORDS))
         frame.Icon:SetDrawLayer("BORDER", 5)
 
-        local border = frame.Icon.preyBorder
-        frame.Icon:SetParent(border)
+        CreateIconBorder(frame.Icon, frame, qualityColor)
 
         if not frame.preyBackdrop then
             local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetThemeColors()
 
             local backdrop = CreateFrame("Frame", nil, frame, "BackdropTemplate")
             backdrop:SetFrameLevel(frame:GetFrameLevel())
-            backdrop:SetPoint("TOPLEFT", border, "TOPLEFT", -8, 8)
-            backdrop:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT", 180, -8)
+            backdrop:SetPoint("TOPLEFT", frame.Icon.preyBorder, "TOPLEFT", -8, 8)
+            backdrop:SetPoint("BOTTOMRIGHT", frame.Icon.preyBorder, "BOTTOMRIGHT", 180, -8)
             backdrop:SetBackdrop({
                 bgFile = "Interface\\Buttons\\WHITE8x8",
                 edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -674,8 +666,7 @@ local function SkinEntitlementAlert(frame)
         frame.Icon:ClearAllPoints()
         frame.Icon:SetPoint("LEFT", frame.preyBackdrop, 9, 0)
 
-        local border = CreateIconBorder(frame.Icon, frame)
-        frame.Icon:SetParent(border)
+        CreateIconBorder(frame.Icon, frame)
     end
 
     frame.preySkinned = true
@@ -732,8 +723,7 @@ local function SkinGuildChallengeAlert(frame)
     Kill(frame.EmblemBorder)
 
     if frame.EmblemIcon then
-        local border = CreateIconBorder(frame.EmblemIcon, frame)
-        frame.EmblemIcon:SetParent(border)
+        CreateIconBorder(frame.EmblemIcon, frame)
         SetLargeGuildTabardTextures("player", frame.EmblemIcon)
     end
 
@@ -763,8 +753,7 @@ local function SkinInvasionAlert(frame)
 
         if icon and icon:IsObjectType("Texture") then
             if icon:GetTexture() == 236293 then  -- interface\icons\ability_warlock_demonicpower
-                local border = CreateIconBorder(icon, frame)
-                icon:SetParent(border)
+                CreateIconBorder(icon, frame)
                 icon:SetDrawLayer("OVERLAY")
                 icon:SetTexCoord(unpack(ICON_TEX_COORDS))
             end
@@ -824,7 +813,6 @@ local function SkinBonusRollFrames()
         Kill(lootItem.IconBorder)
 
         local border = CreateIconBorder(lootItem.Icon, lootFrame)
-        lootItem.Icon:SetParent(border)
 
         local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetThemeColors()
         local backdrop = CreateFrame("Frame", nil, lootFrame, "BackdropTemplate")
