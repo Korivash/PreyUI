@@ -28,13 +28,13 @@ The Command Deck is a major part of that experience. Instead of treating setting
 
 ## Quick Links
 - Discord: https://discord.gg/JbQQTbH4hR
-- [Changelog](CHANGELOGS.md)
+- [Changelog](CHANGELOG.md)
 - [Features](FEATURES.md)
 - [Install](INSTALLATION.md)
 - [Memory](MEMORY.md)
 
 ## Current Release
-- Version: `3.0.11`
+- Version: `3.0.12`
 - Interface: `120001`
 - AddOn Folder: `PreyUI`
 - Slash Command: `/prey`

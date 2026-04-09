@@ -19,7 +19,7 @@ PreyUI.DEBUG_MODE = false
 -- Version & Defaults
 --============================================================--
 
-PreyUI.versionString = C_AddOns.GetAddOnMetadata("PreyUI", "Version") or "3.0.12"
+PreyUI.versionString = C_AddOns.GetAddOnMetadata("PreyUI", "Version") or "3.0.13"
 
 ---@type table
 PreyUI.defaults = {

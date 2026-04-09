@@ -1,5 +1,10 @@
 # PreyUI Changelog
 
+## 3.0.12 - 2026-04-02
+
+- Fixed protected frame taint caused by hooking managed extra action and zone ability button positioning through `SetPoint` and Blizzard frame-manager state.
+- Switched extra action and zone ability repositioning to safe `OnShow` reapplication with combat deferral.
+
 ## 3.0.11 - 2026-04-02
 
 - Fixed Blizzard taint caused by mutating secure `layoutIndex` data while injecting the PreyUI Escape menu button.
