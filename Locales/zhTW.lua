@@ -1,4 +1,3 @@
--- Localization file for Chinese/Traditional
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "zhTW", false, true)
 
 if L then

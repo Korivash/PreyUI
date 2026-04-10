@@ -1,25 +1,17 @@
----------------------------------------------------------------------------
--- PreyUI Combat Timer
--- Displays elapsed time in combat (resets on combat exit)
----------------------------------------------------------------------------
 local ADDON_NAME, ns = ...
 local PREY = ns.PREY or {}
 ns.PREY = PREY
 
----------------------------------------------------------------------------
--- State tracking
----------------------------------------------------------------------------
+
 local CombatTimerState = {
     combatStartTime = 0,
     timerFrame = nil,
     isInCombat = false,
     isPreviewMode = false,
-    isInEncounter = false,  -- Track boss encounter state
+    isInEncounter = false,
 }
 
----------------------------------------------------------------------------
--- Get settings from database
----------------------------------------------------------------------------
+
 local function GetSettings()
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     if PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.combatTimer then
@@ -28,16 +20,14 @@ local function GetSettings()
     return nil
 end
 
----------------------------------------------------------------------------
--- Backdrop template with optional LSM border texture
----------------------------------------------------------------------------
+
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
 local function GetBackdropInfo(borderTextureName, borderSize)
     local edgeFile = nil
     local edgeSize = 0
 
-    -- Use LSM border texture if specified and not "None"
+
     if borderTextureName and borderTextureName ~= "None" and LSM then
         edgeFile = LSM:Fetch("border", borderTextureName)
         edgeSize = borderSize or 1
@@ -53,15 +43,13 @@ local function GetBackdropInfo(borderTextureName, borderSize)
     }
 end
 
----------------------------------------------------------------------------
--- Create uniform border lines (for solid "None" border)
----------------------------------------------------------------------------
+
 local function CreateBorderLines(frame)
     if frame.borderLines then return frame.borderLines end
 
     local borders = {}
 
-    -- Use OVERLAY layer to render on top of backdrop, avoiding blend artifacts
+
     borders.top = frame:CreateTexture(nil, "OVERLAY")
     borders.top:SetColorTexture(0, 0, 0, 1)
     borders.top:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
@@ -90,7 +78,7 @@ local function UpdateBorderLines(frame, size, r, g, b, a, hide)
     local borders = frame.borderLines
     if not borders then return end
 
-    -- Hide all if requested or size is 0
+
     if hide or size <= 0 then
         for _, line in pairs(borders) do
             line:Hide()
@@ -98,7 +86,7 @@ local function UpdateBorderLines(frame, size, r, g, b, a, hide)
         return
     end
 
-    -- Set size and color
+
     borders.top:SetHeight(size)
     borders.bottom:SetHeight(size)
     borders.left:SetWidth(size)
@@ -114,9 +102,7 @@ local function UpdateBorderLines(frame, size, r, g, b, a, hide)
     end
 end
 
----------------------------------------------------------------------------
--- Get font path from LibSharedMedia
----------------------------------------------------------------------------
+
 local function GetFontPath(fontName)
     if LSM and fontName then
         local path = LSM:Fetch("font", fontName)
@@ -125,9 +111,7 @@ local function GetFontPath(fontName)
     return "Fonts\\FRIZQT__.TTF"
 end
 
----------------------------------------------------------------------------
--- Create the timer frame (one-time setup)
----------------------------------------------------------------------------
+
 local function CreateTimerFrame()
     if CombatTimerState.timerFrame then return end
 
@@ -137,11 +121,11 @@ local function CreateTimerFrame()
     frame:SetFrameStrata("HIGH")
     frame:SetFrameLevel(50)
 
-    -- Set up backdrop (background only)
+
     frame:SetBackdrop(GetBackdropInfo())
     frame:SetBackdropColor(0, 0, 0, 0.6)
 
-    -- Create manual border lines for uniform edges
+
     CreateBorderLines(frame)
     UpdateBorderLines(frame, 1, 0, 0, 0, 1)
 
@@ -158,18 +142,14 @@ local function CreateTimerFrame()
     CombatTimerState.timerFrame = frame
 end
 
----------------------------------------------------------------------------
--- Format elapsed time as MM:SS
----------------------------------------------------------------------------
+
 local function FormatTime(seconds)
     local mins = math.floor(seconds / 60)
     local secs = math.floor(seconds % 60)
     return string.format("%02d:%02d", mins, secs)
 end
 
----------------------------------------------------------------------------
--- OnUpdate handler for timer
----------------------------------------------------------------------------
+
 local function OnTimerUpdate(self, elapsed)
     if not CombatTimerState.isInCombat then return end
 
@@ -181,9 +161,7 @@ local function OnTimerUpdate(self, elapsed)
     end
 end
 
----------------------------------------------------------------------------
--- Get global addon font setting
----------------------------------------------------------------------------
+
 local function GetGlobalFont()
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     if PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.general and PREYCore.db.profile.general.font then
@@ -192,21 +170,17 @@ local function GetGlobalFont()
     return "Prey"
 end
 
----------------------------------------------------------------------------
--- Get player class color
----------------------------------------------------------------------------
+
 local function GetClassColor()
     local _, class = UnitClass("player")
     if class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class] then
         local c = RAID_CLASS_COLORS[class]
         return {c.r, c.g, c.b, 1}
     end
-    return {1, 1, 1, 1}  -- Fallback to white
+    return {1, 1, 1, 1}
 end
 
----------------------------------------------------------------------------
--- Update timer appearance from settings
----------------------------------------------------------------------------
+
 local function UpdateTimerAppearance()
     if not CombatTimerState.timerFrame then
         CreateTimerFrame()
@@ -217,24 +191,24 @@ local function UpdateTimerAppearance()
 
     local frame = CombatTimerState.timerFrame
 
-    -- Update size
+
     local width = settings.width or 80
     local height = settings.height or 30
     frame:SetSize(width, height)
 
-    -- Update position
+
     local xOffset = settings.xOffset or 0
     local yOffset = settings.yOffset or -150
     frame:ClearAllPoints()
     frame:SetPoint("CENTER", UIParent, "CENTER", xOffset, yOffset)
 
-    -- Update font (using LSM) - check if using custom font or global
+
     local fontSize = settings.fontSize or 16
     local fontName = settings.useCustomFont and settings.font or GetGlobalFont()
     local fontPath = GetFontPath(fontName)
     frame.text:SetFont(fontPath, fontSize, "OUTLINE")
 
-    -- Update text color (use class color or custom color)
+
     local textColor
     if settings.useClassColorText then
         textColor = GetClassColor()
@@ -243,7 +217,7 @@ local function UpdateTimerAppearance()
     end
     frame.text:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
 
-    -- Update backdrop and border
+
     local showBackdrop = settings.showBackdrop
     if showBackdrop == nil then showBackdrop = true end
 
@@ -251,7 +225,7 @@ local function UpdateTimerAppearance()
     local borderTexture = settings.borderTexture or "None"
     local useLSMBorder = borderTexture ~= "None" and borderSize > 0
 
-    -- Get border color
+
     local borderColor
     if settings.useClassColorBorder then
         borderColor = GetClassColor()
@@ -259,11 +233,10 @@ local function UpdateTimerAppearance()
         borderColor = settings.borderColor or {0, 0, 0, 1}
     end
 
-    -- Set up backdrop with or without LSM border
-    -- Skip LSM border if hideBorder is enabled
+
     local hideBorder = settings.hideBorder
     local effectiveUseLSMBorder = useLSMBorder and not hideBorder
-    
+
     if showBackdrop or effectiveUseLSMBorder then
         frame:SetBackdrop(GetBackdropInfo(hideBorder and "None" or borderTexture, hideBorder and 0 or borderSize))
 
@@ -281,30 +254,27 @@ local function UpdateTimerAppearance()
         frame:SetBackdrop(nil)
     end
 
-    -- Update manual border lines (only used when no LSM border is selected)
-    -- Hide all borders if hideBorder is enabled
+
     local hideBorder = settings.hideBorder
-    CreateBorderLines(frame)  -- Ensure borders exist
+    CreateBorderLines(frame)
     UpdateBorderLines(frame, borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1, useLSMBorder or hideBorder)
 
-    -- Ensure text is always centered
+
     frame.text:ClearAllPoints()
     frame.text:SetPoint("CENTER", frame, "CENTER", 0, 1)
 end
 
----------------------------------------------------------------------------
--- Combat start handler
----------------------------------------------------------------------------
+
 local function OnCombatStart()
     local settings = GetSettings()
     if not settings or not settings.enabled then return end
 
-    -- Don't start combat timer if we're in preview mode
+
     if CombatTimerState.isPreviewMode then return end
 
-    -- If encounters-only mode is enabled and we're not in an encounter, don't show
+
     if settings.onlyShowInEncounters and not CombatTimerState.isInEncounter then
-        CombatTimerState.isInCombat = true  -- Track combat state but don't show timer
+        CombatTimerState.isInCombat = true
         return
     end
 
@@ -321,11 +291,9 @@ local function OnCombatStart()
     end
 end
 
----------------------------------------------------------------------------
--- Combat end handler
----------------------------------------------------------------------------
+
 local function OnCombatEnd()
-    -- Don't hide if in preview mode
+
     if CombatTimerState.isPreviewMode then return end
 
     CombatTimerState.isInCombat = false
@@ -336,19 +304,17 @@ local function OnCombatEnd()
     end
 end
 
----------------------------------------------------------------------------
--- Encounter start handler (boss encounters)
----------------------------------------------------------------------------
+
 local function OnEncounterStart()
     local settings = GetSettings()
     if not settings or not settings.enabled then return end
 
     CombatTimerState.isInEncounter = true
 
-    -- Don't interfere with preview mode
+
     if CombatTimerState.isPreviewMode then return end
 
-    -- If encounters-only mode and we're in combat but timer not shown, show it now
+
     if settings.onlyShowInEncounters and CombatTimerState.isInCombat then
         CreateTimerFrame()
         UpdateTimerAppearance()
@@ -363,33 +329,28 @@ local function OnEncounterStart()
     end
 end
 
----------------------------------------------------------------------------
--- Encounter end handler
----------------------------------------------------------------------------
+
 local function OnEncounterEnd()
     CombatTimerState.isInEncounter = false
 
     local settings = GetSettings()
     if not settings then return end
 
-    -- Don't hide if in preview mode
+
     if CombatTimerState.isPreviewMode then return end
 
-    -- If encounters-only mode is enabled, hide the timer when encounter ends
-    -- (even if still in combat)
+
     if settings.onlyShowInEncounters and CombatTimerState.timerFrame then
         CombatTimerState.timerFrame:SetScript("OnUpdate", nil)
         CombatTimerState.timerFrame:Hide()
     end
 end
 
----------------------------------------------------------------------------
--- Refresh function (called when settings change)
----------------------------------------------------------------------------
+
 local function RefreshCombatTimer()
     local settings = GetSettings()
 
-    -- If disabled and not in preview mode, hide the timer
+
     if (not settings or not settings.enabled) and not CombatTimerState.isPreviewMode then
         CombatTimerState.isInCombat = false
         if CombatTimerState.timerFrame then
@@ -399,13 +360,13 @@ local function RefreshCombatTimer()
         return
     end
 
-    -- Update appearance if settings changed
+
     UpdateTimerAppearance()
 
-    -- If currently in combat (and not preview), make sure it's visible
+
     if InCombatLockdown() and CombatTimerState.timerFrame and not CombatTimerState.isPreviewMode then
         if not CombatTimerState.isInCombat then
-            -- Entered combat while feature was disabled, start now
+
             CombatTimerState.combatStartTime = GetTime()
             CombatTimerState.isInCombat = true
             CombatTimerState.timerFrame.text:SetText("0:00")
@@ -415,9 +376,7 @@ local function RefreshCombatTimer()
     end
 end
 
----------------------------------------------------------------------------
--- Toggle preview mode (for options panel)
----------------------------------------------------------------------------
+
 local function TogglePreview(enable)
     CreateTimerFrame()
     if not CombatTimerState.timerFrame then return end
@@ -425,16 +384,16 @@ local function TogglePreview(enable)
     CombatTimerState.isPreviewMode = enable
 
     if enable then
-        -- Show preview
+
         UpdateTimerAppearance()
         CombatTimerState.timerFrame.text:SetText("01:23")
         CombatTimerState.timerFrame:Show()
-        CombatTimerState.timerFrame:SetScript("OnUpdate", nil)  -- No counting in preview
+        CombatTimerState.timerFrame:SetScript("OnUpdate", nil)
     else
-        -- Hide preview (unless actually in combat with feature enabled)
+
         local settings = GetSettings()
         if settings and settings.enabled and InCombatLockdown() then
-            -- Don't hide, we're in combat with feature enabled
+
             CombatTimerState.isInCombat = true
             CombatTimerState.combatStartTime = GetTime()
             CombatTimerState.timerFrame.text:SetText("0:00")
@@ -450,9 +409,7 @@ local function IsPreviewMode()
     return CombatTimerState.isPreviewMode
 end
 
----------------------------------------------------------------------------
--- Initialize
----------------------------------------------------------------------------
+
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -475,9 +432,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
----------------------------------------------------------------------------
--- Global functions for GUI
----------------------------------------------------------------------------
+
 _G.PreyUI_RefreshCombatTimer = RefreshCombatTimer
 _G.PreyUI_ToggleCombatTimerPreview = TogglePreview
 _G.PreyUI_IsCombatTimerPreviewMode = IsPreviewMode

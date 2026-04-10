@@ -1,4 +1,3 @@
--- Localization file for Russian/Russia
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "ruRU", false, true)
 
 if L then

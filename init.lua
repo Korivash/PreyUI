@@ -1,31 +1,23 @@
---============================================================--
--- PreyUI Initialization
---============================================================--
-
--- Keybinding display name (must be global before Bindings.xml loads)
 BINDING_NAME_PREYUI_TOGGLE_OPTIONS = "Open PreyUI Options"
 
----@type table|AceAddon
+
 PreyUI = LibStub("AceAddon-3.0"):NewAddon("PreyUI", "AceConsole-3.0", "AceEvent-3.0")
 
----@type table<string, string>
+
 PreyUI.L = LibStub("AceLocale-3.0"):GetLocale("PreyUI")
 
 local L = PreyUI.L
 PreyUI.DF = rawget(_G, "DetailsFramework")
 PreyUI.DEBUG_MODE = false
 
---============================================================--
--- Version & Defaults
---============================================================--
 
 PreyUI.versionString = C_AddOns.GetAddOnMetadata("PreyUI", "Version") or "3.0.12"
 
----@type table
+
 PreyUI.defaults = {
     global = {},
     char = {
-        ---@type table
+
         debug = {
             reload = false
         }
@@ -42,28 +34,22 @@ local function AdoptLegacySavedVariables()
     end
 end
 
---============================================================--
--- Initialization
---============================================================--
 
 function PreyUI:OnInitialize()
     AdoptLegacySavedVariables()
 
-    ---@type AceDBObject-3.0
+
     self.db = LibStub("AceDB-3.0"):New("PreyUI_DB", self.defaults, "Default")
 
-    -- Slash Commands
+
     self:RegisterChatCommand("prey", "SlashCommandOpen")
     self:RegisterChatCommand("preyui", "SlashCommandOpen")
     self:RegisterChatCommand("rl", "SlashCommandReload")
 
-    -- Media registration
+
     self:CheckMediaRegistration()
 end
 
---============================================================--
--- Slash Commands
---============================================================--
 
 function PreyUI:SlashCommandOpen(input)
     if input and input == "debug" then
@@ -79,7 +65,7 @@ function PreyUI:SlashCommandOpen(input)
         return
     end
 
-    -- Default: Open GUI
+
     if self.GUI then
         self.GUI:Toggle()
     else
@@ -91,11 +77,7 @@ function PreyUI:SlashCommandReload()
     PreyUI:SafeReload()
 end
 
---============================================================--
--- Keybind Shortcuts
---============================================================--
 
--- Quick Keybind Mode (/kb)
 SLASH_PREYKB1 = "/kb"
 SlashCmdList["PREYKB"] = function()
     local LibKeyBound = LibStub("LibKeyBound-1.0", true)
@@ -108,7 +90,7 @@ SlashCmdList["PREYKB"] = function()
     end
 end
 
--- Cooldown Manager Shortcut (/cdm)
+
 SLASH_PREYUI_CDM1 = "/cdm"
 SlashCmdList["PREYUI_CDM"] = function()
     if CooldownViewerSettings then
@@ -118,14 +100,11 @@ SlashCmdList["PREYUI_CDM"] = function()
     end
 end
 
---============================================================--
--- OnEnable Lifecycle
---============================================================--
 
 function PreyUI:OnEnable()
     self:RegisterEvent("PLAYER_ENTERING_WORLD")
 
-    -- Initialize PREYCore if present
+
     if self.PREYCore then
         if self.db.profile and self.db.profile.chat and self.db.profile.chat.showIntroMessage ~= false then
             print("|cFFB91C1CPreyUI|r loaded. |cFFFFFF00/prey|r to configure.")
@@ -138,14 +117,11 @@ function PreyUI:OnEnable()
     end
 end
 
---============================================================--
--- Player World Entry
---============================================================--
 
 function PreyUI:PLAYER_ENTERING_WORLD(_, isInitialLogin, isReloadingUi)
     self:BackwardsCompat()
 
-    -- Ensure debug table exists
+
     if not self.db.char.debug then
         self.db.char.debug = { reload = false }
     end
@@ -160,23 +136,8 @@ function PreyUI:PLAYER_ENTERING_WORLD(_, isInitialLogin, isReloadingUi)
         self:DebugPrint("Debug Mode Enabled")
     end
 
-    --============================================================--
-    -- Add to Options Menu (NEW)
-    --============================================================--
-    -- In your options registration function:
-    if select(2, UnitClass("player")) == "MONK" then
-        if self.GetStaggerOptions then
-            local options = self:GetOptionsTable()
-            if options and options.args then
-                options.args.stagger = self:GetStaggerOptions()
-            end
-        end
-    end
 end
 
---============================================================--
--- Debug & Helper Functions
---============================================================--
 
 function PreyUI:DebugPrint(...)
     if self.DEBUG_MODE then
@@ -184,9 +145,6 @@ function PreyUI:DebugPrint(...)
     end
 end
 
---============================================================--
--- Addon Compartment Functions
---============================================================--
 
 function PreyUI_CompartmentClick()
     if PreyUI.GUI then

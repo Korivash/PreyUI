@@ -2,16 +2,11 @@ local ADDON_NAME, ns = ...
 local PREYCore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 
----------------------------------------------------------------------------
--- PREY Buff Bar Manager
--- Handles dynamic centering of BuffIconCooldownViewer and BuffBarCooldownViewer
--- Uses hash-based polling + sticky center debounce for stable updates
----------------------------------------------------------------------------
 
 local PREY_BuffBar = {}
 ns.BuffBar = PREY_BuffBar
 
--- Keep addon state out of Blizzard-owned frame/texture tables to reduce taint risk.
+
 local IconMeta = setmetatable({}, { __mode = "k" })
 local BarMeta = setmetatable({}, { __mode = "k" })
 local TextureMeta = setmetatable({}, { __mode = "k" })
@@ -60,9 +55,7 @@ local function GetStableFrameOrder(frame)
     return order
 end
 
----------------------------------------------------------------------------
--- HELPER: Get font from general settings
----------------------------------------------------------------------------
+
 local function GetGeneralFont()
     if PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.general then
         local general = PREYCore.db.profile.general
@@ -79,9 +72,6 @@ local function GetGeneralFontOutline()
     return "OUTLINE"
 end
 
----------------------------------------------------------------------------
--- UTILITY FUNCTIONS
----------------------------------------------------------------------------
 
 local floor = math.floor
 
@@ -90,8 +80,7 @@ local function roundPixel(value)
     return floor(value + 0.5)
 end
 
--- Tolerance-based position check: skip repositioning if within tolerance
--- Prevents jitter from floating-point drift
+
 local abs = math.abs
 local function PositionMatchesTolerance(icon, expectedX, tolerance)
     if not icon then return false end
@@ -100,9 +89,6 @@ local function PositionMatchesTolerance(icon, expectedX, tolerance)
     return abs((xOfs or 0) - expectedX) <= (tolerance or 2)
 end
 
----------------------------------------------------------------------------
--- DATABASE ACCESS
----------------------------------------------------------------------------
 
 local function GetDB()
     if PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.ncdm then
@@ -115,17 +101,17 @@ local function GetBuffSettings()
     local db = GetDB()
     if db and db.buff then
         local buff = db.buff
-        -- Migrate old 'shape' setting to new 'aspectRatioCrop'
+
         if buff.aspectRatioCrop == nil and buff.shape then
             if buff.shape == "rectangle" or buff.shape == "flat" then
-                buff.aspectRatioCrop = 1.33  -- 4:3 aspect ratio
+                buff.aspectRatioCrop = 1.33
             else
-                buff.aspectRatioCrop = 1.0  -- square
+                buff.aspectRatioCrop = 1.0
             end
         end
         return buff
     end
-    -- Return defaults if no DB
+
     return {
         enabled = true,
         iconSize = 42,
@@ -142,7 +128,7 @@ local function GetTrackedBarSettings()
     if db and db.trackedBar then
         return db.trackedBar
     end
-    -- Return defaults if no DB
+
     return {
         enabled = true,
         barHeight = 24,
@@ -158,7 +144,7 @@ local function GetTrackedBarSettings()
         spacing = 4,
         growUp = true,
         hideText = false,
-        -- Vertical bar settings
+
         orientation = "horizontal",
         fillDirection = "up",
         iconPosition = "top",
@@ -166,31 +152,14 @@ local function GetTrackedBarSettings()
     }
 end
 
----------------------------------------------------------------------------
--- FORWARD DECLARATIONS
----------------------------------------------------------------------------
 
 local LayoutBuffIcons
 local LayoutBuffBars
 
----------------------------------------------------------------------------
--- RE-ENTRY GUARDS: Prevent recursive layout calls
----------------------------------------------------------------------------
 
 local isIconLayoutRunning = false
 local isBarLayoutRunning = false
 
----------------------------------------------------------------------------
--- ARCHITECTURE NOTES:
--- - Hash-based change detection: only layout when count OR settings change
--- - Direct centering: immediate layout on count change (no debounce)
--- - 0.05s polling rate (20 FPS) matches proven stable implementations
--- - Per-icon OnShow hooks REMOVED - they caused cascade during rapid changes
----------------------------------------------------------------------------
-
----------------------------------------------------------------------------
--- LAYOUT SUPPRESSION: Prevents recursive layout calls from our own SetSize()
----------------------------------------------------------------------------
 
 local layoutSuppressed = 0
 
@@ -206,9 +175,6 @@ local function IsLayoutSuppressed()
     return layoutSuppressed > 0
 end
 
----------------------------------------------------------------------------
--- ICON FRAME COLLECTION
----------------------------------------------------------------------------
 
 local function GetBuffIconFrames()
     if not BuffIconCooldownViewer then
@@ -219,9 +185,9 @@ local function GetBuffIconFrames()
 
     for _, child in ipairs({ BuffIconCooldownViewer:GetChildren() }) do
         if child then
-            -- Skip Selection frame (Edit Mode)
+
             if child == BuffIconCooldownViewer.Selection then
-                -- Skip
+
             else
                 local hasIcon = child.icon or child.Icon
                 local hasCooldown = child.cooldown or child.Cooldown
@@ -237,7 +203,7 @@ local function GetBuffIconFrames()
         return GetStableFrameOrder(a) < GetStableFrameOrder(b)
     end)
 
-    -- Only keep visible icons with expected icon/cooldown regions.
+
     local visible = {}
     for _, icon in ipairs(all) do
         if icon:IsShown() and (icon.icon or icon.Icon) and (icon.cooldown or icon.Cooldown) then
@@ -248,9 +214,6 @@ local function GetBuffIconFrames()
     return visible
 end
 
----------------------------------------------------------------------------
--- BAR FRAME COLLECTION
----------------------------------------------------------------------------
 
 local function GetBuffBarFrames()
     if not BuffBarCooldownViewer then
@@ -259,7 +222,7 @@ local function GetBuffBarFrames()
 
     local frames = {}
 
-    -- First, try CooldownViewer API if present
+
     if BuffBarCooldownViewer.GetItemFrames then
         local ok, items = pcall(BuffBarCooldownViewer.GetItemFrames, BuffBarCooldownViewer)
         if ok and items then
@@ -267,13 +230,13 @@ local function GetBuffBarFrames()
         end
     end
 
-    -- Fallback to raw children scan
+
     if #frames == 0 then
         local okc, children = pcall(BuffBarCooldownViewer.GetChildren, BuffBarCooldownViewer)
         if okc and children then
             for _, child in ipairs({ children }) do
                 if child and child:IsObjectType("Frame") then
-                    -- Skip Selection frame
+
                     if child ~= BuffBarCooldownViewer.Selection then
                         table.insert(frames, child)
                     end
@@ -282,7 +245,7 @@ local function GetBuffBarFrames()
         end
     end
 
-    -- Filter to active/visible frames
+
     local active = {}
     for _, frame in ipairs(frames) do
         if frame:IsShown() and frame:IsVisible() then
@@ -297,50 +260,43 @@ local function GetBuffBarFrames()
     return active
 end
 
----------------------------------------------------------------------------
--- HELPER: Strip Blizzard's overlay texture (the square artifact)
----------------------------------------------------------------------------
 
 local function StripBlizzardOverlay(icon)
     if not icon or not icon.GetRegions then return end
 
     for _, region in ipairs({ icon:GetRegions() }) do
         if region:IsObjectType("Texture") then
-            -- Check for the specific overlay atlas
+
             if region.GetAtlas then
                 local atlas = region:GetAtlas()
                 if atlas == "UI-HUD-CoolDownManager-IconOverlay" then
                     region:SetTexture("")
                     region:Hide()
-                    region.Show = function() end  -- Prevent it from showing again
+                    region.Show = function() end
                 end
             end
         end
     end
 end
 
----------------------------------------------------------------------------
--- HELPER: Disable atlas-based border textures (debuff type colors, etc.)
--- Hooks SetAtlas to prevent Blizzard from re-applying borders on updates
----------------------------------------------------------------------------
 
 local function DisableAtlasBorder(tex)
     if not tex then return end
 
-    -- Immediately clear everything
+
     if tex.SetAtlas then tex:SetAtlas(nil) end
     if tex.SetTexture then tex:SetTexture(nil) end
     if tex.SetAlpha then tex:SetAlpha(0) end
     if tex.Hide then tex:Hide() end
 
-    -- Hook to re-clear on future SetAtlas calls (Blizzard re-applies on buff updates)
+
     if tex.SetAtlas and not TextureMeta[tex] then
         TextureMeta[tex] = true
         hooksecurefunc(tex, "SetAtlas", function(self)
             C_Timer.After(0, function()
-                -- Safety check in case texture was released before timer fires
+
                 if not self or (self.IsForbidden and self:IsForbidden()) then return end
-                -- Must also clear the atlas, not just texture/alpha
+
                 pcall(function()
                     self:SetAtlas(nil)
                     self:SetTexture(nil)
@@ -352,17 +308,12 @@ local function DisableAtlasBorder(tex)
     end
 end
 
----------------------------------------------------------------------------
--- HELPER: One-time icon setup (mask removal, overlay strip)
--- NOTE: Per-icon OnShow hooks removed - they caused cascade during rapid buff changes
--- Polling at 0.05s + viewer hooks handle detection efficiently
----------------------------------------------------------------------------
 
 local function SetupIconOnce(icon)
     local meta = GetIconMeta(icon)
     if meta.setupDone then return end
 
-    -- Remove ALL of Blizzard's masks (they may have multiple)
+
     local textures = { icon.Icon, icon.icon, icon.texture, icon.Texture }
     for _, tex in ipairs(textures) do
         if tex and tex.GetMaskTexture then
@@ -375,17 +326,17 @@ local function SetupIconOnce(icon)
         end
     end
 
-    -- Hide any NormalTexture border that Blizzard adds
+
     if icon.NormalTexture then icon.NormalTexture:SetAlpha(0) end
     if icon.GetNormalTexture then
         local normalTex = icon:GetNormalTexture()
         if normalTex then normalTex:SetAlpha(0) end
     end
 
-    -- Strip Blizzard's overlay texture
+
     StripBlizzardOverlay(icon)
 
-    -- Disable aura type border textures (debuff colors, buff borders, enchant borders)
+
     DisableAtlasBorder(icon.DebuffBorder)
     DisableAtlasBorder(icon.BuffBorder)
     DisableAtlasBorder(icon.TempEnchantBorder)
@@ -393,9 +344,6 @@ local function SetupIconOnce(icon)
     meta.setupDone = true
 end
 
----------------------------------------------------------------------------
--- HELPER: Apply icon size, aspect ratio, border, and perfect square fix
----------------------------------------------------------------------------
 
 local function ApplyIconStyle(icon, settings)
     if not icon then return end
@@ -407,20 +355,19 @@ local function ApplyIconStyle(icon, settings)
     local zoom = settings.zoom or 0
     local borderSize = settings.borderSize or 2
 
-    -- Calculate dimensions using crop-based aspect ratio
+
     local width, height = size, size
     if aspectRatio > 1.0 then
-        -- Wider: height shrinks
+
         height = size / aspectRatio
     elseif aspectRatio < 1.0 then
-        -- Taller: width shrinks
+
         width = size * aspectRatio
     end
 
     icon:SetSize(width, height)
 
-    -- Create or update border (using BACKGROUND texture to avoid secret value errors during combat)
-    -- BackdropTemplate causes "arithmetic on secret value" crashes when frame is resized during combat
+
     local meta = GetIconMeta(icon)
     if borderSize > 0 then
         if not meta.borderTexture then
@@ -440,21 +387,20 @@ local function ApplyIconStyle(icon, settings)
         meta.borderSize = 0
     end
 
-    -- Calculate texture coordinates (crop-based, no stretching)
-    -- BASE_CROP always applied first to hide Blizzard's grey icon edges
+
     local BASE_CROP = 0.08
     local left, right, top, bottom = BASE_CROP, 1 - BASE_CROP, BASE_CROP, 1 - BASE_CROP
 
-    -- Apply aspect ratio crop ON TOP of base crop (within the already-cropped area)
+
     if aspectRatio > 1.0 then
-        -- Wider: crop MORE from top/bottom
+
         local cropAmount = 1.0 - (1.0 / aspectRatio)
         local availableHeight = bottom - top
         local offset = (cropAmount * availableHeight) / 2.0
         top = top + offset
         bottom = bottom - offset
     elseif aspectRatio < 1.0 then
-        -- Taller: crop MORE from left/right
+
         local cropAmount = 1.0 - aspectRatio
         local availableWidth = right - left
         local offset = (cropAmount * availableWidth) / 2.0
@@ -462,7 +408,7 @@ local function ApplyIconStyle(icon, settings)
         right = right - offset
     end
 
-    -- Apply zoom on top of everything (zooms into center)
+
     if zoom > 0 then
         local centerX = (left + right) / 2.0
         local centerY = (top + bottom) / 2.0
@@ -484,22 +430,22 @@ local function ApplyIconStyle(icon, settings)
         end
     end
 
-    -- Try common texture property names
+
     ProcessTexture(icon.Icon)
     ProcessTexture(icon.icon)
     ProcessTexture(icon.texture)
     ProcessTexture(icon.Texture)
 
-    -- Fix the Cooldown frame
+
     local cooldown = icon.Cooldown or icon.cooldown
     if cooldown then
         cooldown:ClearAllPoints()
         cooldown:SetAllPoints(icon)
-        -- Use simple stretchable texture so swipe fills entire frame
+
         cooldown:SetSwipeTexture("Interface\\Buttons\\WHITE8X8")
         cooldown:SetSwipeColor(0, 0, 0, 0.8)
 
-        -- Show cooldown swipe based on showBuffIconSwipe setting (opt-in, default OFF)
+
         local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
         local showBuffIconSwipe = PREYCore and PREYCore.db and PREYCore.db.profile.cooldownSwipe
             and PREYCore.db.profile.cooldownSwipe.showBuffIconSwipe or false
@@ -511,13 +457,13 @@ local function ApplyIconStyle(icon, settings)
         end
     end
 
-    -- Fix CooldownFlash if it exists
+
     if icon.CooldownFlash then
         icon.CooldownFlash:ClearAllPoints()
         icon.CooldownFlash:SetAllPoints(icon)
     end
 
-    -- Apply text sizes and offsets
+
     local durationSize = settings.durationSize or 12
     local stackSize = settings.stackSize or 12
     local durationOffsetX = settings.durationOffsetX or 0
@@ -527,13 +473,13 @@ local function ApplyIconStyle(icon, settings)
     local stackOffsetY = settings.stackOffsetY or 0
     local stackAnchor = settings.stackAnchor or "BOTTOMRIGHT"
 
-    -- Get font from general settings
+
     local generalFont = GetGeneralFont()
     local generalOutline = GetGeneralFontOutline()
 
-    -- Apply duration text size and offset (cooldown text)
+
     if cooldown and durationSize then
-        -- Method 1: Check for OmniCC text
+
         if cooldown.text then
             cooldown.text:SetFont(generalFont, durationSize, generalOutline)
             pcall(function()
@@ -542,7 +488,7 @@ local function ApplyIconStyle(icon, settings)
             end)
         end
 
-        -- Method 2: Check for Blizzard's built-in cooldown text (GetRegions)
+
         for _, region in ipairs({ cooldown:GetRegions() }) do
             if region:GetObjectType() == "FontString" then
                 region:SetFont(generalFont, durationSize, generalOutline)
@@ -554,10 +500,10 @@ local function ApplyIconStyle(icon, settings)
         end
     end
 
-    -- Apply stack text size using same approach as preycore_main.lua
+
     local fs = nil
 
-    -- 1. ChargeCount (ability charges)
+
     local charge = icon.ChargeCount
     if charge then
         fs = charge.Current or charge.Text or charge.Count or nil
@@ -571,7 +517,7 @@ local function ApplyIconStyle(icon, settings)
         end
     end
 
-    -- 2. Applications (Buff stacks)
+
     if not fs then
         local apps = icon.Applications
         if apps and apps.GetRegions then
@@ -584,7 +530,7 @@ local function ApplyIconStyle(icon, settings)
         end
     end
 
-    -- 3. Fallback: look for named stack text
+
     if not fs and icon.GetRegions then
         for _, region in ipairs({ icon:GetRegions() }) do
             if region:GetObjectType() == "FontString" then
@@ -597,7 +543,7 @@ local function ApplyIconStyle(icon, settings)
         end
     end
 
-    -- Apply the stack size and offset
+
     if fs and stackSize then
         fs:SetFont(generalFont, stackSize, generalOutline)
         pcall(function()
@@ -606,14 +552,11 @@ local function ApplyIconStyle(icon, settings)
         end)
     end
 
-    -- Apply opacity
+
     local opacity = settings.opacity or 1.0
     icon:SetAlpha(opacity)
 end
 
----------------------------------------------------------------------------
--- BAR STYLING (for BuffBarCooldownViewer item cooldowns)
----------------------------------------------------------------------------
 
 local function ApplyBarStyle(frame, settings)
     if not frame then return end
@@ -632,25 +575,24 @@ local function ApplyBarStyle(frame, settings)
     local hideIcon = settings.hideIcon
     local hideText = settings.hideText
 
-    -- Vertical bar settings
+
     local orientation = settings.orientation or "horizontal"
     local isVertical = (orientation == "vertical")
     local fillDirection = settings.fillDirection or "up"
     local iconPosition = settings.iconPosition or "top"
     local showTextOnVertical = settings.showTextOnVertical or false
 
-    -- For vertical bars: swap width/height conceptually
-    -- "Bar Height" setting becomes bar width, "Bar Width" becomes bar height
+
     local frameWidth, frameHeight
     if isVertical then
-        frameWidth = barHeight   -- Height setting becomes width
-        frameHeight = barWidth   -- Width setting becomes height
+        frameWidth = barHeight
+        frameHeight = barWidth
     else
         frameWidth = barWidth
         frameHeight = barHeight
     end
 
-    -- Get the StatusBar child (usually frame.Bar)
+
     local statusBar = frame.Bar
     if not statusBar and frame.GetChildren then
         local okC, children = pcall(frame.GetChildren, frame)
@@ -664,7 +606,7 @@ local function ApplyBarStyle(frame, settings)
         end
     end
 
-    -- 1. STRIP Blizzard's decorative textures from the statusBar (keep only the fill texture)
+
     if statusBar and statusBar.GetRegions then
         pcall(function()
             local mainTex = statusBar:GetStatusBarTexture()
@@ -677,57 +619,57 @@ local function ApplyBarStyle(frame, settings)
         end)
     end
 
-    -- 1b. Disable atlas borders on the bar FRAME itself (debuff type colors like red/purple/green)
+
     DisableAtlasBorder(frame.DebuffBorder)
     DisableAtlasBorder(frame.BuffBorder)
     DisableAtlasBorder(frame.TempEnchantBorder)
 
-    -- 2. Set bar dimensions (swapped for vertical orientation)
+
     pcall(function()
         frame:SetHeight(frameHeight)
         frame:SetWidth(frameWidth)
         if statusBar then
             statusBar:SetHeight(frameHeight)
             statusBar:SetWidth(frameWidth)
-            -- Set StatusBar orientation
+
             if statusBar.SetOrientation then
                 statusBar:SetOrientation(isVertical and "VERTICAL" or "HORIZONTAL")
             end
-            -- Set fill direction for vertical bars
+
             if isVertical and statusBar.SetReverseFill then
                 statusBar:SetReverseFill(fillDirection == "down")
             end
         end
     end)
 
-    -- 3. Handle icon visibility and styling
+
     local iconContainer = frame.Icon
     if iconContainer then
         if hideIcon then
-            -- Hide icon completely when user wants no icon
+
             pcall(function()
                 iconContainer:Hide()
                 iconContainer:SetAlpha(0)
             end)
         else
-            -- Show and style icon with full texture stripping for clean rendering
+
             pcall(function()
                 iconContainer:Show()
                 iconContainer:SetAlpha(1)
 
-                -- Disable atlas borders on iconContainer (prevents thick border reappearance)
+
                 DisableAtlasBorder(iconContainer.DebuffBorder)
                 DisableAtlasBorder(iconContainer.BuffBorder)
                 DisableAtlasBorder(iconContainer.TempEnchantBorder)
 
-                -- Icon size: use the smaller dimension for vertical bars
+
                 local iconSize = isVertical and frameWidth or frameHeight
                 iconContainer:SetSize(iconSize, iconSize)
 
-            -- Get the actual icon texture inside the container
+
             local iconTexture = iconContainer.Icon or iconContainer.icon or iconContainer.texture
             if iconTexture and iconTexture.IsObjectType and iconTexture:IsObjectType("Texture") then
-                -- Step A: Remove ALL mask textures FIRST (iterate through all of them)
+
                 if iconTexture.GetMaskTexture then
                     local i = 1
                     local mask = iconTexture:GetMaskTexture(i)
@@ -738,22 +680,22 @@ local function ApplyBarStyle(frame, settings)
                     end
                 end
 
-                -- Disable cooldown swipe on buff bar icons (bar shows duration, swipe is redundant)
+
                 local cooldown = iconContainer.Cooldown or iconContainer.cooldown
                 if cooldown then
                     if cooldown.SetDrawSwipe then cooldown:SetDrawSwipe(false) end
                     if cooldown.SetDrawEdge then cooldown:SetDrawEdge(false) end
                 end
 
-                -- Step B: Clear anchor points and fill container completely
+
                 iconTexture:ClearAllPoints()
                 iconTexture:SetPoint("TOPLEFT", iconContainer, "TOPLEFT", 0, 0)
                 iconTexture:SetPoint("BOTTOMRIGHT", iconContainer, "BOTTOMRIGHT", 0, 0)
 
-                -- Step C: Apply TexCoord cropping (removes transparent icon border)
+
                 iconTexture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-                -- Step D: Strip ALL sibling textures from iconContainer (removes debuff rings, borders)
+
                 for _, region in ipairs({iconContainer:GetRegions()}) do
                     if region:IsObjectType("Texture") and region ~= iconTexture then
                         region:SetTexture(nil)
@@ -761,11 +703,11 @@ local function ApplyBarStyle(frame, settings)
                     end
                 end
 
-                -- Step E: Also strip any child frames that might contain borders
+
                 if iconContainer.GetChildren then
                     for _, child in ipairs({iconContainer:GetChildren()}) do
                         if child and child ~= iconTexture then
-                            -- Hide border frames but not the cooldown
+
                             local childName = child.GetName and child:GetName() or ""
                             if not childName:find("Cooldown") then
                                 for _, reg in ipairs({child:GetRegions()}) do
@@ -780,13 +722,13 @@ local function ApplyBarStyle(frame, settings)
                 end
             end
 
-            -- Step E2: Hide all text on icon (duration shown by bar, text is redundant)
+
             for _, region in ipairs({iconContainer:GetRegions()}) do
                 if region:IsObjectType("FontString") then
                     region:SetAlpha(0)
                 end
             end
-            -- Also check icon children for text (cooldown timers, count text)
+
             if iconContainer.GetChildren then
                 for _, child in ipairs({iconContainer:GetChildren()}) do
                     if child.GetRegions then
@@ -799,30 +741,30 @@ local function ApplyBarStyle(frame, settings)
                 end
             end
 
-            -- Step F: Hook SetAtlas on icon texture to prevent Blizzard re-applying borders (one-time hook)
+
             if iconTexture and iconTexture.SetAtlas and not iconTexture._preyAtlasHooked then
                 iconTexture._preyAtlasHooked = true
                 hooksecurefunc(iconTexture, "SetAtlas", function(self)
-                    -- Restore TexCoord after any atlas change
+
                     self:SetTexCoord(0.07, 0.93, 0.07, 0.93)
                 end)
             end
         end)
-        end  -- end else (not hideIcon)
+        end
     end
 
-    -- 3b. Reposition statusBar and icon based on orientation and visibility
+
     if statusBar then
         pcall(function()
             statusBar:ClearAllPoints()
 
             if isVertical then
-                -- VERTICAL: Icon at top or bottom, bar fills remaining space
+
                 if hideIcon or not iconContainer then
-                    -- No icon: bar fills entire frame
+
                     statusBar:SetAllPoints(frame)
                 else
-                    -- Position icon based on iconPosition setting
+
                     iconContainer:ClearAllPoints()
                     if iconPosition == "bottom" then
                         iconContainer:SetPoint("BOTTOM", frame, "BOTTOM", 0, 0)
@@ -830,7 +772,7 @@ local function ApplyBarStyle(frame, settings)
                         statusBar:SetPoint("LEFT", frame, "LEFT", 0, 0)
                         statusBar:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
                         statusBar:SetPoint("BOTTOM", iconContainer, "TOP", 0, 0)
-                    else -- "top" (default)
+                    else
                         iconContainer:SetPoint("TOP", frame, "TOP", 0, 0)
                         statusBar:SetPoint("BOTTOM", frame, "BOTTOM", 0, 0)
                         statusBar:SetPoint("LEFT", frame, "LEFT", 0, 0)
@@ -839,7 +781,7 @@ local function ApplyBarStyle(frame, settings)
                     end
                 end
             else
-                -- HORIZONTAL: Original behavior
+
                 if hideIcon or not iconContainer then
                     statusBar:SetPoint("LEFT", frame, "LEFT", 0, 0)
                 else
@@ -852,7 +794,7 @@ local function ApplyBarStyle(frame, settings)
         end)
     end
 
-    -- 4. Apply StatusBar texture
+
     if statusBar and statusBar.SetStatusBarTexture then
         local texturePath = LSM:Fetch("statusbar", texture) or LSM:Fetch("statusbar", "Prey v5")
         if texturePath then
@@ -860,7 +802,7 @@ local function ApplyBarStyle(frame, settings)
         end
     end
 
-    -- 5. Apply bar color (class or custom) with opacity
+
     if statusBar and statusBar.SetStatusBarColor then
         pcall(function()
             if useClassColor then
@@ -876,13 +818,12 @@ local function ApplyBarStyle(frame, settings)
         end)
     end
 
-    -- 6. Apply clean backdrop (solid background BEHIND the statusBar fill)
-    -- Create on the frame itself, positioned behind statusBar
+
     local barMeta = GetBarMeta(frame)
     if not barMeta.bgTexture then
         barMeta.bgTexture = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
     end
-    -- Apply background color from settings
+
     local bgR, bgG, bgB = bgColor[1] or 0, bgColor[2] or 0, bgColor[3] or 0
     barMeta.bgTexture:SetColorTexture(bgR, bgG, bgB, 1)
     if statusBar then
@@ -892,14 +833,13 @@ local function ApplyBarStyle(frame, settings)
     barMeta.bgTexture:SetAlpha(bgOpacity)
     barMeta.bgTexture:Show()
 
-    -- 7. Apply crisp border using 4-edge technique
-    -- Parent to the bar frame itself (not viewer) so it hides when bar hides
+
     if borderSize > 0 then
         if not barMeta.borderContainer then
             local container = CreateFrame("Frame", nil, frame)
             container:SetFrameLevel((frame.GetFrameLevel and frame:GetFrameLevel() or 1) + 5)
 
-            -- Create 4 edge textures
+
             container._top = container:CreateTexture(nil, "OVERLAY", nil, 7)
             container._top:SetColorTexture(0, 0, 0, 1)
             container._bottom = container:CreateTexture(nil, "OVERLAY", nil, 7)
@@ -913,30 +853,30 @@ local function ApplyBarStyle(frame, settings)
         end
 
         local container = barMeta.borderContainer
-        -- Position container to wrap around the bar (extends OUTSIDE by borderSize)
+
         container:ClearAllPoints()
         container:SetPoint("TOPLEFT", frame, "TOPLEFT", -borderSize, borderSize)
         container:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", borderSize, -borderSize)
 
-        -- Top edge
+
         container._top:ClearAllPoints()
         container._top:SetPoint("TOPLEFT", container, "TOPLEFT", 0, 0)
         container._top:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, 0)
         container._top:SetHeight(borderSize)
 
-        -- Bottom edge
+
         container._bottom:ClearAllPoints()
         container._bottom:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 0, 0)
         container._bottom:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", 0, 0)
         container._bottom:SetHeight(borderSize)
 
-        -- Left edge
+
         container._left:ClearAllPoints()
         container._left:SetPoint("TOPLEFT", container, "TOPLEFT", 0, 0)
         container._left:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 0, 0)
         container._left:SetWidth(borderSize)
 
-        -- Right edge
+
         container._right:ClearAllPoints()
         container._right:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, 0)
         container._right:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", 0, 0)
@@ -949,7 +889,7 @@ local function ApplyBarStyle(frame, settings)
         end
     end
 
-    -- 8. Apply text size to duration/name text (hide if hideText enabled or vertical without showTextOnVertical)
+
     local generalFont = GetGeneralFont()
     local generalOutline = GetGeneralFontOutline()
     local showText = not hideText and (not isVertical or showTextOnVertical)
@@ -987,9 +927,6 @@ local function ApplyBarStyle(frame, settings)
     barMeta.styled = true
 end
 
----------------------------------------------------------------------------
--- ICON CENTER MANAGER (PARENT-SYNCHRONIZED & STABILIZED)
----------------------------------------------------------------------------
 
 local iconState = {
     isInitialized = false,
@@ -998,7 +935,7 @@ local iconState = {
 
 LayoutBuffIcons = function()
     if not BuffIconCooldownViewer then return end
-    if isIconLayoutRunning then return end  -- Re-entry guard
+    if isIconLayoutRunning then return end
     if IsLayoutSuppressed() then return end
 
     isIconLayoutRunning = true
@@ -1009,7 +946,7 @@ LayoutBuffIcons = function()
         return
     end
 
-    -- Apply HUD layer priority
+
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     local hudLayering = PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.hudLayering
     local layerPriority = hudLayering and hudLayering.buffIcon or 5
@@ -1021,7 +958,7 @@ LayoutBuffIcons = function()
     local icons = GetBuffIconFrames()
     local currentCount = #icons
 
-    -- Handle empty state
+
     if currentCount == 0 then
         iconState.lastCount = 0
         iconState.isInitialized = false
@@ -1029,19 +966,19 @@ LayoutBuffIcons = function()
         return
     end
 
-    -- Get settings
+
     local iconSize = settings.iconSize or 42
     local padding = settings.padding or 0
     local aspectRatio = settings.aspectRatioCrop or 1.0
     local growthDirection = settings.growthDirection or "CENTERED_HORIZONTAL"
 
-    -- Calculate dimensions using crop-based aspect ratio
+
     local iconWidth, iconHeight = iconSize, iconSize
     if aspectRatio > 1.0 then
-        -- Wider: height shrinks
+
         iconHeight = iconSize / aspectRatio
     elseif aspectRatio < 1.0 then
-        -- Taller: width shrinks
+
         iconWidth = iconSize * aspectRatio
     end
 
@@ -1049,10 +986,10 @@ LayoutBuffIcons = function()
     iconState.lastCount = currentCount
     iconState.isInitialized = true
 
-    -- Determine if vertical or horizontal layout
+
     local isVertical = (growthDirection == "UP" or growthDirection == "DOWN")
 
-    -- Calculate total size using our settings
+
     local totalWidth, totalHeight
     if isVertical then
         totalWidth = iconWidth
@@ -1064,27 +1001,26 @@ LayoutBuffIcons = function()
         totalHeight = iconHeight
     end
 
-    -- Calculate starting position for centering within the viewer
+
     local startX, startY
     if isVertical then
         startX = 0
         if growthDirection == "UP" then
-            -- Grow up: icon 1 at bottom, icons stack upward
+
             startY = -totalHeight / 2 + iconHeight / 2
-        else -- DOWN
-            -- Grow down: icon 1 at top, icons stack downward
+        else
+
             startY = totalHeight / 2 - iconHeight / 2
         end
         startY = roundPixel(startY)
     else
-        -- Horizontal (centered)
+
         startX = -totalWidth / 2 + iconWidth / 2
         startX = roundPixel(startX)
         startY = 0
     end
 
-    -- Tolerance-based check: skip repositioning if all icons are already in correct positions
-    -- Prevents jitter from floating-point drift (allows 2px tolerance)
+
     local needsReposition = false
     for i, icon in ipairs(icons) do
         local expectedX, expectedY
@@ -1092,10 +1028,10 @@ LayoutBuffIcons = function()
             expectedX = 0
             if growthDirection == "UP" then
                 expectedY = roundPixel(startY + (i - 1) * (iconHeight + padding))
-            else -- DOWN
+            else
                 expectedY = roundPixel(startY - (i - 1) * (iconHeight + padding))
             end
-            -- Check Y position for vertical layout
+
             local point, _, _, xOfs, yOfs = icon:GetPoint(1)
             if not point or abs((yOfs or 0) - expectedY) > 2 then
                 needsReposition = true
@@ -1111,20 +1047,20 @@ LayoutBuffIcons = function()
     end
 
     if needsReposition then
-        -- TWO-PASS LAYOUT: Clear all points first, then position - prevents mixed state flicker
-        -- PASS 1: Clear all points first
+
+
         for _, icon in ipairs(icons) do
             icon:ClearAllPoints()
         end
 
-        -- PASS 2: Apply style and position each icon
+
         for i, icon in ipairs(icons) do
             ApplyIconStyle(icon, settings)
             if isVertical then
                 local y
                 if growthDirection == "UP" then
                     y = startY + (i - 1) * (iconHeight + padding)
-                else -- DOWN
+                else
                     y = startY - (i - 1) * (iconHeight + padding)
                 end
                 icon:SetPoint("CENTER", BuffIconCooldownViewer, "CENTER", 0, roundPixel(y))
@@ -1134,20 +1070,19 @@ LayoutBuffIcons = function()
             end
         end
     else
-        -- Positions are correct, just apply styling (skip SetPoint calls)
+
         for _, icon in ipairs(icons) do
             ApplyIconStyle(icon, settings)
         end
     end
 
-    -- Update viewer size to match icon grid (for Edit Mode)
-    -- Wrap with suppression to prevent OnSizeChanged from triggering recursive layouts
+
     if not InCombatLockdown() then
         SuppressLayout()
         BuffIconCooldownViewer:SetSize(roundPixel(totalWidth), roundPixel(totalHeight))
         UnsuppressLayout()
 
-        -- Also resize Selection child if it exists
+
         if BuffIconCooldownViewer.Selection then
             BuffIconCooldownViewer.Selection:ClearAllPoints()
             BuffIconCooldownViewer.Selection:SetPoint("TOPLEFT", BuffIconCooldownViewer, "TOPLEFT", 0, 0)
@@ -1159,9 +1094,6 @@ LayoutBuffIcons = function()
     isIconLayoutRunning = false
 end
 
----------------------------------------------------------------------------
--- BAR ALIGNMENT MANAGER (FORCED UPWARD GROWTH)
----------------------------------------------------------------------------
 
 local barState = {
     lastCount      = 0,
@@ -1172,21 +1104,21 @@ local barState = {
 
 LayoutBuffBars = function()
     if not BuffBarCooldownViewer then return end
-    if isBarLayoutRunning then return end  -- Re-entry guard
+    if isBarLayoutRunning then return end
     if IsLayoutSuppressed() then return end
-    if InCombatLockdown() then return end  -- Protected frame updates are blocked in combat
+    if InCombatLockdown() then return end
 
     isBarLayoutRunning = true
 
-    -- Apply HUD layer priority (strata + level)
+
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     local hudLayering = PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.hudLayering
     local layerPriority = hudLayering and hudLayering.buffBar or 5
-    local frameLevel = 200  -- Default fallback
+    local frameLevel = 200
     if PREYCore and PREYCore.GetHUDFrameLevel then
         frameLevel = PREYCore:GetHUDFrameLevel(layerPriority)
     end
-    -- Avoid protected SetFrameStrata calls on Blizzard cooldown viewers.
+
     BuffBarCooldownViewer:SetFrameLevel(frameLevel)
 
     local bars = GetBuffBarFrames()
@@ -1203,25 +1135,25 @@ LayoutBuffBars = function()
         return
     end
 
-    -- Get tracked bar settings
+
     local settings = GetTrackedBarSettings()
     local stylingEnabled = settings.enabled
 
-    -- Use settings for dimensions if styling enabled, otherwise use frame defaults
+
     local barWidth = refBar:GetWidth()
     local barHeight = stylingEnabled and settings.barHeight or refBar:GetHeight()
     local spacing = stylingEnabled and settings.spacing or 0
     local growFromBottom = (not stylingEnabled) or (settings.growUp ~= false)
 
-    -- Vertical bar support
+
     local orientation = stylingEnabled and settings.orientation or "horizontal"
     local isVertical = (orientation == "vertical")
 
-    -- For vertical bars, swap dimensions (height setting becomes width)
+
     local effectiveBarWidth, effectiveBarHeight
     if isVertical then
-        effectiveBarWidth = barHeight  -- Height setting becomes bar width
-        effectiveBarHeight = stylingEnabled and settings.barWidth or 200  -- Width setting becomes bar height
+        effectiveBarWidth = barHeight
+        effectiveBarHeight = stylingEnabled and settings.barWidth or 200
     else
         effectiveBarWidth = barWidth
         effectiveBarHeight = barHeight
@@ -1237,7 +1169,7 @@ LayoutBuffBars = function()
     barState.lastBarHeight = effectiveBarHeight
     barState.lastSpacing = spacing
 
-    -- Total size of the stack (height for horizontal bars, width for vertical)
+
     local totalSize
     if isVertical then
         totalSize = (count * effectiveBarWidth) + ((count - 1) * spacing)
@@ -1246,15 +1178,13 @@ LayoutBuffBars = function()
     end
     totalSize = roundPixel(totalSize)
 
-    -- POSITION VERIFICATION: Check if bars are already in correct positions (within 2px tolerance)
-    -- This mirrors the icon layout's self-correcting behavior - if Blizzard moves a bar,
-    -- we detect it and snap it back immediately
+
     local needsReposition = false
     for index, bar in ipairs(bars) do
         local offsetIndex = index - 1
 
         if isVertical then
-            -- Check X position for vertical layout
+
             local expectedX
             if growFromBottom then
                 expectedX = roundPixel(offsetIndex * (effectiveBarWidth + spacing))
@@ -1267,7 +1197,7 @@ LayoutBuffBars = function()
                 break
             end
         else
-            -- Check Y position for horizontal layout
+
             local expectedY
             if growFromBottom then
                 expectedY = roundPixel(offsetIndex * (effectiveBarHeight + spacing))
@@ -1283,31 +1213,31 @@ LayoutBuffBars = function()
     end
 
     if needsReposition then
-        -- PASS 1: Clear all points
+
         for _, bar in ipairs(bars) do
             bar:ClearAllPoints()
         end
 
-        -- PASS 2: Position each bar
+
         for index, bar in ipairs(bars) do
             local offsetIndex = index - 1
 
             if isVertical then
-                -- VERTICAL BARS: Stack horizontally (left/right)
+
                 local x
                 if growFromBottom then
-                    -- Grow Right: bar 1 at LEFT edge, stacks rightward
+
                     x = offsetIndex * (effectiveBarWidth + spacing)
                     x = roundPixel(x)
                     bar:SetPoint("LEFT", BuffBarCooldownViewer, "LEFT", x, 0)
                 else
-                    -- Grow Left: bar 1 at RIGHT edge, stacks leftward
+
                     x = -offsetIndex * (effectiveBarWidth + spacing)
                     x = roundPixel(x)
                     bar:SetPoint("RIGHT", BuffBarCooldownViewer, "RIGHT", x, 0)
                 end
             else
-                -- HORIZONTAL BARS: Stack vertically (up/down)
+
                 local y
                 if growFromBottom then
                     y = offsetIndex * (effectiveBarHeight + spacing)
@@ -1322,12 +1252,12 @@ LayoutBuffBars = function()
         end
     end
 
-    -- Apply visual styling and frame strata/level to each bar (always, regardless of reposition)
+
     for _, bar in ipairs(bars) do
         if stylingEnabled then
             ApplyBarStyle(bar, settings)
         end
-        -- Apply frame level to each bar and child regions for HUD layering.
+
         bar:SetFrameLevel(frameLevel)
         if bar.Bar then
             bar.Bar:SetFrameLevel(frameLevel + 1)
@@ -1337,24 +1267,21 @@ LayoutBuffBars = function()
         end
     end
 
-    -- Update container dimensions to prevent Blizzard's Layout() from resizing and causing drift
-    -- Both vertical and horizontal set ONE dimension fixed, letting bars overflow the other dimension
-    -- This prevents CENTER-anchor drift because container size never changes with bar count
+
     if isVertical then
         SuppressLayout()
 
-        -- Only set HEIGHT, leave width alone so bars overflow horizontally
+
         local currentWidth = BuffBarCooldownViewer:GetWidth()
         BuffBarCooldownViewer:SetSize(currentWidth, roundPixel(effectiveBarHeight))
 
         UnsuppressLayout()
     else
-        -- HORIZONTAL BARS: Fix BOTH dimensions to single bar size
-        -- Unlike vertical (which only fixes HEIGHT), horizontal needs both because
-        -- bars anchor to BOTTOM/TOP edges - if HEIGHT changes, those edges move
+
+
         SuppressLayout()
 
-        -- Set both dimensions to single bar size - bars overflow, edges stay fixed
+
         BuffBarCooldownViewer:SetSize(roundPixel(effectiveBarWidth), roundPixel(effectiveBarHeight))
 
         UnsuppressLayout()
@@ -1363,15 +1290,10 @@ LayoutBuffBars = function()
     isBarLayoutRunning = false
 end
 
----------------------------------------------------------------------------
--- CHANGE DETECTION (called from OnUpdate hooks on viewers)
--- Icons: Hash-based detection for count/settings changes
--- Bars: Position verification (hash removed - bars now self-correct via position checks)
----------------------------------------------------------------------------
 
 local lastIconHash = ""
 
--- Build hash of icon count + settings to detect actual changes
+
 local function BuildIconHash(count, settings)
     return string.format("%d_%d_%d_%.2f_%d_%s",
         count,
@@ -1388,7 +1310,7 @@ local function CheckIconChanges()
     if isIconLayoutRunning then return end
     if IsLayoutSuppressed() then return end
 
-    -- Count visible icons
+
     local visibleCount = 0
     for _, child in ipairs({ BuffIconCooldownViewer:GetChildren() }) do
         if child and child ~= BuffIconCooldownViewer.Selection then
@@ -1398,11 +1320,11 @@ local function CheckIconChanges()
         end
     end
 
-    -- Build hash including count AND settings
+
     local settings = GetBuffSettings()
     local hash = BuildIconHash(visibleCount, settings)
 
-    -- Only layout if hash changed (count or settings)
+
     if hash == lastIconHash then
         return
     end
@@ -1413,19 +1335,12 @@ end
 
 local function CheckBarChanges()
     if not BuffBarCooldownViewer then return end
-    if isBarLayoutRunning then return end  -- Skip if already laying out
+    if isBarLayoutRunning then return end
 
-    -- Always call LayoutBuffBars - it now has internal position verification
-    -- that will skip repositioning if all bars are already in correct positions.
-    -- This ensures we catch any position drift caused by Blizzard's Layout()
-    -- even when count/settings haven't changed.
+
     LayoutBuffBars()
 end
 
----------------------------------------------------------------------------
--- FORCE POPULATE: Briefly trigger Edit Mode behavior to load all spells
--- This ensures the buff icons know what spells to display on first load
----------------------------------------------------------------------------
 
 local forcePopulateDone = false
 
@@ -1438,12 +1353,11 @@ local function ForcePopulateBuffIcons()
 
     forcePopulateDone = true
 
-    -- If the viewer has systemInfo with spells, it should auto-populate.
-    -- Just triggering a size change can help force refresh
+
     if not InCombatLockdown() then
         local w, h = viewer:GetSize()
         if w and h and w > 0 and h > 0 then
-            -- Briefly nudge size to trigger internal refresh
+
             pcall(function()
                 viewer:SetSize(w + 0.1, h)
                 C_Timer.After(0.05, function()
@@ -1455,7 +1369,7 @@ local function ForcePopulateBuffIcons()
         end
     end
 
-    -- Force a rescan via PREYCore if available.
+
     if _G.PreyUI and _G.PreyUI.PREYCore then
         local PREYCore = _G.PreyUI.PREYCore
         if PREYCore.ForceRefreshBuffIcons then
@@ -1466,9 +1380,6 @@ local function ForcePopulateBuffIcons()
     end
 end
 
----------------------------------------------------------------------------
--- INITIALIZATION
----------------------------------------------------------------------------
 
 local initialized = false
 
@@ -1476,10 +1387,10 @@ local function Initialize()
     if initialized then return end
     initialized = true
 
-    -- Force populate buff icons first (teaches the viewer what spells to show)
+
     ForcePopulateBuffIcons()
 
-    -- OnUpdate polling at 0.05s (20 FPS) - works alongside UNIT_AURA event detection
+
     if BuffIconCooldownViewer and not GetViewerMeta(BuffIconCooldownViewer).onUpdateHooked then
         local viewerMeta = GetViewerMeta(BuffIconCooldownViewer)
         viewerMeta.onUpdateHooked = true
@@ -1487,7 +1398,7 @@ local function Initialize()
         BuffIconCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
             local meta = GetViewerMeta(self)
             meta.elapsed = (meta.elapsed or 0) + elapsed
-            if meta.elapsed > 0.05 then  -- 20 FPS polling - hash prevents over-layout
+            if meta.elapsed > 0.05 then
                 meta.elapsed = 0
                 if self:IsShown() then
                     CheckIconChanges()
@@ -1503,7 +1414,7 @@ local function Initialize()
         BuffBarCooldownViewer:HookScript("OnUpdate", function(self, elapsed)
             local meta = GetViewerMeta(self)
             meta.elapsed = (meta.elapsed or 0) + elapsed
-            if meta.elapsed > 0.05 then  -- 20 FPS for bars
+            if meta.elapsed > 0.05 then
                 meta.elapsed = 0
                 if self:IsShown() then
                     CheckBarChanges()
@@ -1512,31 +1423,30 @@ local function Initialize()
         end)
     end
 
-    -- CRITICAL: OnSizeChanged hook - immediate response when Blizzard resizes viewer
+
     if BuffIconCooldownViewer then
         BuffIconCooldownViewer:HookScript("OnSizeChanged", function(self)
             if IsLayoutSuppressed() then return end
-            if isIconLayoutRunning then return end  -- Re-entry guard
-            LayoutBuffIcons()  -- Direct call
+            if isIconLayoutRunning then return end
+            LayoutBuffIcons()
         end)
     end
 
-    -- OnShow hook - refresh when viewer becomes visible
+
     if BuffIconCooldownViewer then
         BuffIconCooldownViewer:HookScript("OnShow", function(self)
             if IsLayoutSuppressed() then return end
             if isIconLayoutRunning then return end
-            LayoutBuffIcons()  -- Direct call
+            LayoutBuffIcons()
         end)
     end
 
-    -- Hook Layout - immediate call after Blizzard's layout completes
-    -- hooksecurefunc runs AFTER original function returns, so Blizzard is already done
+
     if BuffIconCooldownViewer and BuffIconCooldownViewer.Layout then
         hooksecurefunc(BuffIconCooldownViewer, "Layout", function()
             if IsLayoutSuppressed() then return end
             if isIconLayoutRunning then return end
-            LayoutBuffIcons()  -- Immediate - no defer needed
+            LayoutBuffIcons()
         end)
     end
 
@@ -1548,10 +1458,6 @@ local function Initialize()
         end)
     end
 
-    ---------------------------------------------------------------------------
-    -- EVENT-BASED UPDATES: UNIT_AURA hook for immediate buff change detection
-    -- (Replaces polling as primary detection - polling becomes fallback only)
-    ---------------------------------------------------------------------------
 
     if BuffIconCooldownViewer and not GetViewerMeta(BuffIconCooldownViewer).auraHook then
         local viewerMeta = GetViewerMeta(BuffIconCooldownViewer)
@@ -1559,16 +1465,16 @@ local function Initialize()
         viewerMeta.auraHook:RegisterEvent("UNIT_AURA")
         viewerMeta.auraHook:SetScript("OnEvent", function(_, event, unit)
             if unit == "player" and BuffIconCooldownViewer:IsShown() then
-                -- Debounce: only queue one rescan per 0.1s window
+
                 if not viewerMeta.rescanPending then
                     viewerMeta.rescanPending = true
                     C_Timer.After(0.1, function()
                         viewerMeta.rescanPending = nil
-                        -- Re-check visibility after timer (viewer may have hidden)
+
                         if BuffIconCooldownViewer:IsShown() then
                             if isIconLayoutRunning then return end
                             if IsLayoutSuppressed() then return end
-                            -- Reset hash to force layout recalculation
+
                             lastIconHash = ""
                             CheckIconChanges()
                         end
@@ -1578,16 +1484,13 @@ local function Initialize()
         end)
     end
 
-    -- Initial layouts (after force populate)
+
     C_Timer.After(0.3, function()
-        LayoutBuffIcons()  -- Direct calls
+        LayoutBuffIcons()
         LayoutBuffBars()
     end)
 end
 
----------------------------------------------------------------------------
--- EVENT HANDLING
----------------------------------------------------------------------------
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
@@ -1596,7 +1499,7 @@ eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
         C_Timer.After(1, Initialize)
-        -- Additional force populate attempts
+
         C_Timer.After(2, ForcePopulateBuffIcons)
         C_Timer.After(4, ForcePopulateBuffIcons)
     elseif event == "PLAYER_ENTERING_WORLD" then
@@ -1604,46 +1507,43 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         if isInitialLogin or isReloadingUi then
             C_Timer.After(1.5, function()
                 ForcePopulateBuffIcons()
-                LayoutBuffIcons()  -- Direct calls
+                LayoutBuffIcons()
                 LayoutBuffBars()
             end)
         end
     elseif event == "PLAYER_REGEN_ENABLED" then
-        -- After combat ends, try to populate if we haven't yet
+
         C_Timer.After(0.5, function()
             ForcePopulateBuffIcons()
-            LayoutBuffIcons()  -- Direct calls
+            LayoutBuffIcons()
             LayoutBuffBars()
         end)
     end
 end)
 
--- Also try to initialize immediately if viewers exist
+
 C_Timer.After(0, function()
     if BuffIconCooldownViewer or BuffBarCooldownViewer then
         Initialize()
     end
 end)
 
----------------------------------------------------------------------------
--- PUBLIC API
----------------------------------------------------------------------------
 
 PREY_BuffBar.LayoutIcons = LayoutBuffIcons
 PREY_BuffBar.LayoutBars = LayoutBuffBars
 PREY_BuffBar.Initialize = Initialize
 
--- Force refresh function (can be called from GUI)
+
 function PREY_BuffBar.Refresh()
-    -- Reset states to force recalculation
+
     iconState.isInitialized = false
     iconState.lastCount = 0
     barState.lastCount = 0
-    lastIconHash = ""  -- Force hash recalculation for icons
+    lastIconHash = ""
 
     LayoutBuffIcons()
     LayoutBuffBars()
 end
 
--- Global refresh function for GUI
+
 _G.PreyUI_RefreshBuffBar = PREY_BuffBar.Refresh

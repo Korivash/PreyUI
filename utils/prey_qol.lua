@@ -1,8 +1,5 @@
 local addonName, ns = ...
 
----------------------------------------------------------------------------
--- QOL AUTOMATION FEATURES
----------------------------------------------------------------------------
 
 local function GetSettings()
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
@@ -14,15 +11,12 @@ end
 
 local qolFrame = CreateFrame("Frame")
 
----------------------------------------------------------------------------
--- MERCHANT: SELL JUNK + AUTO REPAIR
----------------------------------------------------------------------------
 
 local function OnMerchantShow()
     local settings = GetSettings()
     if not settings then return end
 
-    -- Sell gray items
+
     if settings.sellJunk then
         for bag = 0, 4 do
             for slot = 1, C_Container.GetContainerNumSlots(bag) do
@@ -34,7 +28,7 @@ local function OnMerchantShow()
         end
     end
 
-    -- Auto repair (dropdown: "off", "personal", "guild")
+
     local repairMode = settings.autoRepair
     if repairMode and repairMode ~= "off" and CanMerchantRepair() then
         local repairCost = GetRepairAllCost()
@@ -48,9 +42,6 @@ local function OnMerchantShow()
     end
 end
 
----------------------------------------------------------------------------
--- ROLE CHECK: AUTO ACCEPT
----------------------------------------------------------------------------
 
 local function OnRoleCheckShow()
     local settings = GetSettings()
@@ -59,15 +50,12 @@ local function OnRoleCheckShow()
     end
 end
 
----------------------------------------------------------------------------
--- PARTY INVITES: AUTO ACCEPT
----------------------------------------------------------------------------
 
 local function IsFriendOrBNet(name)
     if not name then return false end
-    -- Check regular friends
+
     if C_FriendList.IsFriend(name) then return true end
-    -- Check BattleNet friends (by iterating through them)
+
     local numBNetTotal = BNGetNumFriends()
     for i = 1, numBNetTotal do
         local accountInfo = C_BattleNet.GetFriendAccountInfo(i)
@@ -105,7 +93,7 @@ local function OnPartyInvite(inviterName)
     local settings = GetSettings()
     if not settings then return end
 
-    -- Dropdown: "off", "all", "friends", "guild", "both"
+
     local mode = settings.autoAcceptInvites
     if not mode or mode == "off" then return end
 
@@ -127,9 +115,6 @@ local function OnPartyInvite(inviterName)
     end
 end
 
----------------------------------------------------------------------------
--- QUESTS: AUTO ACCEPT & AUTO TURN-IN
----------------------------------------------------------------------------
 
 local function ShouldPauseQuest(settings)
     return settings.questHoldShift and IsShiftKeyDown()
@@ -148,16 +133,13 @@ local function OnQuestComplete()
     if not settings or not settings.autoTurnInQuest then return end
     if ShouldPauseQuest(settings) then return end
 
-    -- If multiple reward choices exist, let player decide
+
     local numChoices = GetNumQuestChoices()
     if numChoices > 1 then return end
 
     GetQuestReward(numChoices > 0 and 1 or nil)
 end
 
----------------------------------------------------------------------------
--- GOSSIP: AUTO-SELECT SINGLE OPTION
----------------------------------------------------------------------------
 
 local gossipClicked = {}
 
@@ -165,23 +147,23 @@ local function OnGossipShow()
     local settings = GetSettings()
     if not settings or not settings.autoSelectGossip then return end
 
-    -- Shift bypass: let user manually interact (reuse quest shift setting)
+
     if settings.questHoldShift and IsShiftKeyDown() then return end
 
-    -- Get available quests (pickups) and active quests (turnins)
+
     local availableQuests = C_GossipInfo.GetAvailableQuests()
     local numActiveQuests = C_GossipInfo.GetNumActiveQuests()
 
-    -- If quest options exist, don't auto-select gossip
+
     if (availableQuests and #availableQuests > 0) or (numActiveQuests and numActiveQuests > 0) then
         return
     end
 
-    -- Get pure gossip options
+
     local options = C_GossipInfo.GetOptions()
     if not options or #options == 0 then return end
 
-    -- Count valid options to ensure we truly have only one choice
+
     local validOptions = {}
     for _, option in pairs(options) do
         if option.gossipOptionID then
@@ -189,7 +171,7 @@ local function OnGossipShow()
         end
     end
 
-    -- ONLY auto-select when there is exactly 1 option
+
     if #validOptions == 1 then
         local option = validOptions[1]
         local optionID = option.gossipOptionID
@@ -202,17 +184,14 @@ local function OnGossipShow()
             print(string.format("|cFFB91C1CPreyUI:|r %s", optionName))
         end
     end
-    -- If there are multiple options, do NOTHING - let the player choose
-    -- This prevents auto-skipping dialogue/cutscene choices
+
+
 end
 
 local function OnGossipClosed()
     gossipClicked = {}
 end
 
----------------------------------------------------------------------------
--- FAST AUTO LOOT
----------------------------------------------------------------------------
 
 local lootRetryPending = false
 
@@ -230,7 +209,7 @@ local function CheckRemainingLoot()
     local settings = GetSettings()
     if not settings or not settings.fastAutoLoot then return end
 
-    -- Check if any items still remain (handles stuck loot bug)
+
     local numItems = GetNumLootItems()
     for slotIndex = 1, numItems do
         if LootSlotHasItem(slotIndex) then
@@ -244,23 +223,20 @@ local function OnLootReady()
     local settings = GetSettings()
     if not settings or not settings.fastAutoLoot then return end
 
-    -- Auto-enable WoW's auto-loot if our setting is on (lazy init on first loot)
+
     if not GetCVarBool("autoLootDefault") then
         SetCVar("autoLootDefault", "1")
     end
 
     TryLootAll()
 
-    -- Schedule check for stuck items
+
     if not lootRetryPending then
         lootRetryPending = true
         C_Timer.After(0.1, CheckRemainingLoot)
     end
 end
 
----------------------------------------------------------------------------
--- M+ COMBAT LOGGING
----------------------------------------------------------------------------
 
 local wasLoggingBeforeChallenge = false
 
@@ -268,7 +244,7 @@ local function OnChallengeModeStart()
     local settings = GetSettings()
     if not settings or not settings.autoCombatLog then return end
 
-    -- Remember if user already had logging enabled (don't disable their manual logging)
+
     wasLoggingBeforeChallenge = LoggingCombat()
 
     if not wasLoggingBeforeChallenge then
@@ -281,7 +257,7 @@ local function OnChallengeModeEnd()
     local settings = GetSettings()
     if not settings or not settings.autoCombatLog then return end
 
-    -- Only stop if WE started it (don't disable user's manual logging)
+
     if not wasLoggingBeforeChallenge and LoggingCombat() then
         LoggingCombat(false)
         print("|cFFB91C1CPreyUI:|r Combat logging stopped")
@@ -289,7 +265,7 @@ local function OnChallengeModeEnd()
     wasLoggingBeforeChallenge = false
 end
 
--- Handle reconnect: if in active M+ and setting enabled, resume logging
+
 local function CheckResumeLogging()
     local settings = GetSettings()
     if not settings or not settings.autoCombatLog then return end
@@ -300,9 +276,6 @@ local function CheckResumeLogging()
     end
 end
 
----------------------------------------------------------------------------
--- DELETE CONFIRMATION: AUTO-FILL
----------------------------------------------------------------------------
 
 local deletePopups = {
     ["DELETE_ITEM"] = true,
@@ -317,28 +290,25 @@ hooksecurefunc("StaticPopup_Show", function(which)
     local settings = GetSettings()
     if not settings or not settings.autoDeleteConfirm then return end
 
-    -- Find the popup frame that's showing this dialog
+
     for i = 1, STATICPOPUP_NUMDIALOGS or 4 do
         local frame = rawget(_G, "StaticPopup" .. i)
         if frame and frame.which == which and frame:IsShown() then
             local editBox = frame.editBox or rawget(_G, "StaticPopup" .. i .. "EditBox")
             if editBox then
                 editBox:SetText(DELETE_ITEM_CONFIRM_STRING or "DELETE")
-                -- Trigger OnTextChanged to enable the confirm button
+
                 local handler = editBox:GetScript("OnTextChanged")
                 if handler then
                     handler(editBox)
                 end
-                -- Note: Cannot auto-click - DeleteCursorItem() is protected
+
             end
             break
         end
     end
 end)
 
----------------------------------------------------------------------------
--- EVENT REGISTRATION
----------------------------------------------------------------------------
 
 qolFrame:RegisterEvent("MERCHANT_SHOW")
 qolFrame:RegisterEvent("LFG_ROLE_CHECK_SHOW")

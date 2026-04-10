@@ -1,14 +1,9 @@
--- PreyUI Rebuild Layer
--- Replaces legacy options shell with the rebuilt PreyUI layout.
-
 local PREY = PreyUI
 if not PREY or not PREY.GUI then return end
 
 local GUI = PREY.GUI
 
--- ---------------------------------------------------------------------------
--- Brand + Theme
--- ---------------------------------------------------------------------------
+
 GUI.Brand = {
     product = "PreyUI",
     subtitle = "Version",
@@ -65,9 +60,7 @@ local function UseTitleFont(fs, size, color)
     end
 end
 
--- ---------------------------------------------------------------------------
--- New shell frame
--- ---------------------------------------------------------------------------
+
 function GUI:CreateMainFrame()
     if self.MainFrame then
         return self.MainFrame

@@ -1,26 +1,17 @@
---[[
-    PreyUI Options Pages
-    Top-down flow layout for the /prey GUI
-    Single scrollable content area per tab
-]]
-
 local ADDON_NAME, ns = ...
 local PREY = PreyUI
 local GUI = PREY.GUI
 local PREYCore = ns.Addon
 local C = GUI.Colors
 
----------------------------------------------------------------------------
--- CONSTANTS - Match panel width (750px panel)
----------------------------------------------------------------------------
--- local CONTENT_WIDTH = 670  -- No longer used - scroll content now dynamically sizes
+
 local ROW_GAP = 28
 local SECTION_GAP = 38
-local SECTION_HEADER_GAP = 46  -- Section header height + spacing below underline
-local PADDING = 15  -- Standard left/right padding for all content
-local SLIDER_HEIGHT = 65  -- Standard height for slider widgets
+local SECTION_HEADER_GAP = 46
+local PADDING = 15
+local SLIDER_HEIGHT = 65
 
--- Nine-point anchor options (used for UI element positioning)
+
 local NINE_POINT_ANCHOR_OPTIONS = {
     {value = "TOPLEFT", text = "Top Left"},
     {value = "TOP", text = "Top"},
@@ -47,34 +38,34 @@ local function GetTextureList()
     return textures
 end
 
--- Hidden frame for pre-warming fonts (forces WoW to load font files)
+
 local fontPrewarmFrame = nil
 
 local function GetFontList()
     local fonts = {}
     if LSM then
-        -- Create a hidden frame for pre-warming fonts if needed
+
         if not fontPrewarmFrame then
             fontPrewarmFrame = CreateFrame("Frame", nil, UIParent)
             fontPrewarmFrame:SetSize(1, 1)
-            fontPrewarmFrame:SetPoint("TOPLEFT", -9999, 9999)  -- Off-screen
+            fontPrewarmFrame:SetPoint("TOPLEFT", -9999, 9999)
             fontPrewarmFrame.text = fontPrewarmFrame:CreateFontString(nil, "OVERLAY")
             fontPrewarmFrame.text:SetPoint("CENTER")
-            fontPrewarmFrame.text:SetFont("Fonts\\FRIZQT__.TTF", 12, "")  -- Set default font first
-            fontPrewarmFrame.text:SetText("A")  -- Need some text for font to load
+            fontPrewarmFrame.text:SetFont("Fonts\\FRIZQT__.TTF", 12, "")
+            fontPrewarmFrame.text:SetText("A")
         end
 
         for _, name in ipairs(LSM:List("font")) do
             local path = LSM:Fetch("font", name) or ""
             local pathLower = path:lower()
 
-            -- Only allow fonts from WoW defaults, PreyUI, or SharedMedia
+
             local isWoWFont = pathLower:find("^fonts\\") ~= nil or pathLower:find("^fonts/") ~= nil
             local isPreyFont = pathLower:find("preyui") ~= nil
             local isSharedMediaFont = pathLower:find("sharedmedia") ~= nil
 
             if (isWoWFont or isPreyFont or isSharedMediaFont) and path ~= "" then
-                -- Pre-warm the font by actually applying it (forces WoW to load the font file)
+
                 local success = pcall(function()
                     fontPrewarmFrame.text:SetFont(path, 12, "")
                 end)
@@ -99,21 +90,19 @@ local function GetBorderList()
     return borders
 end
 
----------------------------------------------------------------------------
--- HELPER: Create scrollable content frame
----------------------------------------------------------------------------
+
 local function CreateScrollableContent(parent)
     local scrollFrame = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", 5, -5)
     scrollFrame:SetPoint("BOTTOMRIGHT", -28, 5)
 
     local content = CreateFrame("Frame", nil, scrollFrame)
-    content:SetWidth(scrollFrame:GetWidth())  -- Dynamic width based on scroll frame
+    content:SetWidth(scrollFrame:GetWidth())
     content:SetHeight(1)
     scrollFrame:SetScrollChild(content)
-    content._hasContent = false  -- Track if any content added (for auto-spacing)
+    content._hasContent = false
 
-    -- Update content width when scroll frame resizes (for panel resize support)
+
     scrollFrame:SetScript("OnSizeChanged", function(self, width, height)
         content:SetWidth(width)
     end)
@@ -123,19 +112,19 @@ local function CreateScrollableContent(parent)
         scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 4, -16)
         scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 4, 16)
 
-        -- Style the thumb (safe operation)
+
         local thumb = scrollBar:GetThumbTexture()
         if thumb then
-            thumb:SetColorTexture(0.35, 0.45, 0.5, 0.8)  -- Subtle grey-blue
+            thumb:SetColorTexture(0.35, 0.45, 0.5, 0.8)
         end
 
-        -- Hide arrow buttons (modern best practice)
+
         local scrollUp = scrollBar.ScrollUpButton or scrollBar.Back
         local scrollDown = scrollBar.ScrollDownButton or scrollBar.Forward
         if scrollUp then scrollUp:Hide(); scrollUp:SetAlpha(0) end
         if scrollDown then scrollDown:Hide(); scrollDown:SetAlpha(0) end
 
-        -- Auto-hide scrollbar when not needed
+
         scrollBar:HookScript("OnShow", function(self)
             C_Timer.After(0.066, function()
                 local maxScroll = scrollFrame:GetVerticalScrollRange()
@@ -149,9 +138,7 @@ local function CreateScrollableContent(parent)
     return scrollFrame, content
 end
 
----------------------------------------------------------------------------
--- HELPER: Get database safely
----------------------------------------------------------------------------
+
 local function GetDB()
     if PREYCore and PREYCore.db and PREYCore.db.profile then
         return PREYCore.db.profile
@@ -173,8 +160,8 @@ end
 
 local function RefreshUnitFrames(unit)
     if PREYCore and PREYCore.UnitFrames then
-        -- If unit is a string (valid unit name), update that specific frame
-        -- Otherwise (nil, boolean from checkbox, etc.), refresh all frames
+
+
         if type(unit) == "string" then
             PREYCore.UnitFrames:UpdateUnitFrame(unit)
         else
@@ -189,38 +176,36 @@ local function RefreshBuffBorders()
     end
 end
 
----------------------------------------------------------------------------
--- PAGE: General & QoL
----------------------------------------------------------------------------
+
 local function CreateGeneralQoLPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
 
-    -- Refresh callback for crosshair
+
     local function RefreshCrosshair()
         if _G.PreyUI_RefreshCrosshair then
             _G.PreyUI_RefreshCrosshair()
         end
     end
 
-    -- Refresh callback for reticle
+
     local function RefreshReticle()
         if _G.PreyUI_RefreshReticle then
             _G.PreyUI_RefreshReticle()
         end
     end
 
-    -- Refresh callback for fonts/textures (refreshes everything that uses these defaults)
+
     local function RefreshAll()
-        -- Refresh core CDM viewers
+
         if PREYCore and PREYCore.RefreshAll then
             PREYCore:RefreshAll()
         end
-        -- Refresh unit frames (use global function)
+
         if _G.PreyUI_RefreshUnitFrames then
             _G.PreyUI_RefreshUnitFrames()
         end
-        -- Refresh power bars (recreate to apply new fonts/textures)
+
         if PREYCore then
             if PREYCore.UpdatePowerBar then
                 PREYCore:UpdatePowerBar()
@@ -229,19 +214,19 @@ local function CreateGeneralQoLPage(parent)
                 PREYCore:UpdateSecondaryPowerBar()
             end
         end
-        -- Refresh minimap/datatext
+
         if PREYCore and PREYCore.Minimap and PREYCore.Minimap.Refresh then
             PREYCore.Minimap:Refresh()
         end
-        -- Refresh buff borders
+
         if _G.PreyUI_RefreshBuffBorders then
             _G.PreyUI_RefreshBuffBorders()
         end
-        -- Refresh NCDM (CDM icons)
+
         if ns and ns.NCDM and ns.NCDM.RefreshAll then
             ns.NCDM:RefreshAll()
         end
-        -- Trigger CDM layout refresh
+
         C_Timer.After(0.1, function()
             if PREYCore and PREYCore.ApplyViewerLayout then
                 PREYCore:ApplyViewerLayout("EssentialCooldownViewer")
@@ -250,17 +235,15 @@ local function CreateGeneralQoLPage(parent)
         end)
     end
 
-    -- =====================================================
-    -- SUB-TAB: GENERAL
-    -- =====================================================
+
     local function BuildGeneralTab(tabContent)
         local y = -10
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 1, subTabName = "General"})
 
-        -- UI Scale Section
+
         GUI:SetSearchSection("UI Scale")
         local scaleHeader = GUI:CreateSectionHeader(tabContent, "UI Scale")
         scaleHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -276,7 +259,7 @@ local function CreateGeneralQoLPage(parent)
             scaleSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Quick preset buttons
+
             local presetLabel = GUI:CreateLabel(tabContent, "Quick UI Scale Presets:", 12, C.text)
             presetLabel:SetPoint("TOPLEFT", PADDING, y)
 
@@ -297,7 +280,7 @@ local function CreateGeneralQoLPage(parent)
                 ApplyPreset(scale, "Auto")
             end
 
-            -- Button container aligned with slider track (180px) to editbox right edge
+
             local buttonContainer = CreateFrame("Frame", nil, tabContent)
             buttonContainer:SetPoint("LEFT", scaleSlider, "LEFT", 180, 0)
             buttonContainer:SetPoint("RIGHT", scaleSlider, "RIGHT", 0, 0)
@@ -308,14 +291,14 @@ local function CreateGeneralQoLPage(parent)
             local NUM_BUTTONS = 5
             local buttons = {}
 
-            -- Create buttons with placeholder width (will be set dynamically)
+
             buttons[1] = GUI:CreateButton(buttonContainer, "1080p", 50, 26, function() ApplyPreset(0.7111111, "1080p") end)
             buttons[2] = GUI:CreateButton(buttonContainer, "1440p", 50, 26, function() ApplyPreset(0.5333333, "1440p") end)
             buttons[3] = GUI:CreateButton(buttonContainer, "1440p+", 50, 26, function() ApplyPreset(0.64, "1440p+") end)
             buttons[4] = GUI:CreateButton(buttonContainer, "4K", 50, 26, function() ApplyPreset(0.3555556, "4K") end)
             buttons[5] = GUI:CreateButton(buttonContainer, "Auto", 50, 26, AutoScale)
 
-            -- Dynamically size and position buttons when container width is known
+
             buttonContainer:SetScript("OnSizeChanged", function(self, width)
                 if width and width > 0 then
                     local buttonWidth = (width - (NUM_BUTTONS - 1) * BUTTON_GAP) / NUM_BUTTONS
@@ -331,7 +314,7 @@ local function CreateGeneralQoLPage(parent)
                 end
             end)
 
-            -- Tooltip data for preset buttons
+
             local tooltipData = {
                 { title = "1080p", desc = "Scale: 0.7111111\nPixel-perfect for 1920×1080" },
                 { title = "1440p", desc = "Scale: 0.5333333\nPixel-perfect for 2560×1440" },
@@ -340,7 +323,7 @@ local function CreateGeneralQoLPage(parent)
                 { title = "Auto", desc = "Computes pixel-perfect scale based on your resolution.\nFormula: 768 ÷ screen height" },
             }
 
-            -- Add tooltips to buttons
+
             for i, btn in ipairs(buttons) do
                 local data = tooltipData[i]
                 btn:HookScript("OnEnter", function(self)
@@ -356,14 +339,14 @@ local function CreateGeneralQoLPage(parent)
 
             y = y - FORM_ROW - 6
 
-            -- Single summary line (cleaner than 5 separate description lines)
+
             local presetSummary = GUI:CreateLabel(tabContent,
                 "Hover over any preset for details. 1440p+ is Prey's personal setting.",
                 11, C.textMuted)
             presetSummary:SetPoint("TOPLEFT", PADDING, y)
             y = y - 20
 
-            -- Big picture advice
+
             local bigPicture = GUI:CreateLabel(tabContent,
                 "UI scale is highly personal—it depends on your monitor size, resolution, and preference. If you already have a scale you like from years of playing WoW, stick with it. These presets are just common values people tend to use.",
                 11, C.textMuted)
@@ -373,7 +356,7 @@ local function CreateGeneralQoLPage(parent)
             y = y - 36
         end
 
-        -- Default Font Section
+
         GUI:SetSearchSection("Default Font Settings")
         local fontTexHeader = GUI:CreateSectionHeader(tabContent, "Default Font Settings")
         fontTexHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -415,7 +398,7 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
-        -- Combat Status Text Indicator Section
+
         local combatTextHeader = GUI:CreateSectionHeader(tabContent, "Combat Status Text Indicator")
         combatTextHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - combatTextHeader.gap
@@ -430,7 +413,7 @@ local function CreateGeneralQoLPage(parent)
         combatTextDesc:SetHeight(15)
         y = y - 25
 
-        -- Preview buttons
+
         local previewEnterBtn = GUI:CreateButton(tabContent, "Preview +Combat", 140, 28, function()
             if _G.PreyUI_PreviewCombatText then _G.PreyUI_PreviewCombatText("+Combat") end
         end)
@@ -506,7 +489,7 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
-        -- Combat Timer Section
+
         local combatTimerHeader = GUI:CreateSectionHeader(tabContent, "Combat Timer")
         combatTimerHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - combatTimerHeader.gap
@@ -530,7 +513,7 @@ local function CreateGeneralQoLPage(parent)
             combatTimerCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Encounters-only mode toggle
+
             local encountersOnlyCheck = GUI:CreateFormCheckbox(tabContent, "Only Show In Encounters", "onlyShowInEncounters", combatTimerDB, function(val)
                 if _G.PreyUI_RefreshCombatTimer then _G.PreyUI_RefreshCombatTimer() end
             end)
@@ -538,7 +521,7 @@ local function CreateGeneralQoLPage(parent)
             encountersOnlyCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Preview toggle
+
             local previewState = { enabled = _G.PreyUI_IsCombatTimerPreviewMode and _G.PreyUI_IsCombatTimerPreviewMode() or false }
             local previewCheck = GUI:CreateFormCheckbox(tabContent, "Preview Combat Timer", "enabled", previewState, function(val)
                 if _G.PreyUI_ToggleCombatTimerPreview then
@@ -549,7 +532,7 @@ local function CreateGeneralQoLPage(parent)
             previewCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Frame size settings
+
             local timerWidthSlider = GUI:CreateFormSlider(tabContent, "Frame Width", 40, 200, 1, "width", combatTimerDB, function()
                 if _G.PreyUI_RefreshCombatTimer then _G.PreyUI_RefreshCombatTimer() end
             end)
@@ -585,12 +568,12 @@ local function CreateGeneralQoLPage(parent)
             timerYOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Text color with class color toggle
-            local timerColorPicker  -- Forward declare
+
+            local timerColorPicker
 
             local useClassColorTextCheck = GUI:CreateFormCheckbox(tabContent, "Use Class Color for Text", "useClassColorText", combatTimerDB, function(val)
                 if _G.PreyUI_RefreshCombatTimer then _G.PreyUI_RefreshCombatTimer() end
-                -- Enable/disable text color picker based on toggle
+
                 if timerColorPicker and timerColorPicker.SetEnabled then
                     timerColorPicker:SetEnabled(not val)
                 end
@@ -604,20 +587,19 @@ local function CreateGeneralQoLPage(parent)
             end)
             timerColorPicker:SetPoint("TOPLEFT", PADDING, y)
             timerColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            -- Initial state based on setting
+
             if timerColorPicker.SetEnabled then
                 timerColorPicker:SetEnabled(not combatTimerDB.useClassColorText)
             end
             y = y - FORM_ROW
 
-            -- Font selection with custom toggle
-            -- Create font dropdown first, then the toggle (so toggle callback can reference it)
+
             local fontList = GetFontList()
-            local timerFontDropdown  -- Forward declare
+            local timerFontDropdown
 
             local useCustomFontCheck = GUI:CreateFormCheckbox(tabContent, "Use Custom Font", "useCustomFont", combatTimerDB, function(val)
                 if _G.PreyUI_RefreshCombatTimer then _G.PreyUI_RefreshCombatTimer() end
-                -- Enable/disable font dropdown based on toggle
+
                 if timerFontDropdown and timerFontDropdown.SetEnabled then
                     timerFontDropdown:SetEnabled(val)
                 end
@@ -631,17 +613,17 @@ local function CreateGeneralQoLPage(parent)
             end)
             timerFontDropdown:SetPoint("TOPLEFT", PADDING, y)
             timerFontDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            -- Limit dropdown height to 8 items (scrollable)
+
             if timerFontDropdown.menuFrame then
                 timerFontDropdown.menuFrame:SetClipsChildren(true)
             end
-            -- Initial state based on setting
+
             if timerFontDropdown.SetEnabled then
                 timerFontDropdown:SetEnabled(combatTimerDB.useCustomFont == true)
             end
             y = y - FORM_ROW
 
-            -- Backdrop settings
+
             local backdropCheck = GUI:CreateFormCheckbox(tabContent, "Show Backdrop", "showBackdrop", combatTimerDB, function(val)
                 if _G.PreyUI_RefreshCombatTimer then _G.PreyUI_RefreshCombatTimer() end
             end)
@@ -656,22 +638,21 @@ local function CreateGeneralQoLPage(parent)
             backdropColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Border settings
-            -- Forward declare border controls so hide toggle can reference them
+
             local borderSizeSlider, borderTextureDropdown, useClassColorCheck, borderColorPicker
 
-            -- Helper to update all border control states
+
             local function UpdateBorderControlsEnabled(enabled)
                 if borderSizeSlider and borderSizeSlider.SetEnabled then borderSizeSlider:SetEnabled(enabled) end
                 if borderTextureDropdown and borderTextureDropdown.SetEnabled then borderTextureDropdown:SetEnabled(enabled) end
                 if useClassColorCheck and useClassColorCheck.SetEnabled then useClassColorCheck:SetEnabled(enabled) end
-                -- Border color picker is enabled if borders are shown AND class color is not used
-                if borderColorPicker and borderColorPicker.SetEnabled then 
+
+                if borderColorPicker and borderColorPicker.SetEnabled then
                     borderColorPicker:SetEnabled(enabled and not combatTimerDB.useClassColorBorder)
                 end
             end
 
-            -- Hide Border toggle
+
             local hideBorderCheck = GUI:CreateFormCheckbox(tabContent, "Hide Border", "hideBorder", combatTimerDB, function(val)
                 if _G.PreyUI_RefreshCombatTimer then _G.PreyUI_RefreshCombatTimer() end
                 UpdateBorderControlsEnabled(not val)
@@ -695,10 +676,10 @@ local function CreateGeneralQoLPage(parent)
             borderTextureDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Class color border toggle
+
             useClassColorCheck = GUI:CreateFormCheckbox(tabContent, "Use Class Color for Border", "useClassColorBorder", combatTimerDB, function(val)
                 if _G.PreyUI_RefreshCombatTimer then _G.PreyUI_RefreshCombatTimer() end
-                -- Enable/disable border color picker based on toggle (only if borders are shown)
+
                 if borderColorPicker and borderColorPicker.SetEnabled then
                     borderColorPicker:SetEnabled(not val and not combatTimerDB.hideBorder)
                 end
@@ -714,14 +695,14 @@ local function CreateGeneralQoLPage(parent)
             borderColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Set initial enabled states based on current settings
+
             local bordersVisible = not combatTimerDB.hideBorder
             UpdateBorderControlsEnabled(bordersVisible)
         end
 
         y = y - 10
 
-        -- Automation Section
+
         local autoHeader = GUI:CreateSectionHeader(tabContent, "Automation")
         autoHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - autoHeader.gap
@@ -816,7 +797,7 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
-        -- Missing Raid Buffs Section
+
         local raidBuffsHeader = GUI:CreateSectionHeader(tabContent, "Missing Raid Buffs")
         raidBuffsHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - raidBuffsHeader.gap
@@ -829,13 +810,13 @@ local function CreateGeneralQoLPage(parent)
         raidBuffsDesc:SetHeight(20)
         y = y - 30
 
-        -- Ensure raidBuffs settings exist
+
         if not db.raidBuffs then
             db.raidBuffs = { enabled = true, showOnlyInGroup = true, showOnlyInInstance = false, providerMode = false, hideLabelBar = false, iconSize = 32, labelFontSize = 12, labelTextColor = nil, position = nil }
         end
         local rbDB = db.raidBuffs
 
-        -- Refresh function for live preview
+
         local function RefreshRaidBuffs()
             if ns.RaidBuffs and ns.RaidBuffs.ForceUpdate then
                 ns.RaidBuffs:ForceUpdate()
@@ -894,19 +875,19 @@ local function CreateGeneralQoLPage(parent)
         rbTextColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- Disable color picker when label bar is hidden (color is irrelevant)
+
         local function UpdateColorPickerState()
             local isHidden = rbDB.hideLabelBar
             if rbTextColorPicker.SetEnabled then
                 rbTextColorPicker:SetEnabled(not isHidden)
             end
-            -- Visual feedback: dim the control when disabled
+
             rbTextColorPicker:SetAlpha(isHidden and 0.5 or 1.0)
         end
         rbHideLabelCheck.track:HookScript("OnClick", UpdateColorPickerState)
-        UpdateColorPickerState()  -- Set initial state
+        UpdateColorPickerState()
 
-        -- Preview toggle button
+
         local previewBtn = GUI:CreateButton(tabContent, "Toggle Preview", 120, 24)
         previewBtn:SetPoint("TOPLEFT", PADDING, y)
         previewBtn:SetScript("OnClick", function()
@@ -919,7 +900,7 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
-        -- Quick Salvage Section
+
         local quickSalvageHeader = GUI:CreateSectionHeader(tabContent, "Quick Salvage")
         quickSalvageHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - quickSalvageHeader.gap
@@ -934,7 +915,7 @@ local function CreateGeneralQoLPage(parent)
         quickSalvageDesc:SetHeight(20)
         y = y - 30
 
-        -- Ensure quickSalvage settings exist
+
         if not db.general.quickSalvage then
             db.general.quickSalvage = { enabled = false, modifier = "ALT" }
         end
@@ -971,7 +952,7 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
-        -- M+ Dungeons Section
+
         local mplusHeader = GUI:CreateSectionHeader(tabContent, "M+ Dungeons")
         mplusHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - mplusHeader.gap
@@ -1010,7 +991,7 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
-        -- Others Section
+
         local othersHeader = GUI:CreateSectionHeader(tabContent, "Others")
         othersHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - othersHeader.gap
@@ -1046,17 +1027,15 @@ local function CreateGeneralQoLPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- =====================================================
-    -- SUB-TAB: HUD VISIBILITY
-    -- =====================================================
+
     local function BuildHUDVisibilityTab(tabContent)
         local y = -10
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 2, subTabName = "HUD Visibility"})
 
-        -- Ensure cdmVisibility settings exist
+
         if not db.cdmVisibility then db.cdmVisibility = {} end
         local cdmVis = db.cdmVisibility
         if cdmVis.showAlways == nil then cdmVis.showAlways = true end
@@ -1074,7 +1053,7 @@ local function CreateGeneralQoLPage(parent)
             end
         end
 
-        -- CDM Visibility Section
+
         local cdmHeader = GUI:CreateSectionHeader(tabContent, "CDM Visibility")
         cdmHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - cdmHeader.gap
@@ -1173,7 +1152,7 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
-        -- Unitframes Visibility Section
+
         if not db.unitframesVisibility then db.unitframesVisibility = {} end
         local ufVis = db.unitframesVisibility
         if ufVis.showAlways == nil then ufVis.showAlways = true end
@@ -1294,9 +1273,7 @@ local function CreateGeneralQoLPage(parent)
         ufMountedHint:SetJustifyH("LEFT")
         y = y - 20
 
-        -- =====================================================
-        -- CUSTOM TRACKERS VISIBILITY SECTION
-        -- =====================================================
+
         if not db.customTrackersVisibility then db.customTrackersVisibility = {} end
         local ctVis = db.customTrackersVisibility
         if ctVis.showAlways == nil then ctVis.showAlways = true end
@@ -1413,17 +1390,15 @@ local function CreateGeneralQoLPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- =====================================================
-    -- SUB-TAB: CURSOR & CROSSHAIR
-    -- =====================================================
+
     local function BuildCrosshairTab(tabContent)
         local y = -10
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 3, subTabName = "Cursor & Crosshair"})
 
-        -- ========== CURSOR RING SECTION (before crosshair) ==========
+
         local cursorHeader = GUI:CreateSectionHeader(tabContent, "Cursor Ring")
         cursorHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - cursorHeader.gap
@@ -1436,7 +1411,7 @@ local function CreateGeneralQoLPage(parent)
             enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Reticle Style dropdown
+
             local reticleOptions = {
                 {value = "dot", text = "Dot"},
                 {value = "cross", text = "Cross"},
@@ -1453,7 +1428,7 @@ local function CreateGeneralQoLPage(parent)
             reticleSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Ring Style dropdown
+
             local ringStyleOptions = {
                 {value = "thin", text = "Thin"},
                 {value = "standard", text = "Standard"},
@@ -1495,8 +1470,8 @@ local function CreateGeneralQoLPage(parent)
             hideOOCCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- GCD Settings sub-section
-            y = y - 10  -- Extra spacing before sub-section
+
+            y = y - 10
             local gcdLabel = GUI:CreateLabel(tabContent, "GCD Settings", 12, C.accent)
             gcdLabel:SetPoint("TOPLEFT", PADDING, y)
             y = y - 20
@@ -1529,9 +1504,9 @@ local function CreateGeneralQoLPage(parent)
             y = y - 40
         end
 
-        y = y - 20  -- Spacing between sections
+        y = y - 20
 
-        -- ========== PREY CROSSHAIR SECTION ==========
+
         local crossHeader = GUI:CreateSectionHeader(tabContent, "PREY Crosshair")
         crossHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - crossHeader.gap
@@ -1549,14 +1524,14 @@ local function CreateGeneralQoLPage(parent)
             combatCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Out of melee range color change
-            local outOfRangeColorPicker  -- Forward declare
-            local rangeColorCombatOnlyCheck  -- Forward declare
-            local hideUntilOutOfRangeCheck  -- Forward declare
+
+            local outOfRangeColorPicker
+            local rangeColorCombatOnlyCheck
+            local hideUntilOutOfRangeCheck
 
             local rangeColorCheck = GUI:CreateFormCheckbox(tabContent, "Out of Melee Range Check", "changeColorOnRange", ch, function(val)
                 RefreshCrosshair()
-                -- Enable/disable the related controls based on toggle
+
                 if outOfRangeColorPicker and outOfRangeColorPicker.SetEnabled then
                     outOfRangeColorPicker:SetEnabled(val)
                 end
@@ -1574,7 +1549,7 @@ local function CreateGeneralQoLPage(parent)
             rangeColorCombatOnlyCheck = GUI:CreateFormCheckbox(tabContent, "Check Only In Combat", "rangeColorInCombatOnly", ch, RefreshCrosshair)
             rangeColorCombatOnlyCheck:SetPoint("TOPLEFT", PADDING, y)
             rangeColorCombatOnlyCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            -- Initial state based on setting
+
             if rangeColorCombatOnlyCheck.SetEnabled then
                 rangeColorCombatOnlyCheck:SetEnabled(ch.changeColorOnRange == true)
             end
@@ -1583,7 +1558,7 @@ local function CreateGeneralQoLPage(parent)
             hideUntilOutOfRangeCheck = GUI:CreateFormCheckbox(tabContent, "Only Show When Out of Range", "hideUntilOutOfRange", ch, RefreshCrosshair)
             hideUntilOutOfRangeCheck:SetPoint("TOPLEFT", PADDING, y)
             hideUntilOutOfRangeCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            -- Initial state based on setting
+
             if hideUntilOutOfRangeCheck.SetEnabled then
                 hideUntilOutOfRangeCheck:SetEnabled(ch.changeColorOnRange == true)
             end
@@ -1597,7 +1572,7 @@ local function CreateGeneralQoLPage(parent)
             end)
             outOfRangeColorPicker:SetPoint("TOPLEFT", PADDING, y)
             outOfRangeColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
-            -- Initial state based on setting
+
             if outOfRangeColorPicker.SetEnabled then
                 outOfRangeColorPicker:SetEnabled(ch.changeColorOnRange == true)
             end
@@ -1666,22 +1641,20 @@ local function CreateGeneralQoLPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- =====================================================
-    -- SUB-TAB: BUFF & DEBUFF
-    -- =====================================================
+
     local function BuildBuffDebuffTab(tabContent)
         local y = -10
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 4, subTabName = "Buff & Debuff"})
 
-        -- Section Header
+
         local header = GUI:CreateSectionHeader(tabContent, "Buff & Debuff Borders")
         header:SetPoint("TOPLEFT", PADDING, y)
         y = y - header.gap
 
-        -- Description
+
         local desc = GUI:CreateLabel(tabContent, "Modifies borders and font size of Blizzard default Buff and Debuff frames, normally placed beside minimap.", 11, C.textMuted)
         desc:SetPoint("TOPLEFT", PADDING, y)
         desc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
@@ -1691,47 +1664,47 @@ local function CreateGeneralQoLPage(parent)
         y = y - 40
 
         if db and db.buffBorders then
-            -- Enable Buff Borders
+
             local enableBuffs = GUI:CreateFormCheckbox(tabContent, "Enable Buff Borders",
                 "enableBuffs", db.buffBorders, RefreshBuffBorders)
             enableBuffs:SetPoint("TOPLEFT", PADDING, y)
             enableBuffs:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Enable Debuff Borders
+
             local enableDebuffs = GUI:CreateFormCheckbox(tabContent, "Enable Debuff Borders",
                 "enableDebuffs", db.buffBorders, RefreshBuffBorders)
             enableDebuffs:SetPoint("TOPLEFT", PADDING, y)
             enableDebuffs:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Border Size slider
+
             local borderSlider = GUI:CreateFormSlider(tabContent, "Border Size", 1, 5, 0.5,
                 "borderSize", db.buffBorders, RefreshBuffBorders)
             borderSlider:SetPoint("TOPLEFT", PADDING, y)
             borderSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Font Size slider
+
             local fontSlider = GUI:CreateFormSlider(tabContent, "Font Size", 6, 24, 1,
                 "fontSize", db.buffBorders, RefreshBuffBorders)
             fontSlider:SetPoint("TOPLEFT", PADDING, y)
             fontSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Section Header: Hide Blizzard Default Buffs and Debuffs
+
             local hideHeader = GUI:CreateSectionHeader(tabContent, "Hide Blizzard Default Buffs and Debuffs")
             hideHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - hideHeader.gap
 
-            -- Hide Buffs
+
             local hideBuffs = GUI:CreateFormCheckbox(tabContent, "Hide Buffs",
                 "hideBuffFrame", db.buffBorders, RefreshBuffBorders)
             hideBuffs:SetPoint("TOPLEFT", PADDING, y)
             hideBuffs:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- Hide Debuffs
+
             local hideDebuffs = GUI:CreateFormCheckbox(tabContent, "Hide Debuffs",
                 "hideDebuffFrame", db.buffBorders, RefreshBuffBorders)
             hideDebuffs:SetPoint("TOPLEFT", PADDING, y)
@@ -1745,17 +1718,15 @@ local function CreateGeneralQoLPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- =====================================================
-    -- SUB-TAB: CHAT
-    -- =====================================================
+
     local function BuildChatTab(tabContent)
         local y = -10
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 5, subTabName = "Chat"})
 
-        -- Refresh callback
+
         local function RefreshChat()
             if _G.PreyUI_RefreshChat then
                 _G.PreyUI_RefreshChat()
@@ -1765,7 +1736,7 @@ local function CreateGeneralQoLPage(parent)
         if db and db.chat then
             local chat = db.chat
 
-            -- SECTION: Enable/Disable
+
             local enableHeader = GUI:CreateSectionHeader(tabContent, "Enable/Disable PREY Chat Module")
             enableHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - enableHeader.gap
@@ -1781,7 +1752,7 @@ local function CreateGeneralQoLPage(parent)
             enableInfo:SetJustifyH("LEFT")
             y = y - 20
 
-            -- SECTION: Intro Message
+
             local introHeader = GUI:CreateSectionHeader(tabContent, "Intro Message")
             introHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - introHeader.gap
@@ -1797,7 +1768,7 @@ local function CreateGeneralQoLPage(parent)
             introInfo:SetJustifyH("LEFT")
             y = y - 20
 
-            -- SECTION: Chat Background
+
             local glassHeader = GUI:CreateSectionHeader(tabContent, "Chat Background")
             glassHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - glassHeader.gap
@@ -1819,7 +1790,7 @@ local function CreateGeneralQoLPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- SECTION: Input Box Background
+
             local editBoxHeader = GUI:CreateSectionHeader(tabContent, "Input Box Background")
             editBoxHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - editBoxHeader.gap
@@ -1852,7 +1823,7 @@ local function CreateGeneralQoLPage(parent)
                 y = y - 20
             end
 
-            -- SECTION: Message Fade
+
             local fadeHeader = GUI:CreateSectionHeader(tabContent, "Message Fade")
             fadeHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - fadeHeader.gap
@@ -1869,7 +1840,7 @@ local function CreateGeneralQoLPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- SECTION: URL Detection
+
             local urlHeader = GUI:CreateSectionHeader(tabContent, "URL Detection")
             urlHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - urlHeader.gap
@@ -1887,7 +1858,7 @@ local function CreateGeneralQoLPage(parent)
                 y = y - 20
             end
 
-            -- SECTION: Timestamps
+
             local timestampHeader = GUI:CreateSectionHeader(tabContent, "Timestamps")
             timestampHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - timestampHeader.gap
@@ -1919,7 +1890,7 @@ local function CreateGeneralQoLPage(parent)
             timestampColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
             y = y - FORM_ROW
 
-            -- SECTION: UI Cleanup
+
             local cleanupHeader = GUI:CreateSectionHeader(tabContent, "UI Cleanup")
             cleanupHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - cleanupHeader.gap
@@ -1937,7 +1908,7 @@ local function CreateGeneralQoLPage(parent)
 
             y = y - FORM_ROW
 
-            -- SECTION: Copy Button
+
             local copyHeader = GUI:CreateSectionHeader(tabContent, "Copy Button")
             copyHeader:SetPoint("TOPLEFT", PADDING, y)
             y = y - copyHeader.gap
@@ -1962,17 +1933,15 @@ local function CreateGeneralQoLPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- =====================================================
-    -- SUB-TAB: TOOLTIP
-    -- =====================================================
+
     local function BuildTooltipTab(tabContent)
         local y = -10
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 6, subTabName = "Tooltip"})
 
-        -- Refresh callback
+
         local function RefreshTooltips()
             if _G.PreyUI_RefreshTooltips then
                 _G.PreyUI_RefreshTooltips()
@@ -1982,7 +1951,7 @@ local function CreateGeneralQoLPage(parent)
         local tooltip = db and db.tooltip
         if not tooltip then return end
 
-        -- Visibility dropdown options
+
         local visibilityOptions = {
             {value = "SHOW", text = "Always Show"},
             {value = "HIDE", text = "Always Hide"},
@@ -1991,7 +1960,7 @@ local function CreateGeneralQoLPage(parent)
             {value = "ALT", text = "Alt to Show"},
         }
 
-        -- Combat override dropdown options
+
         local combatOverrideOptions = {
             {value = "NONE", text = "None"},
             {value = "SHIFT", text = "Shift"},
@@ -1999,7 +1968,7 @@ local function CreateGeneralQoLPage(parent)
             {value = "ALT", text = "Alt"},
         }
 
-        -- SECTION: Enable/Disable
+
         GUI:SetSearchSection("Enable/Disable")
         local enableHeader = GUI:CreateSectionHeader(tabContent, "Enable/Disable PREY Tooltip Module")
         enableHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2016,7 +1985,7 @@ local function CreateGeneralQoLPage(parent)
         enableInfo:SetJustifyH("LEFT")
         y = y - 20
 
-        -- SECTION: Cursor Anchor
+
         GUI:SetSearchSection("Cursor Anchor")
         local cursorHeader = GUI:CreateSectionHeader(tabContent, "Cursor Anchor")
         cursorHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2033,7 +2002,7 @@ local function CreateGeneralQoLPage(parent)
         cursorInfo:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Class Color Name option
+
         local classColorCheck = GUI:CreateFormCheckbox(tabContent, "Class Color Player Names", "classColorName", tooltip, RefreshTooltips)
         classColorCheck:SetPoint("TOPLEFT", PADDING, y)
         classColorCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
@@ -2045,7 +2014,7 @@ local function CreateGeneralQoLPage(parent)
         classColorInfo:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Hide Health Bar option
+
         local hideHealthBarCheck = GUI:CreateFormCheckbox(tabContent, "Hide Tooltip Health Bar", "hideHealthBar", tooltip, RefreshTooltips)
         hideHealthBarCheck:SetPoint("TOPLEFT", PADDING, y)
         hideHealthBarCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
@@ -2057,7 +2026,7 @@ local function CreateGeneralQoLPage(parent)
         hideHealthBarInfo:SetJustifyH("LEFT")
         y = y - 20
 
-        -- SECTION: Tooltip Visibility
+
         GUI:SetSearchSection("Tooltip Visibility")
         local visHeader = GUI:CreateSectionHeader(tabContent, "Tooltip Visibility")
         visHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2103,7 +2072,7 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
-        -- SECTION: Combat
+
         GUI:SetSearchSection("Combat")
         local combatHeader = GUI:CreateSectionHeader(tabContent, "Combat")
         combatHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2128,13 +2097,11 @@ local function CreateGeneralQoLPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- =====================================================
-    -- SUB-TAB: CHARACTER PANE
-    -- =====================================================
+
     local function BuildCharacterPaneTab(tabContent)
         local y = -10
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 7, subTabName = "Character Pane"})
 
         local char = db and db.character
@@ -2142,7 +2109,7 @@ local function CreateGeneralQoLPage(parent)
 
         local FORM_ROW = 32
 
-        -- SECTION: Enable/Disable
+
         local enableHeader = GUI:CreateSectionHeader(tabContent, "Enable/Disable PREY Character Module")
         enableHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - enableHeader.gap
@@ -2170,12 +2137,12 @@ local function CreateGeneralQoLPage(parent)
         enableInfo:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Section Header
+
         local header = GUI:CreateSectionHeader(tabContent, "Character Pane Settings")
         header:SetPoint("TOPLEFT", PADDING, y)
         y = y - header.gap
 
-        -- Description
+
         local desc = GUI:CreateLabel(tabContent, "Character Pane settings are now accessed from the Character Panel itself.\n\nOpen your Character Frame (C) and click the gear icon to access all settings.", 11, C.textMuted)
         desc:SetPoint("TOPLEFT", PADDING, y)
         desc:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
@@ -2184,9 +2151,7 @@ local function CreateGeneralQoLPage(parent)
         desc:SetHeight(50)
         y = y - 60
 
-        -- ───────────────────────────────────────────────────────────────
-        -- INSPECT FRAME Section
-        -- ───────────────────────────────────────────────────────────────
+
         local inspectHeader = GUI:CreateSectionHeader(tabContent, "Inspect Frame")
         inspectHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - inspectHeader.gap
@@ -2210,13 +2175,13 @@ local function CreateGeneralQoLPage(parent)
 
         y = y - 10
 
-        -- Open Character Panel button
+
         local openBtn = GUI:CreateButton(tabContent, "Open Character Panel", 200, 32, function()
-            -- Open character frame if not open
+
             if not CharacterFrame:IsShown() then
                 ToggleCharacter("PaperDollFrame")
             end
-            -- Show settings panel after a short delay
+
             C_Timer.After(0.1, function()
                 local settingsPanel = rawget(_G, "PreyUI_CharSettingsPanel")
                 if settingsPanel then
@@ -2229,28 +2194,26 @@ local function CreateGeneralQoLPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- =====================================================
-    -- SUB-TAB: Dragonriding
-    -- =====================================================
+
     local function BuildDragonridingTab(tabContent)
         local y = -10
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 1, tabName = "General & QoL", subTabIndex = 8, subTabName = "Dragonriding"})
 
-        -- Refresh callback
+
         local function RefreshSkyriding()
             if _G.PreyUI_RefreshSkyriding then
                 _G.PreyUI_RefreshSkyriding()
             end
         end
 
-        -- Get skyriding settings
+
         if not db.skyriding then db.skyriding = {} end
         local sr = db.skyriding
 
-        -- Initialize defaults if missing
+
         if sr.enabled == nil then sr.enabled = true end
         if sr.width == nil then sr.width = 250 end
         if sr.vigorHeight == nil then sr.vigorHeight = 12 end
@@ -2270,9 +2233,7 @@ local function CreateGeneralQoLPage(parent)
         if sr.useClassColorVigor == nil then sr.useClassColorVigor = false end
         if sr.useClassColorSecondWind == nil then sr.useClassColorSecondWind = false end
 
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Enable
-        -- ═══════════════════════════════════════════════════════════════
+
         GUI:SetSearchSection("Enable")
         local header = GUI:CreateSectionHeader(tabContent, "Skyriding Vigor Bar")
         header:SetPoint("TOPLEFT", PADDING, y)
@@ -2289,9 +2250,7 @@ local function CreateGeneralQoLPage(parent)
         desc:SetJustifyH("LEFT")
         y = y - 24
 
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Visibility
-        -- ═══════════════════════════════════════════════════════════════
+
         GUI:SetSearchSection("Visibility")
         local visHeader = GUI:CreateSectionHeader(tabContent, "Visibility")
         visHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2324,9 +2283,7 @@ local function CreateGeneralQoLPage(parent)
         visInfo:SetWordWrap(true)
         y = y - 30
 
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Bar Size
-        -- ═══════════════════════════════════════════════════════════════
+
         GUI:SetSearchSection("Bar Size")
         local sizeHeader = GUI:CreateSectionHeader(tabContent, "Bar Size")
         sizeHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2352,9 +2309,7 @@ local function CreateGeneralQoLPage(parent)
         textureDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Position
-        -- ═══════════════════════════════════════════════════════════════
+
         GUI:SetSearchSection("Position")
         local posHeader = GUI:CreateSectionHeader(tabContent, "Position")
         posHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2381,15 +2336,13 @@ local function CreateGeneralQoLPage(parent)
         ySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Fill Colors
-        -- ═══════════════════════════════════════════════════════════════
+
         GUI:SetSearchSection("Fill Colors")
         local fillHeader = GUI:CreateSectionHeader(tabContent, "Fill Colors")
         fillHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - fillHeader.gap
 
-        local barColorPicker  -- Forward declaration for conditional disable
+        local barColorPicker
         local function UpdateVigorColorState()
             if barColorPicker then
                 barColorPicker:SetAlpha(sr.useClassColorVigor and 0.4 or 1)
@@ -2408,7 +2361,7 @@ local function CreateGeneralQoLPage(parent)
         barColorPicker:SetAlpha(sr.useClassColorVigor and 0.4 or 1)
         y = y - FORM_ROW
 
-        local swColorPicker  -- Forward declaration for conditional disable
+        local swColorPicker
         local function UpdateSWColorState()
             if swColorPicker then
                 swColorPicker:SetAlpha(sr.useClassColorSecondWind and 0.4 or 1)
@@ -2427,9 +2380,7 @@ local function CreateGeneralQoLPage(parent)
         swColorPicker:SetAlpha(sr.useClassColorSecondWind and 0.4 or 1)
         y = y - FORM_ROW
 
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Background & Effects
-        -- ═══════════════════════════════════════════════════════════════
+
         GUI:SetSearchSection("Background & Effects")
         local bgHeader = GUI:CreateSectionHeader(tabContent, "Background & Effects")
         bgHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2455,9 +2406,7 @@ local function CreateGeneralQoLPage(parent)
         rechargeColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- ═══════════════════════════════════════════════════════════════
-        -- SECTION: Text Display
-        -- ═══════════════════════════════════════════════════════════════
+
         GUI:SetSearchSection("Text Display")
         local textHeader = GUI:CreateSectionHeader(tabContent, "Text Display")
         textHeader:SetPoint("TOPLEFT", PADDING, y)
@@ -2497,7 +2446,7 @@ local function CreateGeneralQoLPage(parent)
         y = y - FORM_ROW
 
         local fontSizeSlider = GUI:CreateFormSlider(tabContent, "Text Font Size", 8, 24, 1, "vigorFontSize", sr, function()
-            sr.speedFontSize = sr.vigorFontSize  -- Keep both in sync
+            sr.speedFontSize = sr.vigorFontSize
             RefreshSkyriding()
         end)
         fontSizeSlider:SetPoint("TOPLEFT", PADDING, y)
@@ -2507,9 +2456,7 @@ local function CreateGeneralQoLPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- =====================================================
-    -- CREATE SUB-TABS
-    -- =====================================================
+
     local subTabs = GUI:CreateSubTabs(content, {
         {name = "General", builder = BuildGeneralTab},
         {name = "HUD Visibility", builder = BuildHUDVisibilityTab},
@@ -2527,14 +2474,12 @@ local function CreateGeneralQoLPage(parent)
     content:SetHeight(650)
 end
 
----------------------------------------------------------------------------
--- PAGE: Autohide & Skinning (with sub-tabs)
----------------------------------------------------------------------------
+
 local function CreateAutohidesPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
 
-    -- Build Autohide sub-tab
+
     local function BuildAutohideTab(tabContent)
         local y = -10
         local PAD = 10
@@ -2546,9 +2491,7 @@ local function CreateAutohidesPage(parent)
         if db then
             if not db.uiHider then db.uiHider = {} end
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- SECTION: Objective Tracker
-            -- ═══════════════════════════════════════════════════════════════
+
             local objHeader = GUI:CreateSectionHeader(tabContent, "Objective Tracker")
             objHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - objHeader.gap
@@ -2558,7 +2501,7 @@ local function CreateAutohidesPage(parent)
             checkAlways:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Ensure instance types table exists
+
             if not db.uiHider.hideObjectiveTrackerInstanceTypes then
                 db.uiHider.hideObjectiveTrackerInstanceTypes = {
                     mythicPlus = false,
@@ -2590,9 +2533,7 @@ local function CreateAutohidesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- SECTION: Frames & Buttons
-            -- ═══════════════════════════════════════════════════════════════
+
             local framesHeader = GUI:CreateSectionHeader(tabContent, "Frames & Buttons")
             framesHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - framesHeader.gap
@@ -2612,9 +2553,7 @@ local function CreateAutohidesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- SECTION: Nameplates
-            -- ═══════════════════════════════════════════════════════════════
+
             local nameplatesHeader = GUI:CreateSectionHeader(tabContent, "Nameplates")
             nameplatesHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - nameplatesHeader.gap
@@ -2631,9 +2570,7 @@ local function CreateAutohidesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- SECTION: Status Bars
-            -- ═══════════════════════════════════════════════════════════════
+
             local barsHeader = GUI:CreateSectionHeader(tabContent, "Status Bars")
             barsHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - barsHeader.gap
@@ -2650,9 +2587,7 @@ local function CreateAutohidesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- SECTION: Combat & Messages
-            -- ═══════════════════════════════════════════════════════════════
+
             local combatHeader = GUI:CreateSectionHeader(tabContent, "Combat & Messages")
             combatHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - combatHeader.gap
@@ -2672,7 +2607,7 @@ local function CreateAutohidesPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- Build Skinning sub-tab
+
     local function BuildSkinningTab(tabContent)
         local y = -10
         local PAD = 10
@@ -2683,23 +2618,21 @@ local function CreateAutohidesPage(parent)
         if db and db.general then
             local general = db.general
 
-            -- Initialize defaults
+
             if general.skinUseClassColor == nil then general.skinUseClassColor = true end
             if general.skinCustomColor == nil then general.skinCustomColor = {0.820, 0.180, 0.220, 1} end
             if general.skinKeystoneFrame == nil then general.skinKeystoneFrame = true end
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- CHOOSE DEFAULT COLOR SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Choose Default Color")
 
             local colorHeader = GUI:CreateSectionHeader(tabContent, "Choose Default Color")
             colorHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - colorHeader.gap
 
-            local customColorPicker  -- Forward declare for closure
+            local customColorPicker
 
-            -- Helper to refresh all skinned frames when colors change
+
             local function RefreshAllSkinning()
                 if _G.PreyUI_RefreshKeystoneColors then
                     _G.PreyUI_RefreshKeystoneColors()
@@ -2752,12 +2685,12 @@ local function CreateAutohidesPage(parent)
             customColorPicker = GUI:CreateFormColorPicker(tabContent, "Custom Color", "skinCustomColor", general, RefreshAllSkinning, { noAlpha = true })
             customColorPicker:SetPoint("TOPLEFT", PAD, y)
             customColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            customColorPicker:SetEnabled(not general.skinUseClassColor)  -- Initial state
+            customColorPicker:SetEnabled(not general.skinUseClassColor)
             y = y - FORM_ROW
 
-            y = y - 10  -- Extra padding before background color
+            y = y - 10
 
-            -- Background color (with alpha for transparency)
+
             if general.skinBgColor == nil then general.skinBgColor = { 0.05, 0.05, 0.05, 0.95 } end
 
             local bgColorPicker = GUI:CreateFormColorPicker(tabContent, "Background Color", "skinBgColor", general, RefreshAllSkinning, { hasAlpha = true })
@@ -2765,11 +2698,9 @@ local function CreateAutohidesPage(parent)
             bgColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- GAME MENU SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Game Menu")
 
             if general.skinGameMenu == nil then general.skinGameMenu = false end
@@ -2823,11 +2754,9 @@ local function CreateAutohidesPage(parent)
             gameMenuFontSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- READY CHECK FRAME SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Ready Check Frame")
 
             if general.skinReadyCheck == nil then general.skinReadyCheck = true end
@@ -2857,7 +2786,7 @@ local function CreateAutohidesPage(parent)
             skinReadyCheckCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Move/Reset buttons for Ready Check frame position
+
             local rcMoveBtn = GUI:CreateButton(tabContent, "Toggle Mover", 140, 28, function()
                 if _G.PreyUI_ToggleReadyCheckMover then
                     _G.PreyUI_ToggleReadyCheckMover()
@@ -2874,11 +2803,9 @@ local function CreateAutohidesPage(parent)
             rcResetBtn:SetPoint("LEFT", rcMoveBtn, "RIGHT", 10, 0)
             y = y - 36
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- KEYSTONE FRAME SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Keystone Frame")
 
             local header = GUI:CreateSectionHeader(tabContent, "Keystone Frame")
@@ -2906,11 +2833,9 @@ local function CreateAutohidesPage(parent)
             skinCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- ENCOUNTER POWER BAR SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Encounter Power Bar")
 
             if general.skinPowerBarAlt == nil then general.skinPowerBarAlt = true end
@@ -2948,11 +2873,9 @@ local function CreateAutohidesPage(parent)
             powerBarMoverBtn:SetPoint("TOPLEFT", PAD, y)
             y = y - 36
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- ALERT FRAMES SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Alert Frames")
 
             if general.skinAlerts == nil then general.skinAlerts = true end
@@ -2982,7 +2905,7 @@ local function CreateAutohidesPage(parent)
             alertCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Toggle movers button
+
             local moverBtn = GUI:CreateButton(tabContent, "Toggle Position Movers", 200, 28, function()
                 local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
                 if PREYCore and PREYCore.Alerts then
@@ -2998,15 +2921,12 @@ local function CreateAutohidesPage(parent)
             moverInfo:SetJustifyH("LEFT")
             y = y - 25
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- LOOT WINDOW SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Loot Window")
 
-            -- Get loot settings from profile root (not general)
-            -- Ensure tables and individual keys exist
+
             if not db.loot then db.loot = {} end
             if db.loot.enabled == nil then db.loot.enabled = true end
             if db.loot.lootUnderMouse == nil then db.loot.lootUnderMouse = false end
@@ -3060,11 +2980,9 @@ local function CreateAutohidesPage(parent)
             transmogCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- ROLL FRAMES SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Roll Frames")
 
             local rollHeader = GUI:CreateSectionHeader(tabContent, "Roll Frames")
@@ -3092,7 +3010,7 @@ local function CreateAutohidesPage(parent)
             rollCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Helper to refresh roll preview live when settings change
+
             local function RefreshRollPreview()
                 local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
                 if PREYCore and PREYCore.Loot and PREYCore.Loot:IsRollPreviewActive() then
@@ -3120,7 +3038,7 @@ local function CreateAutohidesPage(parent)
             spacingSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Toggle movers button
+
             local rollMoverBtn = GUI:CreateButton(tabContent, "Toggle Position Movers", 200, 28, function()
                 local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
                 if PREYCore and PREYCore.Loot then
@@ -3136,11 +3054,9 @@ local function CreateAutohidesPage(parent)
             rollMoverInfo:SetJustifyH("LEFT")
             y = y - 25
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- LOOT HISTORY SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Loot History")
 
             local historyHeader = GUI:CreateSectionHeader(tabContent, "Loot History")
@@ -3168,11 +3084,9 @@ local function CreateAutohidesPage(parent)
             historyCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- PREY M+ TIMER SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("PREY M+ Timer")
 
             local mplusTimer = db.mplusTimer
@@ -3189,7 +3103,7 @@ local function CreateAutohidesPage(parent)
                 }
                 mplusTimer = db.mplusTimer
             end
-            -- Ensure new fields exist for existing profiles
+
             if mplusTimer.layoutMode == nil then mplusTimer.layoutMode = "full" end
             if mplusTimer.showTimer == nil then mplusTimer.showTimer = true end
             if mplusTimer.showBorder == nil then mplusTimer.showBorder = true end
@@ -3228,7 +3142,7 @@ local function CreateAutohidesPage(parent)
             preyMplusCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Layout mode dropdown
+
             local layoutOptions = {
                 { text = "Compact", value = "compact" },
                 { text = "Full", value = "full" },
@@ -3247,7 +3161,7 @@ local function CreateAutohidesPage(parent)
             layoutDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Scale slider
+
             local scaleSlider = GUI:CreateFormSlider(tabContent, "Timer Scale", 0.5, 2.0, 0.05, "scale", mplusTimer, function()
                 local MPlusTimer = _G.PreyUI_MPlusTimer
                 if MPlusTimer and MPlusTimer.ApplyScale then
@@ -3258,7 +3172,7 @@ local function CreateAutohidesPage(parent)
             scaleSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Show Timer checkbox (full mode only)
+
             local preyMplusTimerCheck = GUI:CreateFormCheckbox(tabContent, "Show Timer Text (Full mode)", "showTimer", mplusTimer, function()
                 local MPlusTimer = _G.PreyUI_MPlusTimer
                 if MPlusTimer and MPlusTimer.UpdateLayout then
@@ -3269,7 +3183,7 @@ local function CreateAutohidesPage(parent)
             preyMplusTimerCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Show Border checkbox
+
             local preyMplusBorderCheck = GUI:CreateFormCheckbox(tabContent, "Show Border", "showBorder", mplusTimer, function()
                 if _G.PreyUI_ApplyMPlusTimerSkin then
                     _G.PreyUI_ApplyMPlusTimerSkin()
@@ -3309,7 +3223,7 @@ local function CreateAutohidesPage(parent)
             preyMplusObjCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Demo mode button
+
             local preyMplusDemoBtn = GUI:CreateButton(tabContent, "Toggle Demo Mode", 200, 28, function()
                 local MPlusTimer = _G.PreyUI_MPlusTimer
                 if MPlusTimer then
@@ -3325,9 +3239,7 @@ local function CreateAutohidesPage(parent)
             preyMplusDemoInfo:SetJustifyH("LEFT")
             y = y - 25
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- REPUTATION/CURRENCY SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Reputation/Currency")
 
             if general.skinCharacterFrame == nil then general.skinCharacterFrame = true end
@@ -3357,11 +3269,9 @@ local function CreateAutohidesPage(parent)
             charFrameCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- INSPECT FRAME SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Inspect Frame")
 
             if general.skinInspectFrame == nil then general.skinInspectFrame = true end
@@ -3391,11 +3301,9 @@ local function CreateAutohidesPage(parent)
             inspectFrameCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- OVERRIDE ACTION BAR SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Override Action Bar")
 
             if general.skinOverrideActionBar == nil then general.skinOverrideActionBar = false end
@@ -3425,11 +3333,9 @@ local function CreateAutohidesPage(parent)
             overrideBarCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- OBJECTIVE TRACKER SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Objective Tracker")
 
             if general.skinObjectiveTracker == nil then general.skinObjectiveTracker = false end
@@ -3542,13 +3448,10 @@ local function CreateAutohidesPage(parent)
             textColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Note: Background opacity is controlled via Edit Mode's built-in opacity slider
 
-            y = y - 10  -- Extra padding before next section
+            y = y - 10
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- INSTANCE FRAMES SECTION
-            -- ═══════════════════════════════════════════════════════════════
+
             GUI:SetSearchSection("Instance Frames")
 
             if general.skinInstanceFrames == nil then general.skinInstanceFrames = false end
@@ -3590,7 +3493,7 @@ local function CreateAutohidesPage(parent)
         tabContent:SetHeight(math.abs(y) + 50)
     end
 
-    -- Create sub-tabs
+
     local subTabs = GUI:CreateSubTabs(content, {
         {name = "Autohide", builder = BuildAutohideTab},
         {name = "Skinning", builder = BuildSkinningTab},
@@ -3602,23 +3505,21 @@ local function CreateAutohidesPage(parent)
     content:SetHeight(650)
 end
 
----------------------------------------------------------------------------
--- PAGE: Minimap & Datatext (with sub-tabs like old GUI)
----------------------------------------------------------------------------
+
 local function CreateMinimapPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
-    
-    -- Build Minimap sub-tab
+
+
     local function BuildMinimapTab(tabContent)
         local y = -10
         local PAD = 10
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 3, tabName = "Minimap & Datatext", subTabIndex = 1, subTabName = "Minimap"})
 
-        -- Early return if database not ready
+
         if not db then
             local errorLabel = GUI:CreateLabel(tabContent, "Database not ready. Please /reload.", 12, {1, 0.3, 0.3, 1})
             errorLabel:SetPoint("TOPLEFT", PAD, y)
@@ -3626,15 +3527,15 @@ local function CreateMinimapPage(parent)
             return
         end
 
-        -- Ensure minimap table exists (for fresh installs where AceDB defaults may not initialize)
+
         if not db.minimap then
             db.minimap = {}
         end
         local mm = db.minimap
 
-        if true then  -- Always build widgets (was: if db and db.minimap then)
+        if true then
 
-            -- SECTION 1: General
+
             local generalHeader = GUI:CreateSectionHeader(tabContent, "General")
             generalHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - generalHeader.gap
@@ -3667,7 +3568,7 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- SECTION 2: Frame Styling
+
             local styleHeader = GUI:CreateSectionHeader(tabContent, "Frame Styling")
             styleHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - styleHeader.gap
@@ -3689,12 +3590,12 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- SECTION 3: Hide Minimap Elements
+
             local hideHeader = GUI:CreateSectionHeader(tabContent, "Hide Minimap Elements")
             hideHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - hideHeader.gap
 
-            -- Using inverted checkboxes: checked = hide (DB false), unchecked = show (DB true)
+
             local hideMail = GUI:CreateFormCheckboxInverted(tabContent, "Hide Mail (reload after)", "showMail", mm, RefreshMinimap)
             hideMail:SetPoint("TOPLEFT", PAD, y)
             hideMail:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -3715,7 +3616,7 @@ local function CreateMinimapPage(parent)
             hideExpansion:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- UIHider minimap controls (uses db.uiHider)
+
             local hideBorder = GUI:CreateFormCheckbox(tabContent, "Hide Border (Top)", "hideMinimapBorder", db.uiHider, RefreshUIHider)
             hideBorder:SetPoint("TOPLEFT", PAD, y)
             hideBorder:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -3743,7 +3644,7 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- SECTION 4: Zone Label
+
             local zoneHeader = GUI:CreateSectionHeader(tabContent, "Zone Label")
             zoneHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - zoneHeader.gap
@@ -3781,22 +3682,22 @@ local function CreateMinimapPage(parent)
             end
         end
 
-        -- SECTION 5: Dungeon Eye (LFG Queue Button)
-        if true then  -- Always build (mm already guaranteed above)
+
+        if true then
             y = y - 10
             GUI:SetSearchSection("Dungeon Eye")
             local eyeHeader = GUI:CreateSectionHeader(tabContent, "Dungeon Eye (LFG Queue)")
             eyeHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - eyeHeader.gap
 
-            -- Description text
+
             local eyeDesc = GUI:CreateLabel(tabContent, "When enabled, the queue eye automatically appears on the minimap when you join a queue.", 11, C.textMuted)
             eyeDesc:SetPoint("TOPLEFT", PAD, y)
             eyeDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             eyeDesc:SetJustifyH("LEFT")
             y = y - 20
 
-            -- Ensure dungeonEye settings exist
+
             if not mm.dungeonEye then
                 mm.dungeonEye = {
                     enabled = true,
@@ -3808,13 +3709,13 @@ local function CreateMinimapPage(parent)
             end
             local eye = mm.dungeonEye
 
-            -- Enable toggle
+
             local eyeEnable = GUI:CreateFormCheckbox(tabContent, "Enable Dungeon Eye", "enabled", eye, RefreshMinimap)
             eyeEnable:SetPoint("TOPLEFT", PAD, y)
             eyeEnable:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Corner dropdown
+
             local cornerOptions = {
                 {value = "TOPRIGHT", text = "Top Right"},
                 {value = "TOPLEFT", text = "Top Left"},
@@ -3826,19 +3727,19 @@ local function CreateMinimapPage(parent)
             eyeCorner:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Scale slider
+
             local eyeScale = GUI:CreateFormSlider(tabContent, "Icon Scale", 0.1, 2.0, 0.1, "scale", eye, RefreshMinimap)
             eyeScale:SetPoint("TOPLEFT", PAD, y)
             eyeScale:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- X Offset slider
+
             local eyeOffsetX = GUI:CreateFormSlider(tabContent, "X Offset", -30, 30, 1, "offsetX", eye, RefreshMinimap)
             eyeOffsetX:SetPoint("TOPLEFT", PAD, y)
             eyeOffsetX:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Y Offset slider
+
             local eyeOffsetY = GUI:CreateFormSlider(tabContent, "Y Offset", -30, 30, 1, "offsetY", eye, RefreshMinimap)
             eyeOffsetY:SetPoint("TOPLEFT", PAD, y)
             eyeOffsetY:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -3847,17 +3748,17 @@ local function CreateMinimapPage(parent)
 
         tabContent:SetHeight(math.abs(y) + 50)
     end
-    
-    -- Build Datatext sub-tab
+
+
     local function BuildDatatextTab(tabContent)
         local y = -10
         local PAD = 10
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 3, tabName = "Minimap & Datatext", subTabIndex = 2, subTabName = "Datatext"})
 
-        -- Early return if database not ready
+
         if not db then
             local errorLabel = GUI:CreateLabel(tabContent, "Database not ready. Please /reload.", 12, {1, 0.3, 0.3, 1})
             errorLabel:SetPoint("TOPLEFT", PAD, y)
@@ -3865,21 +3766,21 @@ local function CreateMinimapPage(parent)
             return
         end
 
-        -- Ensure datatext table exists (for fresh installs where AceDB defaults may not initialize)
+
         if not db.datatext then
             db.datatext = {}
         end
         local dt = db.datatext
 
-        if true then  -- Always build widgets (was: if db and db.datatext then)
+        if true then
 
-            -- SECTION 1: Minimap Datatext Settings
+
             GUI:SetSearchSection("Minimap Datatext Settings")
             local panelHeader = GUI:CreateSectionHeader(tabContent, "Minimap Datatext Settings")
             panelHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - panelHeader.gap
 
-            -- Description text (grouped together)
+
             local noteLabel = GUI:CreateLabel(tabContent, "This datatext panel is anchored below the minimap and cannot be moved. To create additional movable panels, scroll down to 'Custom Movable Panels'.", 11, C.textMuted)
             noteLabel:SetPoint("TOPLEFT", PAD, y)
             noteLabel:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -3923,8 +3824,7 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- Build datatext options from registry (no section header - flows from Vertical Offset)
-            -- NOTE: Use PREYCore.Datatexts:GetAll() for consistent behavior with extra panels (#89)
+
             local dtOptions = {{value = "", text = "(empty)"}}
             if PREYCore and PREYCore.Datatexts then
                 local allDatatexts = PREYCore.Datatexts:GetAll()
@@ -3933,7 +3833,7 @@ local function CreateMinimapPage(parent)
                 end
             end
 
-            -- Ensure slots table and per-slot configs exist
+
             if not dt.slots then
                 dt.slots = {"time", "friends", "guild"}
             end
@@ -3944,7 +3844,7 @@ local function CreateMinimapPage(parent)
             if dt.slot2.noLabel == nil then dt.slot2.noLabel = false end
             if dt.slot3.noLabel == nil then dt.slot3.noLabel = false end
 
-            -- Slot 1 Group
+
             local slot1 = GUI:CreateFormDropdown(tabContent, "Slot 1 (Left)", dtOptions, nil, nil, function(val)
                 dt.slots[1] = val
                 RefreshMinimap()
@@ -3954,7 +3854,7 @@ local function CreateMinimapPage(parent)
             if slot1.SetValue then slot1.SetValue(dt.slots[1] or "") end
             y = y - FORM_ROW
 
-            local slot1NoLabel  -- Forward declare for mutual reference
+            local slot1NoLabel
             local slot1Short = GUI:CreateFormCheckbox(tabContent, "Slot 1 Short Label", "shortLabel", dt.slot1, function()
                 if slot1NoLabel then slot1NoLabel:SetEnabled(not dt.slot1.shortLabel) end
                 RefreshMinimap()
@@ -3983,9 +3883,9 @@ local function CreateMinimapPage(parent)
             slot1YOff:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Gap before Slot 2
+            y = y - 10
 
-            -- Slot 2 Group
+
             local slot2 = GUI:CreateFormDropdown(tabContent, "Slot 2 (Center)", dtOptions, nil, nil, function(val)
                 dt.slots[2] = val
                 RefreshMinimap()
@@ -3995,7 +3895,7 @@ local function CreateMinimapPage(parent)
             if slot2.SetValue then slot2.SetValue(dt.slots[2] or "") end
             y = y - FORM_ROW
 
-            local slot2NoLabel  -- Forward declare for mutual reference
+            local slot2NoLabel
             local slot2Short = GUI:CreateFormCheckbox(tabContent, "Slot 2 Short Label", "shortLabel", dt.slot2, function()
                 if slot2NoLabel then slot2NoLabel:SetEnabled(not dt.slot2.shortLabel) end
                 RefreshMinimap()
@@ -4024,9 +3924,9 @@ local function CreateMinimapPage(parent)
             slot2YOff:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            y = y - 10  -- Gap before Slot 3
+            y = y - 10
 
-            -- Slot 3 Group
+
             local slot3 = GUI:CreateFormDropdown(tabContent, "Slot 3 (Right)", dtOptions, nil, nil, function(val)
                 dt.slots[3] = val
                 RefreshMinimap()
@@ -4036,7 +3936,7 @@ local function CreateMinimapPage(parent)
             if slot3.SetValue then slot3.SetValue(dt.slots[3] or "") end
             y = y - FORM_ROW
 
-            local slot3NoLabel  -- Forward declare for mutual reference
+            local slot3NoLabel
             local slot3Short = GUI:CreateFormCheckbox(tabContent, "Slot 3 Short Label", "shortLabel", dt.slot3, function()
                 if slot3NoLabel then slot3NoLabel:SetEnabled(not dt.slot3.shortLabel) end
                 RefreshMinimap()
@@ -4065,7 +3965,7 @@ local function CreateMinimapPage(parent)
             slot3YOff:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Hint text explaining flexible slot behavior
+
             local hintText = GUI:CreateLabel(tabContent, "Empty slots are hidden. Using 2 datatexts gives each 50% width.", 11, C.textMuted)
             hintText:SetPoint("TOPLEFT", PAD, y)
             hintText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -4074,7 +3974,7 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- SECTION 3: Spec Display Options
+
             local specHeader = GUI:CreateSectionHeader(tabContent, "Spec Display Options")
             specHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - specHeader.gap
@@ -4084,7 +3984,7 @@ local function CreateMinimapPage(parent)
                 {value = "loadout", text = "Icon + Loadout"},
                 {value = "full", text = "Full (Spec / Loadout)"},
             }, "specDisplayMode", dt, function()
-                -- Refresh all datatexts to apply the new display mode immediately
+
                 if PREYCore and PREYCore.Datatexts and PREYCore.Datatexts.UpdateAll then
                     PREYCore.Datatexts:UpdateAll()
                 end
@@ -4095,7 +3995,7 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- SECTION 4: Time Options
+
             local timeHeader = GUI:CreateSectionHeader(tabContent, "Time Options")
             timeHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - timeHeader.gap
@@ -4118,7 +4018,7 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- SECTION 5: Text Styling
+
             local fontHeader = GUI:CreateSectionHeader(tabContent, "Text Styling")
             fontHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - fontHeader.gap
@@ -4130,7 +4030,7 @@ local function CreateMinimapPage(parent)
 
             local useClassColor = GUI:CreateFormCheckbox(tabContent, "Use Class Color", "useClassColor", dt, function()
                 RefreshMinimap()
-                -- Also update custom datapanels
+
                 if PREYCore and PREYCore.Datatexts and PREYCore.Datatexts.UpdateAll then
                     PREYCore.Datatexts:UpdateAll()
                 end
@@ -4141,7 +4041,7 @@ local function CreateMinimapPage(parent)
 
             local valueColor = GUI:CreateFormColorPicker(tabContent, "Custom Text Color", "valueColor", dt, function()
                 RefreshMinimap()
-                -- Also update custom datapanels
+
                 if PREYCore and PREYCore.Datatexts and PREYCore.Datatexts.UpdateAll then
                     PREYCore.Datatexts:UpdateAll()
                 end
@@ -4152,7 +4052,7 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- SECTION 5b: Time Datatext Settings
+
             local timeHeader = GUI:CreateSectionHeader(tabContent, "Time Datatext")
             timeHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - timeHeader.gap
@@ -4170,7 +4070,7 @@ local function CreateMinimapPage(parent)
 
             y = y - 10
 
-            -- SECTION 6: Custom Movable Datapanels
+
             local customPanelsHeader = GUI:CreateSectionHeader(tabContent, "Custom Movable Panels")
             customPanelsHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - customPanelsHeader.gap
@@ -4186,19 +4086,19 @@ local function CreateMinimapPage(parent)
             panelsWarning:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             panelsWarning:SetJustifyH("LEFT")
             y = y - 28
-            
-            -- Ensure legacy quiDatatexts.panels exists
+
+
             if not db.quiDatatexts then
                 db.quiDatatexts = {panels = {}}
             end
             if not db.quiDatatexts.panels then
                 db.quiDatatexts.panels = {}
             end
-            
-            -- List existing panels
+
+
             local panels = db.quiDatatexts.panels
 
-            -- Track all edit frames for mutual exclusion (only one config open at a time)
+
             local openEditFrames = {}
 
             if #panels > 0 then
@@ -4214,24 +4114,24 @@ local function CreateMinimapPage(parent)
                     })
                     panelFrame:SetBackdropColor(C.bgLight[1], C.bgLight[2], C.bgLight[3], 0.8)
                     panelFrame:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
-                    
-                    -- Panel name
+
+
                     local nameLabel = panelFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
                     nameLabel:SetPoint("TOPLEFT", 10, -10)
                     nameLabel:SetText(string.format("Panel %d: %s", i, panelConfig.name or ("Panel " .. i)))
                     nameLabel:SetTextColor(C.accentLight[1], C.accentLight[2], C.accentLight[3], 1)
-                    
-                    -- Status (simplified - just slot count, other info visible via checkbox or Edit)
+
+
                     local statusLabel = panelFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                     statusLabel:SetPoint("TOPLEFT", 10, -30)
                     statusLabel:SetText(string.format("%d slots", panelConfig.numSlots or 3))
                     statusLabel:SetTextColor(0.7, 0.7, 0.7, 1)
-                    
-                    -- Edit button - opens configuration frame
+
+
                     local editBtn = GUI:CreateButton(panelFrame, "Edit", 60, 22)
                     editBtn:SetPoint("RIGHT", -140, 0)
-                    
-                    -- Create edit frame (initially hidden) - will set height dynamically
+
+
                     local editFrame = CreateFrame("Frame", nil, panelFrame, "BackdropTemplate")
                     editFrame:SetPoint("TOPLEFT", panelFrame, "BOTTOMLEFT", 0, -5)
                     editFrame:SetPoint("RIGHT", panelFrame, "RIGHT", 0, 0)
@@ -4244,26 +4144,26 @@ local function CreateMinimapPage(parent)
                     editFrame:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
                     editFrame:Hide()
 
-                    -- Register for mutual exclusion
+
                     table.insert(openEditFrames, {frame = editFrame, button = editBtn})
 
-                    -- Edit frame content
+
                     local editY = -10
                     local editPad = 15
-                    
-                    -- Title
+
+
                     local editTitle = editFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
                     editTitle:SetPoint("TOPLEFT", editPad, editY)
                     editTitle:SetText("Configure " .. (panelConfig.name or ("Panel " .. i)))
                     editTitle:SetTextColor(C.accentLight[1], C.accentLight[2], C.accentLight[3], 1)
                     editY = editY - 30
-                    
-                    -- Panel Name
+
+
                     local nameLabel = editFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
                     nameLabel:SetPoint("TOPLEFT", editPad, editY)
                     nameLabel:SetText("Panel Name:")
                     editY = editY - 20
-                    
+
                     local nameInput = CreateFrame("EditBox", nil, editFrame, "InputBoxTemplate")
                     nameInput:SetSize(250, 20)
                     nameInput:SetPoint("TOPLEFT", editPad, editY)
@@ -4274,15 +4174,15 @@ local function CreateMinimapPage(parent)
                         panelConfig.name = self:GetText()
                     end)
                     editY = editY - 35
-                    
-                    -- Slot configuration section (MOVED TO TOP)
+
+
                     local slotsHeader = editFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
                     slotsHeader:SetPoint("TOPLEFT", editPad, editY)
                     slotsHeader:SetText("Slot Configuration:")
                     slotsHeader:SetTextColor(C.accentLight[1], C.accentLight[2], C.accentLight[3], 1)
                     editY = editY - 25
-                    
-                    -- Create dropdown for each slot
+
+
                     if not panelConfig.slots then panelConfig.slots = {} end
                     if not panelConfig.slotSettings then panelConfig.slotSettings = {} end
 
@@ -4292,7 +4192,7 @@ local function CreateMinimapPage(parent)
                         slotLabel:SetPoint("TOPLEFT", editPad, editY)
                         slotLabel:SetText("Slot " .. slotIdx .. ":")
 
-                        -- Build datatext options
+
                         local datatextOptions = {{value = "", text = "(empty)"}}
                         if PREYCore and PREYCore.Datatexts then
                             local allDatatexts = PREYCore.Datatexts:GetAll()
@@ -4304,17 +4204,17 @@ local function CreateMinimapPage(parent)
                             end
                         end
 
-                        -- Ensure slot entry exists (use "" for empty, not nil - SavedVariables can't persist nil)
+
                         if not panelConfig.slots[slotIdx] then
                             panelConfig.slots[slotIdx] = ""
                         end
 
-                        -- Ensure slotSettings entry exists for shortLabel/noLabel (#119)
+
                         if not panelConfig.slotSettings[slotIdx] then
                             panelConfig.slotSettings[slotIdx] = { shortLabel = false, noLabel = false }
                         end
 
-                        -- Create a wrapper table for the dropdown to reference
+
                         local slotWrapper = {value = panelConfig.slots[slotIdx] or ""}
 
                         local slotDropdown = GUI:CreateDropdown(editFrame, "", datatextOptions, "value", slotWrapper, function()
@@ -4326,14 +4226,12 @@ local function CreateMinimapPage(parent)
                         slotDropdown:SetPoint("LEFT", slotLabel, "RIGHT", 10, 0)
                         slotDropdown:SetWidth(200)
 
-                        -- #119: Per-slot label options (Short/Hide)
-                        -- Uses compact inline GUI:CreateCheckbox (vs minimap's full-width CreateFormCheckbox)
-                        -- Pattern mirrors dt.slot1/slot2/slot3 but with array-based storage for dynamic slots
+
                         local slotSettings = panelConfig.slotSettings[slotIdx]
-                        local shortLabelCb, noLabelCb  -- Forward declare for mutual reference
+                        local shortLabelCb, noLabelCb
 
                         shortLabelCb = GUI:CreateCheckbox(editFrame, "Short", "shortLabel", slotSettings, function(val)
-                            -- Mutual exclusion: if enabling short, disable hide
+
                             if val and noLabelCb then
                                 noLabelCb.SetValue(false)
                             end
@@ -4341,12 +4239,12 @@ local function CreateMinimapPage(parent)
                                 PREYCore.Datapanels:UpdatePanel(panelConfig.id)
                             end
                         end)
-                        shortLabelCb:SetSize(70, 20)  -- Compact for inline display
+                        shortLabelCb:SetSize(70, 20)
                         shortLabelCb:SetPoint("LEFT", slotDropdown, "RIGHT", 10, 0)
 
-                        -- Hide Label checkbox (#119) - using themed GUI checkbox
+
                         noLabelCb = GUI:CreateCheckbox(editFrame, "Hide", "noLabel", slotSettings, function(val)
-                            -- Mutual exclusion: if enabling hide, disable short
+
                             if val and shortLabelCb then
                                 shortLabelCb.SetValue(false)
                             end
@@ -4354,19 +4252,19 @@ local function CreateMinimapPage(parent)
                                 PREYCore.Datapanels:UpdatePanel(panelConfig.id)
                             end
                         end)
-                        noLabelCb:SetSize(60, 20)  -- Compact inline layout (vs minimap's full-width form checkboxes)
+                        noLabelCb:SetSize(60, 20)
                         noLabelCb:SetPoint("LEFT", shortLabelCb, "RIGHT", 5, 0)
 
-                        -- #119: Resolve conflict if both are true in SavedVariables (noLabel wins per GetLabel behavior)
+
                         if slotSettings.shortLabel and slotSettings.noLabel then
                             slotSettings.shortLabel = false
                         end
 
-                        -- #119: Sync checkbox visual state with stored values
+
                         if shortLabelCb.SetValue then shortLabelCb.SetValue(slotSettings.shortLabel) end
                         if noLabelCb.SetValue then noLabelCb.SetValue(slotSettings.noLabel) end
 
-                        -- Show/hide based on numSlots
+
                         if slotIdx <= (panelConfig.numSlots or 3) then
                             slotLabel:Show()
                             slotDropdown:Show()
@@ -4387,70 +4285,70 @@ local function CreateMinimapPage(parent)
                         }
                         editY = editY - 30
                     end
-                    
+
                     editY = editY - 10
-                    
-                    -- Panel Settings Section
+
+
                     local settingsHeader = editFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
                     settingsHeader:SetPoint("TOPLEFT", editPad, editY)
                     settingsHeader:SetText("Panel Settings:")
                     settingsHeader:SetTextColor(C.accentLight[1], C.accentLight[2], C.accentLight[3], 1)
                     editY = editY - 25
-                    
-                    -- Width slider
+
+
                     local widthSlider = GUI:CreateSlider(editFrame, "Width", 100, 800, 1, "width", panelConfig, function()
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:UpdatePanel(panelConfig.id)
                         end
                     end)
                     widthSlider:SetPoint("TOPLEFT", editPad, editY)
-                    widthSlider:SetWidth(200)  -- Fixed width that works at all panel sizes
-                    
-                    -- Height slider
+                    widthSlider:SetWidth(200)
+
+
                     local heightSlider = GUI:CreateSlider(editFrame, "Height", 16, 50, 1, "height", panelConfig, function()
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:UpdatePanel(panelConfig.id)
                         end
                     end)
                     heightSlider:SetPoint("LEFT", widthSlider, "RIGHT", 10, 0)
-                    heightSlider:SetWidth(200)  -- Fixed width that works at all panel sizes
+                    heightSlider:SetWidth(200)
                     editY = editY - 65
-                    
-                    -- Number of slots slider (callback will be set after slotDropdowns are created)
+
+
                     local slotsSlider = GUI:CreateSlider(editFrame, "Number of Slots", 1, 6, 1, "numSlots", panelConfig, nil)
                     slotsSlider:SetPoint("TOPLEFT", editPad, editY)
-                    slotsSlider:SetWidth(200)  -- Fixed width that works at all panel sizes
-                    
-                    -- Font size slider
+                    slotsSlider:SetWidth(200)
+
+
                     local fontSlider = GUI:CreateSlider(editFrame, "Font Size", 8, 18, 1, "fontSize", panelConfig, function()
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:UpdatePanel(panelConfig.id)
                         end
                     end)
                     fontSlider:SetPoint("LEFT", slotsSlider, "RIGHT", 10, 0)
-                    fontSlider:SetWidth(200)  -- Fixed width that works at all panel sizes
+                    fontSlider:SetWidth(200)
                     editY = editY - 65
-                    
-                    -- Background opacity slider
+
+
                     local opacitySlider = GUI:CreateSlider(editFrame, "Background Opacity", 0, 100, 5, "bgOpacity", panelConfig, function()
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:UpdatePanel(panelConfig.id)
                         end
                     end)
                     opacitySlider:SetPoint("TOPLEFT", editPad, editY)
-                    opacitySlider:SetWidth(200)  -- Fixed width that works at all panel sizes
-                    
-                    -- Border size slider (0=hidden) (#90)
+                    opacitySlider:SetWidth(200)
+
+
                     local borderSlider = GUI:CreateSlider(editFrame, "Border (0=hidden)", 0, 8, 1, "borderSize", panelConfig, function()
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:UpdatePanel(panelConfig.id)
                         end
                     end)
                     borderSlider:SetPoint("LEFT", opacitySlider, "RIGHT", 10, 0)
-                    borderSlider:SetWidth(200)  -- Fixed width that works at all panel sizes
+                    borderSlider:SetWidth(200)
                     editY = editY - 65
 
-                    -- Border color picker (#90)
+
                     local borderColorPicker = GUI:CreateColorPicker(editFrame, "Border Color", "borderColor", panelConfig, function()
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:UpdatePanel(panelConfig.id)
@@ -4459,7 +4357,7 @@ local function CreateMinimapPage(parent)
                     borderColorPicker:SetPoint("TOPLEFT", editPad, editY)
                     editY = editY - 25
 
-                    -- Lock toggle
+
                     local lockCheck = GUI:CreateCheckbox(editFrame, "Lock Position (prevents dragging)", "locked", panelConfig, function()
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:SetLocked(panelConfig.id, panelConfig.locked)
@@ -4467,22 +4365,22 @@ local function CreateMinimapPage(parent)
                     end)
                     lockCheck:SetPoint("TOPLEFT", editPad, editY)
                     editY = editY - 35
-                    
-                    -- Set up callback for numSlots slider to update dropdown visibility
+
+
                     local originalOnValueChanged = slotsSlider.slider:GetScript("OnValueChanged")
                     slotsSlider.slider:SetScript("OnValueChanged", function(self, value)
-                        -- Call original callback first
+
                         if originalOnValueChanged then
                             originalOnValueChanged(self, value)
                         end
-                        
-                        -- Update panel
+
+
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:UpdatePanel(panelConfig.id)
                         end
-                        
-                        -- Update dropdown visibility based on new numSlots value
-                        local numSlots = math.floor(value + 0.5) -- Round to nearest integer
+
+
+                        local numSlots = math.floor(value + 0.5)
                         for idx, controls in ipairs(slotDropdowns) do
                             if idx <= numSlots then
                                 controls.label:Show()
@@ -4497,28 +4395,28 @@ local function CreateMinimapPage(parent)
                             end
                         end
 
-                        -- Update status label on main panel list
+
                         statusLabel:SetText(string.format("%d slots", numSlots))
                     end)
-                    
-                    -- Set dynamic height based on content
-                    local editFrameHeight = math.abs(editY) + 50 -- Add padding at bottom
+
+
+                    local editFrameHeight = math.abs(editY) + 50
                     editFrame:SetHeight(editFrameHeight)
-                    
-                    -- Close button
+
+
                     local closeBtn = GUI:CreateButton(editFrame, "Close", 80, 25, function()
                         editFrame:Hide()
                         editBtn.text:SetText("Edit")
                     end)
                     closeBtn:SetPoint("BOTTOM", 0, 10)
-                    
-                    -- Toggle edit frame
+
+
                     editBtn:SetScript("OnClick", function()
                         if editFrame:IsShown() then
                             editFrame:Hide()
                             editBtn.text:SetText("Edit")
                         else
-                            -- Close all other open edit frames first (mutual exclusion)
+
                             for _, entry in ipairs(openEditFrames) do
                                 if entry.frame:IsShown() and entry.frame ~= editFrame then
                                     entry.frame:Hide()
@@ -4529,7 +4427,7 @@ local function CreateMinimapPage(parent)
                             editFrame:Show()
                             editBtn.text:SetText("Close")
 
-                            -- Update dropdown visibility when opening (in case numSlots changed externally)
+
                             local numSlots = panelConfig.numSlots or 3
                             for idx, controls in ipairs(slotDropdowns) do
                                 if idx <= numSlots then
@@ -4546,23 +4444,23 @@ local function CreateMinimapPage(parent)
                             end
                         end
                     end)
-                    
-                    -- Enable toggle
+
+
                     local enableCheck = GUI:CreateCheckbox(panelFrame, "Enabled", "enabled", panelConfig, function()
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:UpdatePanel(panelConfig.id)
                         end
                     end)
                     enableCheck:SetPoint("RIGHT", -80, 0)
-                    
-                    -- Delete button
+
+
                     local delBtn = GUI:CreateButton(panelFrame, "Delete", 60, 22, function()
                         table.remove(db.quiDatatexts.panels, i)
                         if PREYCore and PREYCore.Datapanels then
                             PREYCore.Datapanels:DeletePanel(panelConfig.id)
                             PREYCore.Datapanels:RefreshAll()
                         end
-                        -- Rebuild the tab to reflect changes
+
                         GUI:ShowConfirmation({
                             title = "Reload UI?",
                             message = "Panel deleted. Reload UI to see changes?",
@@ -4572,7 +4470,7 @@ local function CreateMinimapPage(parent)
                         })
                     end)
                     delBtn:SetPoint("RIGHT", -10, 0)
-                    
+
                     y = y - 70
                 end
             else
@@ -4580,8 +4478,8 @@ local function CreateMinimapPage(parent)
                 noPanelsLabel:SetPoint("TOPLEFT", PAD, y)
                 y = y - 30
             end
-            
-            -- Add Panel button
+
+
             local addPanelBtn = GUI:CreateButton(tabContent, "Add Panel", 120, 28, function()
                 local newID = "panel" .. (time() % 100000)
                 local newPanel = {
@@ -4599,12 +4497,12 @@ local function CreateMinimapPage(parent)
                     slots = {},
                 }
                 table.insert(db.quiDatatexts.panels, newPanel)
-                
+
                 if PREYCore and PREYCore.Datapanels then
                     PREYCore.Datapanels:RefreshAll()
                 end
-                
-                -- Rebuild the tab to show the new panel
+
+
                 GUI:ShowConfirmation({
                     title = "Reload UI?",
                     message = "Panel created. Reload UI to configure it?",
@@ -4616,11 +4514,11 @@ local function CreateMinimapPage(parent)
             addPanelBtn:SetPoint("TOPLEFT", PAD, y)
             y = y - 40
         end
-        
+
         tabContent:SetHeight(math.abs(y) + 50)
     end
-    
-    -- Create sub-tabs
+
+
     local subTabs = GUI:CreateSubTabs(content, {
         {name = "Minimap", builder = BuildMinimapTab},
         {name = "Datatext", builder = BuildDatatextTab},
@@ -4628,28 +4526,23 @@ local function CreateMinimapPage(parent)
     subTabs:SetPoint("TOPLEFT", 5, -5)
     subTabs:SetPoint("TOPRIGHT", -5, -5)
     subTabs:SetHeight(700)
-    
+
     content:SetHeight(750)
 end
 
----------------------------------------------------------------------------
--- PAGE: CDM Setup (New Cooldown Display Manager - PREY NCDM)
--- Per-row configuration for Essential, Utility, and Buff viewers
----------------------------------------------------------------------------
 
--- Refresh callback for NCDM changes
 local function RefreshNCDM()
-    -- Trigger the layout engine
+
     if _G.PreyUI_RefreshNCDM then
         _G.PreyUI_RefreshNCDM()
     end
 end
 
--- Initialize NCDM defaults for existing profiles that don't have them
+
 local function EnsureNCDMDefaults(db)
     if not db then return end
-    
-    -- Default row settings
+
+
     local defaultRow = {
         iconCount = 4,
         iconSize = 50,
@@ -4660,13 +4553,13 @@ local function EnsureNCDMDefaults(db)
         yOffset = 0,
         opacity = 1.0,
     }
-    
-    -- Ensure ncdm table exists
+
+
     if not db.ncdm then
         db.ncdm = {}
     end
-    
-    -- Ensure essential exists
+
+
     if not db.ncdm.essential then
         db.ncdm.essential = { enabled = true }
     end
@@ -4677,14 +4570,14 @@ local function EnsureNCDMDefaults(db)
             for k, v in pairs(defaultRow) do
                 db.ncdm.essential[rowKey][k] = v
             end
-            -- Row 3 disabled by default
+
             if i == 3 then
                 db.ncdm.essential[rowKey].iconCount = 0
             end
         end
     end
-    
-    -- Ensure utility exists
+
+
     if not db.ncdm.utility then
         db.ncdm.utility = { enabled = true }
     end
@@ -4698,14 +4591,14 @@ local function EnsureNCDMDefaults(db)
             db.ncdm.utility[rowKey].iconSize = 42
             db.ncdm.utility[rowKey].iconCount = 6
             db.ncdm.utility[rowKey].zoom = 0.08
-            -- Row 3 disabled by default
+
             if i == 3 then
                 db.ncdm.utility[rowKey].iconCount = 0
             end
         end
     end
-    
-    -- Ensure buff exists
+
+
     if not db.ncdm.buff then
         db.ncdm.buff = { enabled = false }
     end
@@ -4714,15 +4607,15 @@ end
 local function CreateCDMSetupPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
-    
-    -- Ensure NCDM tables exist for this profile
+
+
     EnsureNCDMDefaults(db)
-    
-    -- Helper to copy all settings from one row to another
+
+
     local function CopyRowSettings(sourceRow, targetRow)
         if not sourceRow or not targetRow then return end
 
-        -- Copy all numeric and string settings
+
         local keys = {"iconCount", "iconSize", "borderSize", "shape", "zoom", "padding", "yOffset",
                       "durationSize", "durationOffsetX", "durationOffsetY", "durationAnchor",
                       "stackSize", "stackOffsetX", "stackOffsetY", "stackAnchor", "opacity"}
@@ -4732,7 +4625,7 @@ local function CreateCDMSetupPage(parent)
             end
         end
 
-        -- Copy color tables (deep copy)
+
         if sourceRow.durationTextColor then
             targetRow.durationTextColor = {sourceRow.durationTextColor[1], sourceRow.durationTextColor[2], sourceRow.durationTextColor[3], sourceRow.durationTextColor[4]}
         end
@@ -4740,15 +4633,14 @@ local function CreateCDMSetupPage(parent)
             targetRow.stackTextColor = {sourceRow.stackTextColor[1], sourceRow.stackTextColor[2], sourceRow.stackTextColor[3], sourceRow.stackTextColor[4]}
         end
     end
-    
-    -- Helper to build a single row's settings (form layout - single column)
-    -- trackerData is the parent table (e.g., db.ncdm.essential) containing row1, row2, row3
+
+
     local function BuildRowSettings(tabContent, rowNum, rowData, trackerName, trackerData, rebuildCallback)
         local y = tabContent._currentY or -10
         local PAD = 10
         local FORM_ROW = 32
 
-        -- Ensure offset and text size defaults exist
+
         if rowData.xOffset == nil then rowData.xOffset = 0 end
         if rowData.durationSize == nil then rowData.durationSize = 14 end
         if rowData.durationOffsetX == nil then rowData.durationOffsetX = 0 end
@@ -4762,12 +4654,12 @@ local function CreateCDMSetupPage(parent)
         if rowData.stackAnchor == nil then rowData.stackAnchor = "BOTTOMRIGHT" end
         if rowData.opacity == nil then rowData.opacity = 1.0 end
 
-        -- Row Header
+
         local rowHeader = GUI:CreateSectionHeader(tabContent, string.format("Row %d Configuration", rowNum))
         rowHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - rowHeader.gap
 
-        -- Icon settings
+
         local countSlider = GUI:CreateFormSlider(tabContent, "Icons in Row", 0, 20, 1, "iconCount", rowData, RefreshNCDM)
         countSlider:SetPoint("TOPLEFT", PAD, y)
         countSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -4886,7 +4778,7 @@ local function CreateCDMSetupPage(parent)
         shapeTip:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Copy from dropdown (if trackerData is provided)
+
         if trackerData then
             local copyOptions = {}
             for i = 1, 3 do
@@ -4895,7 +4787,7 @@ local function CreateCDMSetupPage(parent)
                 end
             end
 
-            -- Copy Settings From - using form dropdown with Apply button
+
             local copyWrapper = { selected = copyOptions[1] and copyOptions[1].value or nil }
             local copyRow = CreateFrame("Frame", nil, tabContent)
             copyRow:SetHeight(FORM_ROW)
@@ -4917,29 +4809,29 @@ local function CreateCDMSetupPage(parent)
 
             y = y - FORM_ROW
         end
-        
-        -- Add spacing between rows
+
+
         y = y - 15
-        
+
         tabContent._currentY = y
         return y
     end
-    
-    -- Build Essential sub-tab
+
+
     local function BuildEssentialTab(tabContent)
         tabContent._currentY = -10
         local PAD = 10
         local y = tabContent._currentY
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 6, tabName = "CDM Setup & Class Bars", subTabIndex = 1, subTabName = "Essential"})
 
         if db and db.ncdm and db.ncdm.essential then
             local ess = db.ncdm.essential
-            
-            -- Rebuild callback to refresh the tab after copying
+
+
             local function rebuildEssential()
-                -- Clear and rebuild the tab content
+
                 for _, child in pairs({tabContent:GetChildren()}) do
                     child:Hide()
                     child:SetParent(nil)
@@ -4949,8 +4841,8 @@ local function CreateCDMSetupPage(parent)
                 end
                 BuildEssentialTab(tabContent)
             end
-            
-            -- Enable checkbox
+
+
             local FORM_ROW = 32
             local enableCheck = GUI:CreateFormCheckbox(tabContent, "Enable Essential Cooldowns Display", "enabled", ess, RefreshNCDM)
             enableCheck:SetPoint("TOPLEFT", PAD, y)
@@ -4958,7 +4850,7 @@ local function CreateCDMSetupPage(parent)
             y = y - FORM_ROW
             tabContent._currentY = y
 
-            -- Layout Direction dropdown
+
             ess.layoutDirection = ess.layoutDirection or "HORIZONTAL"
             local directionOptions = {
                 {value = "HORIZONTAL", text = "Horizontal"},
@@ -4970,7 +4862,7 @@ local function CreateCDMSetupPage(parent)
             y = y - FORM_ROW
             tabContent._currentY = y
 
-            -- Hint text
+
             local hintText = GUI:CreateLabel(tabContent, "Tip: Set Icon Size to 100% in Edit Mode for best results.", 11, C.textMuted)
             hintText:SetPoint("TOPLEFT", PAD, y)
             hintText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -4978,17 +4870,17 @@ local function CreateCDMSetupPage(parent)
             y = y - 24
             tabContent._currentY = y
 
-            -- Row 1
+
             if ess.row1 then
                 BuildRowSettings(tabContent, 1, ess.row1, "Essential", ess, rebuildEssential)
             end
-            
-            -- Row 2
+
+
             if ess.row2 then
                 BuildRowSettings(tabContent, 2, ess.row2, "Essential", ess, rebuildEssential)
             end
-            
-            -- Row 3
+
+
             if ess.row3 then
                 BuildRowSettings(tabContent, 3, ess.row3, "Essential", ess, rebuildEssential)
             end
@@ -4996,25 +4888,25 @@ local function CreateCDMSetupPage(parent)
             local info = GUI:CreateLabel(tabContent, "NCDM Essential settings not found. Please reload UI.", 12, C.accentLight)
             info:SetPoint("TOPLEFT", PAD, y)
         end
-        
+
         tabContent:SetHeight(math.abs(tabContent._currentY) + 50)
     end
-    
-    -- Build Utility sub-tab
+
+
     local function BuildUtilityTab(tabContent)
         tabContent._currentY = -10
         local PAD = 10
         local y = tabContent._currentY
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 6, tabName = "CDM Setup & Class Bars", subTabIndex = 2, subTabName = "Utility"})
 
         if db and db.ncdm and db.ncdm.utility then
             local util = db.ncdm.utility
-            
-            -- Rebuild callback to refresh the tab after copying
+
+
             local function rebuildUtility()
-                -- Clear and rebuild the tab content
+
                 for _, child in pairs({tabContent:GetChildren()}) do
                     child:Hide()
                     child:SetParent(nil)
@@ -5024,8 +4916,8 @@ local function CreateCDMSetupPage(parent)
                 end
                 BuildUtilityTab(tabContent)
             end
-            
-            -- Enable checkbox
+
+
             local FORM_ROW = 32
             local enableCheck = GUI:CreateFormCheckbox(tabContent, "Enable Utility Cooldowns Display", "enabled", util, RefreshNCDM)
             enableCheck:SetPoint("TOPLEFT", PAD, y)
@@ -5033,7 +4925,7 @@ local function CreateCDMSetupPage(parent)
             y = y - FORM_ROW
             tabContent._currentY = y
 
-            -- Anchor Below Essential toggle
+
             local anchorCheck = GUI:CreateFormCheckbox(tabContent, "Anchor Below Essential Rows", "anchorBelowEssential", util, function()
                 RefreshNCDM()
                 if _G.PreyUI_ApplyUtilityAnchor then
@@ -5045,7 +4937,7 @@ local function CreateCDMSetupPage(parent)
             y = y - FORM_ROW
             tabContent._currentY = y
 
-            -- Anchor Gap slider
+
             local gapSlider = GUI:CreateFormSlider(tabContent, "Anchor Gap", -200, 200, 1, "anchorGap", util, function()
                 RefreshNCDM()
                 if _G.PreyUI_ApplyUtilityAnchor then
@@ -5057,7 +4949,7 @@ local function CreateCDMSetupPage(parent)
             y = y - FORM_ROW
             tabContent._currentY = y
 
-            -- Layout Direction dropdown
+
             util.layoutDirection = util.layoutDirection or "HORIZONTAL"
             local directionOptions = {
                 {value = "HORIZONTAL", text = "Horizontal"},
@@ -5069,7 +4961,7 @@ local function CreateCDMSetupPage(parent)
             y = y - FORM_ROW
             tabContent._currentY = y
 
-            -- Hint text
+
             local hintText = GUI:CreateLabel(tabContent, "Tip: Set Icon Size to 100% in Edit Mode for best results.", 11, C.textMuted)
             hintText:SetPoint("TOPLEFT", PAD, y)
             hintText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -5077,17 +4969,17 @@ local function CreateCDMSetupPage(parent)
             y = y - 24
             tabContent._currentY = y
 
-            -- Row 1
+
             if util.row1 then
                 BuildRowSettings(tabContent, 1, util.row1, "Utility", util, rebuildUtility)
             end
-            
-            -- Row 2
+
+
             if util.row2 then
                 BuildRowSettings(tabContent, 2, util.row2, "Utility", util, rebuildUtility)
             end
-            
-            -- Row 3
+
+
             if util.row3 then
                 BuildRowSettings(tabContent, 3, util.row3, "Utility", util, rebuildUtility)
             end
@@ -5095,28 +4987,28 @@ local function CreateCDMSetupPage(parent)
             local info = GUI:CreateLabel(tabContent, "NCDM Utility settings not found. Please reload UI.", 12, C.accentLight)
             info:SetPoint("TOPLEFT", PAD, y)
         end
-        
+
         tabContent:SetHeight(math.abs(tabContent._currentY) + 50)
     end
-    
-    -- Build Buff sub-tab with customization options
+
+
     local function BuildBuffTab(tabContent)
         local PAD = 10
         local y = -10
 
-        -- Set search context for widget auto-registration
+
         GUI:SetSearchContext({tabIndex = 6, tabName = "CDM Setup & Class Bars", subTabIndex = 3, subTabName = "Buff"})
 
-        -- Ensure buff settings exist with all required fields
+
         if not db.ncdm then db.ncdm = {} end
         if not db.ncdm.buff then db.ncdm.buff = {} end
-        
-        -- Ensure all fields exist with defaults
+
+
         local buffData = db.ncdm.buff
         if buffData.enabled == nil then buffData.enabled = true end
         if buffData.iconSize == nil then buffData.iconSize = 42 end
         if buffData.borderSize == nil then buffData.borderSize = 2 end
-        if buffData.shape == nil then buffData.shape = "square" end  -- DEPRECATED
+        if buffData.shape == nil then buffData.shape = "square" end
         if buffData.aspectRatioCrop == nil then buffData.aspectRatioCrop = 1.0 end
         if buffData.growthDirection == nil then buffData.growthDirection = "CENTERED_HORIZONTAL" end
         if buffData.zoom == nil then buffData.zoom = 0 end
@@ -5125,14 +5017,14 @@ local function CreateCDMSetupPage(parent)
         if buffData.stackSize == nil then buffData.stackSize = 12 end
         if buffData.opacity == nil then buffData.opacity = 1.0 end
 
-        -- Callback to refresh buff bar
+
         local function RefreshBuff()
             if _G.PreyUI_RefreshBuffBar then
                 _G.PreyUI_RefreshBuffBar()
             end
         end
-        
-        -- Header
+
+
         local FORM_ROW = 32
         local header = GUI:CreateSectionHeader(tabContent, "Buff Icon Settings")
         header:SetPoint("TOPLEFT", PAD, y)
@@ -5240,7 +5132,7 @@ local function CreateCDMSetupPage(parent)
         shapeTip:SetJustifyH("LEFT")
         y = y - 20
 
-        y = y - 10 -- Spacer
+        y = y - 10
 
         local info = GUI:CreateLabel(tabContent, "Position the Buff Icons using Edit Mode (Esc > Edit Mode).", 11, C.textMuted)
         info:SetPoint("TOPLEFT", PAD, y)
@@ -5248,11 +5140,7 @@ local function CreateCDMSetupPage(parent)
         info:SetJustifyH("LEFT")
         y = y - FORM_ROW
 
-        -----------------------------------------------------------------------
-        -- TRACKED BAR SECTION
-        -----------------------------------------------------------------------
 
-        -- Ensure trackedBar settings exist with defaults
         if not db.ncdm.trackedBar then db.ncdm.trackedBar = {} end
         local trackedData = db.ncdm.trackedBar
         if trackedData.enabled == nil then trackedData.enabled = true end
@@ -5270,19 +5158,19 @@ local function CreateCDMSetupPage(parent)
         if trackedData.spacing == nil then trackedData.spacing = 4 end
         if trackedData.growUp == nil then trackedData.growUp = true end
         if trackedData.hideText == nil then trackedData.hideText = false end
-        -- Vertical bar settings
+
         if trackedData.orientation == nil then trackedData.orientation = "horizontal" end
         if trackedData.fillDirection == nil then trackedData.fillDirection = "up" end
         if trackedData.iconPosition == nil then trackedData.iconPosition = "top" end
         if trackedData.showTextOnVertical == nil then trackedData.showTextOnVertical = false end
 
-        y = y - 10 -- Extra spacing before new section
+        y = y - 10
 
         local trackedHeader = GUI:CreateSectionHeader(tabContent, "Tracked Bar")
         trackedHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - trackedHeader.gap
 
-        -- Description text
+
         local trackedDesc = GUI:CreateLabel(tabContent, "Controls the appearance of buff duration bars for spells under 'Tracked Bars' of your CDM. Hint: Most players will opt to display buffs via the Buff Icon section above.", 11, C.textMuted)
         trackedDesc:SetPoint("TOPLEFT", PAD, y)
         trackedDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -5291,40 +5179,40 @@ local function CreateCDMSetupPage(parent)
         trackedDesc:SetHeight(30)
         y = y - 40
 
-        -- Enable toggle
+
         local trackedEnable = GUI:CreateFormCheckbox(tabContent, "Enable Tracked Bar Styling", "enabled", trackedData, RefreshBuff)
         trackedEnable:SetPoint("TOPLEFT", PAD, y)
         trackedEnable:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Hide Icon toggle
+
         local hideIconCheck = GUI:CreateFormCheckbox(tabContent, "Hide Icon", "hideIcon", trackedData, RefreshBuff)
         hideIconCheck:SetPoint("TOPLEFT", PAD, y)
         hideIconCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Bar Height
+
         local heightSlider = GUI:CreateFormSlider(tabContent, "Bar Height", 2, 48, 1, "barHeight", trackedData, RefreshBuff)
         heightSlider:SetPoint("TOPLEFT", PAD, y)
         heightSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Bar Width
+
         local widthSlider = GUI:CreateFormSlider(tabContent, "Bar Width", 100, 400, 1, "barWidth", trackedData, RefreshBuff)
         widthSlider:SetPoint("TOPLEFT", PAD, y)
         widthSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Bar Texture
+
         local textureDropdown = GUI:CreateFormDropdown(tabContent, "Bar Texture", GetTextureList(), "texture", trackedData, RefreshBuff)
         textureDropdown:SetPoint("TOPLEFT", PAD, y)
         textureDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Forward reference for orientation change callback
+
         local updateVerticalStates
 
-        -- Bar Orientation
+
         local orientationDropdown = GUI:CreateFormDropdown(tabContent, "Bar Orientation", {
             {value = "horizontal", text = "Horizontal"},
             {value = "vertical", text = "Vertical"},
@@ -5346,7 +5234,7 @@ local function CreateCDMSetupPage(parent)
         orientationDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Stack Direction (renamed from Growth Direction, context-dependent)
+
         local growthDropdown = GUI:CreateFormDropdown(tabContent, "Stack Direction", {
             {value = true, text = "Up / Right"},
             {value = false, text = "Down / Left"},
@@ -5361,7 +5249,7 @@ local function CreateCDMSetupPage(parent)
         stackTip:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Fill Direction (Vertical only)
+
         local fillDropdown = GUI:CreateFormDropdown(tabContent, "Fill Direction (Vertical)", {
             {value = "up", text = "Fill Up"},
             {value = "down", text = "Fill Down"},
@@ -5376,7 +5264,7 @@ local function CreateCDMSetupPage(parent)
         fillTip:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Icon Position (Vertical only)
+
         local iconPosDropdown = GUI:CreateFormDropdown(tabContent, "Icon Position (Vertical)", {
             {value = "top", text = "Top"},
             {value = "bottom", text = "Bottom"},
@@ -5391,7 +5279,7 @@ local function CreateCDMSetupPage(parent)
         iconPosTip:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Show Text (Vertical only)
+
         local showTextCheck = GUI:CreateFormCheckbox(tabContent, "Show Text (Vertical)", "showTextOnVertical", trackedData, RefreshBuff)
         showTextCheck:SetPoint("TOPLEFT", PAD, y)
         showTextCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -5403,15 +5291,14 @@ local function CreateCDMSetupPage(parent)
         textTip:SetJustifyH("LEFT")
         y = y - 20
 
-        -- UX: Dim vertical-only options when horizontal, swap height/width labels
-        -- Assign to forward reference so orientation dropdown onChange can call it
+
         updateVerticalStates = function()
             local isVertical = trackedData.orientation == "vertical"
             local alpha = isVertical and 1.0 or 0.4
             fillDropdown:SetAlpha(alpha)
             iconPosDropdown:SetAlpha(alpha)
             showTextCheck:SetAlpha(alpha)
-            -- Swap height/width labels based on orientation
+
             if heightSlider.label and widthSlider.label then
                 if isVertical then
                     heightSlider.label:SetText("Bar Width")
@@ -5422,57 +5309,57 @@ local function CreateCDMSetupPage(parent)
                 end
             end
         end
-        updateVerticalStates()  -- Initial state
+        updateVerticalStates()
 
-        -- Use Class Color
+
         local classColorCheck = GUI:CreateFormCheckbox(tabContent, "Use Class Color", "useClassColor", trackedData, RefreshBuff)
         classColorCheck:SetPoint("TOPLEFT", PAD, y)
         classColorCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Bar Color (fallback)
+
         local barColorPicker = GUI:CreateFormColorPicker(tabContent, "Bar Color (Fallback)", "barColor", trackedData, RefreshBuff)
         barColorPicker:SetPoint("TOPLEFT", PAD, y)
         barColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Bar Opacity
+
         local barOpacitySlider = GUI:CreateFormSlider(tabContent, "Bar Opacity", 0, 1, 0.05, "barOpacity", trackedData, RefreshBuff)
         barOpacitySlider:SetPoint("TOPLEFT", PAD, y)
         barOpacitySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Border Size
+
         local trackedBorderSlider = GUI:CreateFormSlider(tabContent, "Border Size", 0, 4, 1, "borderSize", trackedData, RefreshBuff)
         trackedBorderSlider:SetPoint("TOPLEFT", PAD, y)
         trackedBorderSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Background Color
+
         local bgColorPicker = GUI:CreateFormColorPicker(tabContent, "Background Color", "bgColor", trackedData, RefreshBuff)
         bgColorPicker:SetPoint("TOPLEFT", PAD, y)
         bgColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Background Opacity
+
         local bgOpacitySlider = GUI:CreateFormSlider(tabContent, "Background Opacity", 0, 1, 0.1, "bgOpacity", trackedData, RefreshBuff)
         bgOpacitySlider:SetPoint("TOPLEFT", PAD, y)
         bgOpacitySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Text Size
+
         local trackedTextSlider = GUI:CreateFormSlider(tabContent, "Text Size", 8, 24, 1, "textSize", trackedData, RefreshBuff)
         trackedTextSlider:SetPoint("TOPLEFT", PAD, y)
         trackedTextSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Hide Text
+
         local hideTextCheck = GUI:CreateFormCheckbox(tabContent, "Hide Text", "hideText", trackedData, RefreshBuff)
         hideTextCheck:SetPoint("TOPLEFT", PAD, y)
         hideTextCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Bar Spacing
+
         local spacingSlider = GUI:CreateFormSlider(tabContent, "Bar Spacing", 0, 20, 1, "spacing", trackedData, RefreshBuff)
         spacingSlider:SetPoint("TOPLEFT", PAD, y)
         spacingSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -5480,20 +5367,20 @@ local function CreateCDMSetupPage(parent)
 
         tabContent:SetHeight(math.abs(y) + 20)
     end
-    
-    -- Build Powerbar sub-tab
+
+
     local function BuildPowerbarTab(tabContent)
         local PAD = 10
         local y = -10
 
-        -- Set search context for widget auto-registration
+
         GUI:SetSearchContext({tabIndex = 6, tabName = "CDM Setup & Class Bars", subTabIndex = 4, subTabName = "Class Resource Bar"})
 
-        -- Ensure powerBar settings exist
+
         if not db.powerBar then db.powerBar = {} end
         if not db.secondaryPowerBar then db.secondaryPowerBar = {} end
-        
-        -- Ensure all fields exist with defaults
+
+
         local primary = db.powerBar
         if primary.enabled == nil then primary.enabled = true end
         if primary.autoAttach == nil then primary.autoAttach = true end
@@ -5502,8 +5389,8 @@ local function CreateCDMSetupPage(parent)
         if primary.offsetX == nil then primary.offsetX = 0 end
         if primary.offsetY == nil then primary.offsetY = 25 end
         if primary.texture == nil then primary.texture = "Solid" end
-        if primary.colorMode == nil then primary.colorMode = "power" end  -- "power", "class", or "custom"
-        if primary.usePowerColor == nil then primary.usePowerColor = true end  -- Default to power type color
+        if primary.colorMode == nil then primary.colorMode = "power" end
+        if primary.usePowerColor == nil then primary.usePowerColor = true end
         if primary.useClassColor == nil then primary.useClassColor = false end
         if primary.useCustomColor == nil then primary.useCustomColor = false end
         if primary.customColor == nil then primary.customColor = {0.82, 0.18, 0.22, 1} end
@@ -5527,8 +5414,8 @@ local function CreateCDMSetupPage(parent)
         if secondary.offsetX == nil then secondary.offsetX = 0 end
         if secondary.offsetY == nil then secondary.offsetY = 0 end
         if secondary.texture == nil then secondary.texture = "Solid" end
-        if secondary.colorMode == nil then secondary.colorMode = "power" end  -- "power", "class", or "custom"
-        if secondary.usePowerColor == nil then secondary.usePowerColor = true end  -- Default to power type color
+        if secondary.colorMode == nil then secondary.colorMode = "power" end
+        if secondary.usePowerColor == nil then secondary.usePowerColor = true end
         if secondary.useClassColor == nil then secondary.useClassColor = false end
         if secondary.useCustomColor == nil then secondary.useCustomColor = false end
         if secondary.customColor == nil then secondary.customColor = {1.0, 0.8, 0.2, 1} end
@@ -5543,7 +5430,7 @@ local function CreateCDMSetupPage(parent)
         if secondary.orientation == nil then secondary.orientation = "AUTO" end
         if secondary.snapGap == nil then secondary.snapGap = 5 end
 
-        -- Callback to refresh power bars
+
         local function RefreshPowerBars()
             if _G.PreyUI and _G.PreyUI.PREYCore then
                 local PREYCore = _G.PreyUI.PREYCore
@@ -5551,8 +5438,8 @@ local function CreateCDMSetupPage(parent)
                 if PREYCore.UpdateSecondaryPowerBar then PREYCore:UpdateSecondaryPowerBar() end
             end
         end
-        
-        -- Get texture options from LSM
+
+
         local function GetTextureOptions()
             local options = {}
             local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
@@ -5571,21 +5458,19 @@ local function CreateCDMSetupPage(parent)
             end
             return options
         end
-        
-        -- Forward declare slider references
+
+
         local widthPrimarySlider, widthSecondarySlider
         local yOffsetPrimarySlider, yOffsetSecondarySlider
 
         local FORM_ROW = 32
 
-        -- =====================================================
-        -- GENERAL SETTINGS
-        -- =====================================================
+
         local generalHeader = GUI:CreateSectionHeader(tabContent, "General")
         generalHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - generalHeader.gap
 
-        -- Reload prompt for enable/standalone toggles
+
         local function PromptResourceBarReload()
             GUI:ShowConfirmation({
                 title = "Reload UI?",
@@ -5596,7 +5481,7 @@ local function CreateCDMSetupPage(parent)
             })
         end
 
-        -- Enable toggles
+
         local enablePrimary = GUI:CreateFormToggle(tabContent, "Enable Primary Class Resource Bar", "enabled", primary, PromptResourceBarReload)
         enablePrimary:SetPoint("TOPLEFT", PAD, y)
         enablePrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -5607,7 +5492,7 @@ local function CreateCDMSetupPage(parent)
         enableSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Standalone toggles
+
         local standalonePrimary = GUI:CreateFormToggle(tabContent, "Primary Standalone Mode", "standaloneMode", primary, PromptResourceBarReload)
         standalonePrimary:SetPoint("TOPLEFT", PAD, y)
         standalonePrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -5630,7 +5515,7 @@ local function CreateCDMSetupPage(parent)
         standaloneDesc:SetJustifyH("LEFT")
         y = y - 25
 
-        -- Unthrottled CPU Use toggle (affects both primary and secondary)
+
         local unthrottledToggle = GUI:CreateFormToggle(tabContent, "Unthrottled CPU Use", "unthrottledCPU", primary, RefreshPowerBars)
         unthrottledToggle:SetPoint("TOPLEFT", PAD, y)
         unthrottledToggle:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -5642,12 +5527,10 @@ local function CreateCDMSetupPage(parent)
         unthrottledDesc:SetJustifyH("LEFT")
         y = y - 25
 
-        -- Spacer before Primary section
+
         y = y - 10
 
-        -- =====================================================
-        -- PRIMARY POWER BAR SECTION
-        -- =====================================================
+
         local primaryHeader = GUI:CreateSectionHeader(tabContent, "Primary Class Resource Bar")
         primaryHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - primaryHeader.gap
@@ -5664,7 +5547,7 @@ local function CreateCDMSetupPage(parent)
         primaryWarning:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Orientation dropdown
+
         local orientationOptions = {
             {value = "HORIZONTAL", text = "Horizontal"},
             {value = "VERTICAL", text = "Vertical"},
@@ -5674,7 +5557,7 @@ local function CreateCDMSetupPage(parent)
         orientationPrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Snap to Essential button (form style with label)
+
         local snapPrimaryContainer = CreateFrame("Frame", nil, tabContent)
         snapPrimaryContainer:SetHeight(FORM_ROW)
         snapPrimaryContainer:SetPoint("TOPLEFT", PAD, y)
@@ -5708,7 +5591,7 @@ local function CreateCDMSetupPage(parent)
             self:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
         end)
         snapPrimaryBtn:SetScript("OnClick", function()
-            -- Force CDM refresh to ensure __cdmIconWidth is current
+
             if _G.PreyUI_RefreshNCDM then
                 _G.PreyUI_RefreshNCDM()
             end
@@ -5728,7 +5611,7 @@ local function CreateCDMSetupPage(parent)
                     local isVertical = primary.orientation == "VERTICAL"
 
                     if isVertical then
-                        -- Vertical bar: goes to the RIGHT of Essential, length matches total height
+
                         local totalHeight = essentialViewer.__cdmTotalHeight or essentialViewer:GetHeight() or 100
                         local topBottomBorderSize = essentialViewer.__cdmRow1BorderSize or 0
                         local targetWidth = totalHeight + (2 * topBottomBorderSize) - (2 * barBorderSize)
@@ -5744,7 +5627,7 @@ local function CreateCDMSetupPage(parent)
                         primary.offsetY = math.floor(essentialCenterY - screenCenterY + 0.5)
                         primary.width = math.floor(targetWidth + 0.5)
                     else
-                        -- Horizontal bar: goes ABOVE Essential, width matches row width
+
                         local rowWidth = essentialViewer.__cdmRow1Width or essentialViewer.__cdmIconWidth or 300
                         local totalHeight = essentialViewer.__cdmTotalHeight or essentialViewer:GetHeight() or 100
                         local row1BorderSize = essentialViewer.__cdmRow1BorderSize or 2
@@ -5776,7 +5659,7 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Snap to Utility button (side by side with Essential)
+
         local snapUtilityBtn = CreateFrame("Button", nil, snapPrimaryContainer, "BackdropTemplate")
         snapUtilityBtn:SetSize(115, 24)
         snapUtilityBtn:SetPoint("LEFT", snapPrimaryBtn, "RIGHT", 5, 0)
@@ -5800,7 +5683,7 @@ local function CreateCDMSetupPage(parent)
             self:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
         end)
         snapUtilityBtn:SetScript("OnClick", function()
-            -- Force CDM refresh to ensure dimensions are current
+
             if _G.PreyUI_RefreshNCDM then
                 _G.PreyUI_RefreshNCDM()
             end
@@ -5820,7 +5703,7 @@ local function CreateCDMSetupPage(parent)
                     local isVertical = primary.orientation == "VERTICAL"
 
                     if isVertical then
-                        -- Vertical bar: goes to the LEFT of Utility, length matches total height
+
                         local totalHeight = utilityViewer.__cdmTotalHeight or utilityViewer:GetHeight() or 100
                         local topBottomBorderSize = utilityViewer.__cdmRow1BorderSize or 0
                         local targetWidth = totalHeight + (2 * topBottomBorderSize) - (2 * barBorderSize)
@@ -5836,7 +5719,7 @@ local function CreateCDMSetupPage(parent)
                         primary.offsetY = math.floor(utilityCenterY - screenCenterY + 0.5)
                         primary.width = math.floor(targetWidth + 0.5)
                     else
-                        -- Horizontal bar: goes BELOW Utility, width matches row width
+
                         local rowWidth = utilityViewer.__cdmBottomRowWidth or utilityViewer.__cdmIconWidth or 300
                         local totalHeight = utilityViewer.__cdmTotalHeight or utilityViewer:GetHeight() or 100
                         local bottomRowBorderSize = utilityViewer.__cdmBottomRowBorderSize or 2
@@ -5869,7 +5752,7 @@ local function CreateCDMSetupPage(parent)
         end)
         y = y - FORM_ROW
 
-        -- Lock buttons (auto-resize when CDM changes)
+
         local lockContainer = CreateFrame("Frame", nil, tabContent)
         lockContainer:SetHeight(FORM_ROW)
         lockContainer:SetPoint("TOPLEFT", PAD, y)
@@ -5880,7 +5763,7 @@ local function CreateCDMSetupPage(parent)
         lockLabel:SetText("Auto-Resize")
         lockLabel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Lock to Essentials button
+
         local lockEssentialBtn = CreateFrame("Button", nil, lockContainer, "BackdropTemplate")
         lockEssentialBtn:SetSize(115, 24)
         lockEssentialBtn:SetPoint("LEFT", lockContainer, "LEFT", 180, 0)
@@ -5895,7 +5778,7 @@ local function CreateCDMSetupPage(parent)
         lockEssentialText:SetPoint("CENTER")
         lockEssentialText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Lock to Utility button
+
         local lockUtilityBtn = CreateFrame("Button", nil, lockContainer, "BackdropTemplate")
         lockUtilityBtn:SetSize(115, 24)
         lockUtilityBtn:SetPoint("LEFT", lockEssentialBtn, "RIGHT", 5, 0)
@@ -5911,7 +5794,7 @@ local function CreateCDMSetupPage(parent)
         lockUtilityText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
         local function UpdateLockButtonStates()
-            -- Essential button state
+
             if primary.lockedToEssential then
                 lockEssentialText:SetText("Unlock Essential")
                 lockEssentialBtn:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
@@ -5919,7 +5802,7 @@ local function CreateCDMSetupPage(parent)
                 lockEssentialText:SetText("Lock to Essential")
                 lockEssentialBtn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
             end
-            -- Utility button state
+
             if primary.lockedToUtility then
                 lockUtilityText:SetText("Unlock Utility")
                 lockUtilityBtn:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
@@ -5927,14 +5810,14 @@ local function CreateCDMSetupPage(parent)
                 lockUtilityText:SetText("Lock to Utility")
                 lockUtilityBtn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
             end
-            -- Disable Width slider when locked
+
             if widthPrimarySlider and widthPrimarySlider.SetEnabled then
                 widthPrimarySlider:SetEnabled(not primary.lockedToEssential and not primary.lockedToUtility)
             end
         end
         UpdateLockButtonStates()
 
-        -- Essential button hover
+
         lockEssentialBtn:SetScript("OnEnter", function(self)
             self:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
         end)
@@ -5944,7 +5827,7 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Utility button hover
+
         lockUtilityBtn:SetScript("OnEnter", function(self)
             self:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
         end)
@@ -5954,14 +5837,14 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Lock to Essentials click handler
+
         lockEssentialBtn:SetScript("OnClick", function()
             if primary.lockedToEssential then
-                -- Unlock
+
                 primary.lockedToEssential = false
                 UpdateLockButtonStates()
             else
-                -- Lock: do snap first, then enable lock
+
                 if _G.PreyUI_RefreshNCDM then
                     _G.PreyUI_RefreshNCDM()
                 end
@@ -5981,7 +5864,7 @@ local function CreateCDMSetupPage(parent)
                         local isVertical = primary.orientation == "VERTICAL"
 
                         if isVertical then
-                            -- Vertical bar: goes to the RIGHT of Essential
+
                             local totalHeight = essentialViewer.__cdmTotalHeight or essentialViewer:GetHeight() or 100
                             local topBottomBorderSize = essentialViewer.__cdmRow1BorderSize or 0
                             local targetWidth = totalHeight + (2 * topBottomBorderSize) - (2 * barBorderSize)
@@ -5994,7 +5877,7 @@ local function CreateCDMSetupPage(parent)
                             primary.offsetY = math.floor(essentialCenterY - screenCenterY + 0.5)
                             primary.width = math.floor(targetWidth + 0.5)
                         else
-                            -- Horizontal bar: goes ABOVE Essential
+
                             local rowWidth = essentialViewer.__cdmRow1Width or essentialViewer.__cdmIconWidth or 300
                             local totalHeight = essentialViewer.__cdmTotalHeight or essentialViewer:GetHeight() or 100
                             local row1BorderSize = essentialViewer.__cdmRow1BorderSize or 2
@@ -6009,7 +5892,7 @@ local function CreateCDMSetupPage(parent)
                         primary.autoAttach = false
                         primary.useRawPixels = true
                         primary.lockedToEssential = true
-                        primary.lockedToUtility = false  -- Mutually exclusive
+                        primary.lockedToUtility = false
 
                         RefreshPowerBars()
                         UpdateLockButtonStates()
@@ -6029,14 +5912,14 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Lock to Utility click handler
+
         lockUtilityBtn:SetScript("OnClick", function()
             if primary.lockedToUtility then
-                -- Unlock
+
                 primary.lockedToUtility = false
                 UpdateLockButtonStates()
             else
-                -- Lock: do snap first, then enable lock
+
                 if _G.PreyUI_RefreshNCDM then
                     _G.PreyUI_RefreshNCDM()
                 end
@@ -6056,7 +5939,7 @@ local function CreateCDMSetupPage(parent)
                         local isVertical = primary.orientation == "VERTICAL"
 
                         if isVertical then
-                            -- Vertical bar: goes to the LEFT of Utility
+
                             local totalHeight = utilityViewer.__cdmTotalHeight or utilityViewer:GetHeight() or 100
                             local topBottomBorderSize = utilityViewer.__cdmRow1BorderSize or 0
                             local targetWidth = totalHeight + (2 * topBottomBorderSize) - (2 * barBorderSize)
@@ -6069,7 +5952,7 @@ local function CreateCDMSetupPage(parent)
                             primary.offsetY = math.floor(utilityCenterY - screenCenterY + 0.5)
                             primary.width = math.floor(targetWidth + 0.5)
                         else
-                            -- Horizontal bar: goes BELOW Utility
+
                             local rowWidth = utilityViewer.__cdmBottomRowWidth or utilityViewer.__cdmIconWidth or 300
                             local totalHeight = utilityViewer.__cdmTotalHeight or utilityViewer:GetHeight() or 100
                             local bottomRowBorderSize = utilityViewer.__cdmBottomRowBorderSize or 2
@@ -6084,7 +5967,7 @@ local function CreateCDMSetupPage(parent)
                         primary.autoAttach = false
                         primary.useRawPixels = true
                         primary.lockedToUtility = true
-                        primary.lockedToEssential = false  -- Mutually exclusive
+                        primary.lockedToEssential = false
 
                         RefreshPowerBars()
                         UpdateLockButtonStates()
@@ -6105,7 +5988,7 @@ local function CreateCDMSetupPage(parent)
         end)
         y = y - FORM_ROW
 
-        -- Color options (form style) - radio-button behavior: clicking one turns off the others
+
         local customColorPickerPrimary
 
         local powerColorPrimary = GUI:CreateFormCheckbox(tabContent, "Use Resource Type Color", "usePowerColor", primary, function()
@@ -6114,7 +5997,7 @@ local function CreateCDMSetupPage(parent)
                 primary.useCustomColor = false
                 primary.colorMode = "power"
             else
-                -- Fallback: if turning off and nothing else is on, re-enable this
+
                 if not primary.useClassColor and not primary.useCustomColor then
                     primary.usePowerColor = true
                 end
@@ -6141,7 +6024,7 @@ local function CreateCDMSetupPage(parent)
                 primary.useCustomColor = false
                 primary.colorMode = "class"
             else
-                -- Fallback: if turning off and nothing else is on, enable Resource Type Color
+
                 if not primary.usePowerColor and not primary.useCustomColor then
                     primary.usePowerColor = true
                 end
@@ -6166,7 +6049,7 @@ local function CreateCDMSetupPage(parent)
                 primary.useClassColor = false
                 primary.colorMode = "custom"
             else
-                -- Fallback: if turning off and nothing else is on, enable Resource Type Color
+
                 if not primary.usePowerColor and not primary.useClassColor then
                     primary.usePowerColor = true
                 end
@@ -6186,7 +6069,7 @@ local function CreateCDMSetupPage(parent)
         customColorPickerPrimary:SetEnabled(primary.useCustomColor)
         y = y - FORM_ROW
 
-        -- Text display options
+
         local showTextPrimary = GUI:CreateFormCheckbox(tabContent, "Show Number", "showText", primary, RefreshPowerBars)
         showTextPrimary:SetPoint("TOPLEFT", PAD, y)
         showTextPrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -6197,7 +6080,7 @@ local function CreateCDMSetupPage(parent)
         showPercentPrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Tick marks
+
         local showTicksPrimary = GUI:CreateFormCheckbox(tabContent, "Show Tick Marks", "showTicks", primary, RefreshPowerBars)
         showTicksPrimary:SetPoint("TOPLEFT", PAD, y)
         showTicksPrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -6213,11 +6096,11 @@ local function CreateCDMSetupPage(parent)
         tickColorPrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Size sliders (form style)
+
         widthPrimarySlider = GUI:CreateFormSlider(tabContent, "Width", 0, 2000, 1, "width", primary, RefreshPowerBars)
         widthPrimarySlider:SetPoint("TOPLEFT", PAD, y)
         widthPrimarySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        widthPrimarySlider:SetEnabled(not primary.lockedToEssential and not primary.lockedToUtility)  -- Disabled when locked
+        widthPrimarySlider:SetEnabled(not primary.lockedToEssential and not primary.lockedToUtility)
         y = y - FORM_ROW
 
         local heightPrimary = GUI:CreateFormSlider(tabContent, "Height", 1, 100, 1, "height", primary, RefreshPowerBars)
@@ -6230,7 +6113,7 @@ local function CreateCDMSetupPage(parent)
         borderPrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Position sliders
+
         local xOffsetPrimarySlider = GUI:CreateFormSlider(tabContent, "X Offset", -1000, 1000, 1, "offsetX", primary, RefreshPowerBars)
         xOffsetPrimarySlider:SetPoint("TOPLEFT", PAD, y)
         xOffsetPrimarySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -6241,12 +6124,12 @@ local function CreateCDMSetupPage(parent)
         yOffsetPrimarySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Register sliders for real-time sync during Edit Mode
+
         if _G.PreyUI and _G.PreyUI.PREYCore and _G.PreyUI.PREYCore.RegisterPowerBarEditModeSliders then
             _G.PreyUI.PREYCore:RegisterPowerBarEditModeSliders("primary", xOffsetPrimarySlider, yOffsetPrimarySlider)
         end
 
-        -- Text sliders
+
         local textSizePrimary = GUI:CreateFormSlider(tabContent, "Text Size", 8, 50, 1, "textSize", primary, RefreshPowerBars)
         textSizePrimary:SetPoint("TOPLEFT", PAD, y)
         textSizePrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -6262,8 +6145,8 @@ local function CreateCDMSetupPage(parent)
         textYPrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Text color settings
-        local textCustomColorPrimary  -- Forward declare for mutual reference
+
+        local textCustomColorPrimary
 
         local textUseClassColorPrimary = GUI:CreateFormCheckbox(tabContent, "Use Class Color for Text", "textUseClassColor", primary, function()
             if textCustomColorPrimary then
@@ -6278,7 +6161,7 @@ local function CreateCDMSetupPage(parent)
         textCustomColorPrimary = GUI:CreateFormColorPicker(tabContent, "Custom Text Color", "textCustomColor", primary, RefreshPowerBars)
         textCustomColorPrimary:SetPoint("TOPLEFT", PAD, y)
         textCustomColorPrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        textCustomColorPrimary:SetEnabled(not primary.textUseClassColor)  -- Initial state
+        textCustomColorPrimary:SetEnabled(not primary.textUseClassColor)
         y = y - FORM_ROW
 
         local texturePrimary = GUI:CreateFormDropdown(tabContent, "Bar Texture", GetTextureList(), "texture", primary, RefreshPowerBars)
@@ -6286,12 +6169,10 @@ local function CreateCDMSetupPage(parent)
         texturePrimary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Spacer between sections
+
         y = y - 15
-        
-        -- =====================================================
-        -- SECONDARY POWER BAR SECTION
-        -- =====================================================
+
+
         local secondaryHeader = GUI:CreateSectionHeader(tabContent, "Secondary Class Resource Bar")
         secondaryHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - secondaryHeader.gap
@@ -6308,7 +6189,7 @@ local function CreateCDMSetupPage(parent)
         secondaryWarning:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Orientation dropdown
+
         local orientationOptionsSecondary = {
             {value = "HORIZONTAL", text = "Horizontal"},
             {value = "VERTICAL", text = "Vertical"},
@@ -6318,7 +6199,7 @@ local function CreateCDMSetupPage(parent)
         orientationSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Quick Position row with 3 buttons: Snap to Essentials, Snap to Utility, Snap to Primary
+
         local snapSecondaryContainer = CreateFrame("Frame", nil, tabContent)
         snapSecondaryContainer:SetHeight(FORM_ROW)
         snapSecondaryContainer:SetPoint("TOPLEFT", PAD, y)
@@ -6329,7 +6210,7 @@ local function CreateCDMSetupPage(parent)
         snapSecondaryLabel:SetText("Quick Position")
         snapSecondaryLabel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Snap to Essentials button
+
         local snapSecEssentialBtn = CreateFrame("Button", nil, snapSecondaryContainer, "BackdropTemplate")
         snapSecEssentialBtn:SetSize(100, 24)
         snapSecEssentialBtn:SetPoint("LEFT", snapSecondaryContainer, "LEFT", 180, 0)
@@ -6367,7 +6248,7 @@ local function CreateCDMSetupPage(parent)
                     local isVertical = secondary.orientation == "VERTICAL"
 
                     if isVertical then
-                        -- Vertical bar: goes to the RIGHT of Essential
+
                         local totalHeight = essentialViewer.__cdmTotalHeight or essentialViewer:GetHeight() or 100
                         local topBottomBorderSize = essentialViewer.__cdmRow1BorderSize or 0
                         local targetWidth = totalHeight + (2 * topBottomBorderSize) - (2 * barBorderSize)
@@ -6380,7 +6261,7 @@ local function CreateCDMSetupPage(parent)
                         secondary.lockedBaseY = math.floor(essentialCenterY - screenCenterY + 0.5)
                         secondary.width = math.floor(targetWidth + 0.5)
                     else
-                        -- Horizontal bar: goes ABOVE Essential
+
                         local rowWidth = essentialViewer.__cdmRow1Width or essentialViewer.__cdmIconWidth or 300
                         local totalHeight = essentialViewer.__cdmTotalHeight or essentialViewer:GetHeight() or 100
                         local row1BorderSize = essentialViewer.__cdmRow1BorderSize or 2
@@ -6393,7 +6274,7 @@ local function CreateCDMSetupPage(parent)
                         secondary.width = math.floor(targetWidth + 0.5)
                     end
 
-                    secondary.offsetX = 0  -- Reset user adjustment
+                    secondary.offsetX = 0
                     secondary.offsetY = 0
                     secondary.autoAttach = false
                     secondary.useRawPixels = true
@@ -6408,7 +6289,7 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Snap to Utility button
+
         local snapSecUtilityBtn = CreateFrame("Button", nil, snapSecondaryContainer, "BackdropTemplate")
         snapSecUtilityBtn:SetSize(100, 24)
         snapSecUtilityBtn:SetPoint("LEFT", snapSecEssentialBtn, "RIGHT", 5, 0)
@@ -6446,7 +6327,7 @@ local function CreateCDMSetupPage(parent)
                     local isVertical = secondary.orientation == "VERTICAL"
 
                     if isVertical then
-                        -- Vertical bar: goes to the LEFT of Utility
+
                         local totalHeight = utilityViewer.__cdmTotalHeight or utilityViewer:GetHeight() or 100
                         local topBottomBorderSize = utilityViewer.__cdmRow1BorderSize or 0
                         local targetWidth = totalHeight + (2 * topBottomBorderSize) - (2 * barBorderSize)
@@ -6458,7 +6339,7 @@ local function CreateCDMSetupPage(parent)
                         secondary.lockedBaseY = math.floor(utilityCenterY - screenCenterY + 0.5)
                         secondary.width = math.floor(targetWidth + 0.5)
                     else
-                        -- Horizontal bar: goes BELOW Utility
+
                         local rowWidth = utilityViewer.__cdmBottomRowWidth or utilityViewer.__cdmIconWidth or 300
                         local totalHeight = utilityViewer.__cdmTotalHeight or utilityViewer:GetHeight() or 100
                         local bottomRowBorderSize = utilityViewer.__cdmBottomRowBorderSize or 2
@@ -6471,7 +6352,7 @@ local function CreateCDMSetupPage(parent)
                         secondary.width = math.floor(targetWidth + 0.5)
                     end
 
-                    secondary.offsetX = 0  -- Reset user adjustment
+                    secondary.offsetX = 0
                     secondary.offsetY = 0
                     secondary.autoAttach = false
                     secondary.useRawPixels = true
@@ -6486,7 +6367,7 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Snap to Primary button
+
         local snapSecPrimaryBtn = CreateFrame("Button", nil, snapSecondaryContainer, "BackdropTemplate")
         snapSecPrimaryBtn:SetSize(100, 24)
         snapSecPrimaryBtn:SetPoint("LEFT", snapSecUtilityBtn, "RIGHT", 5, 0)
@@ -6529,7 +6410,7 @@ local function CreateCDMSetupPage(parent)
                     local isVertical = secondary.orientation == "VERTICAL"
 
                     if isVertical then
-                        -- Vertical secondary: goes to the RIGHT of Primary
+
                         local primaryActualWidth = primaryBar:GetWidth()
                         local primaryVisualRight = primaryCenterX + (primaryActualWidth / 2)
                         local secondaryBarCenterX = primaryVisualRight + (secondaryHeight / 2)
@@ -6538,7 +6419,7 @@ local function CreateCDMSetupPage(parent)
                         secondary.lockedBaseY = math.floor(primaryCenterY - screenCenterY + 0.5)
                         secondary.width = math.floor(targetWidth + 0.5)
                     else
-                        -- Horizontal bar: Secondary goes ABOVE Primary
+
                         local primaryVisualTop = primaryCenterY + (primaryHeight / 2) + primaryBorderSize
                         local secondaryBarCenterY = primaryVisualTop + (secondaryHeight / 2) + secondaryBorderSize
                         local targetWidth = primaryWidth + (2 * primaryBorderSize) - (2 * secondaryBorderSize)
@@ -6547,7 +6428,7 @@ local function CreateCDMSetupPage(parent)
                         secondary.width = math.floor(targetWidth + 0.5)
                     end
 
-                    secondary.offsetX = 0  -- Reset user adjustment
+                    secondary.offsetX = 0
                     secondary.offsetY = 0
                     secondary.autoAttach = false
                     secondary.useRawPixels = true
@@ -6563,7 +6444,7 @@ local function CreateCDMSetupPage(parent)
         end)
         y = y - FORM_ROW
 
-        -- Auto-Resize row with 3 buttons: Lock to Essential, Lock to Utility, Lock to Primary
+
         local lockSecContainer = CreateFrame("Frame", nil, tabContent)
         lockSecContainer:SetHeight(FORM_ROW)
         lockSecContainer:SetPoint("TOPLEFT", PAD, y)
@@ -6574,7 +6455,7 @@ local function CreateCDMSetupPage(parent)
         lockSecLabel:SetText("Auto-Resize")
         lockSecLabel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Lock to Essential button
+
         local lockSecEssentialBtn = CreateFrame("Button", nil, lockSecContainer, "BackdropTemplate")
         lockSecEssentialBtn:SetSize(100, 24)
         lockSecEssentialBtn:SetPoint("LEFT", lockSecContainer, "LEFT", 180, 0)
@@ -6590,7 +6471,7 @@ local function CreateCDMSetupPage(parent)
         lockSecEssentialText:SetPoint("CENTER")
         lockSecEssentialText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Lock to Utility button
+
         local lockSecUtilityBtn = CreateFrame("Button", nil, lockSecContainer, "BackdropTemplate")
         lockSecUtilityBtn:SetSize(100, 24)
         lockSecUtilityBtn:SetPoint("LEFT", lockSecEssentialBtn, "RIGHT", 5, 0)
@@ -6606,7 +6487,7 @@ local function CreateCDMSetupPage(parent)
         lockSecUtilityText:SetPoint("CENTER")
         lockSecUtilityText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Lock to Primary button
+
         local lockSecPrimaryBtn = CreateFrame("Button", nil, lockSecContainer, "BackdropTemplate")
         lockSecPrimaryBtn:SetSize(100, 24)
         lockSecPrimaryBtn:SetPoint("LEFT", lockSecUtilityBtn, "RIGHT", 5, 0)
@@ -6622,9 +6503,9 @@ local function CreateCDMSetupPage(parent)
         lockSecPrimaryText:SetPoint("CENTER")
         lockSecPrimaryText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Function to update lock button states (visual + width slider)
+
         local function UpdateSecLockButtonStates()
-            -- Essential button state
+
             if secondary.lockedToEssential then
                 lockSecEssentialText:SetText("Unlock")
                 lockSecEssentialBtn:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
@@ -6632,7 +6513,7 @@ local function CreateCDMSetupPage(parent)
                 lockSecEssentialText:SetText("Essential")
                 lockSecEssentialBtn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
             end
-            -- Utility button state
+
             if secondary.lockedToUtility then
                 lockSecUtilityText:SetText("Unlock")
                 lockSecUtilityBtn:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
@@ -6640,7 +6521,7 @@ local function CreateCDMSetupPage(parent)
                 lockSecUtilityText:SetText("Utility")
                 lockSecUtilityBtn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
             end
-            -- Primary button state
+
             if secondary.lockedToPrimary then
                 lockSecPrimaryText:SetText("Unlock")
                 lockSecPrimaryBtn:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
@@ -6648,13 +6529,13 @@ local function CreateCDMSetupPage(parent)
                 lockSecPrimaryText:SetText("Primary")
                 lockSecPrimaryBtn:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
             end
-            -- Disable Width slider when any lock is active
+
             if widthSecondarySlider and widthSecondarySlider.SetEnabled then
                 widthSecondarySlider:SetEnabled(not secondary.lockedToEssential and not secondary.lockedToUtility and not secondary.lockedToPrimary)
             end
         end
 
-        -- Hover effects (preserve lock state color on leave)
+
         lockSecEssentialBtn:SetScript("OnEnter", function(self)
             self:SetBackdropBorderColor(C.accent[1], C.accent[2], C.accent[3], 1)
         end)
@@ -6680,7 +6561,7 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Lock to Essential click handler
+
         lockSecEssentialBtn:SetScript("OnClick", function()
             if secondary.lockedToEssential then
                 secondary.lockedToEssential = false
@@ -6702,7 +6583,7 @@ local function CreateCDMSetupPage(parent)
                         local isVertical = secondary.orientation == "VERTICAL"
 
                         if isVertical then
-                            -- Vertical bar: goes to the RIGHT of Essential
+
                             local topBottomBorderSize = essentialViewer.__cdmRow1BorderSize or 0
                             local targetWidth = totalHeight + (2 * topBottomBorderSize) - (2 * barBorderSize)
                             local totalWidth = essentialViewer.__cdmIconWidth or essentialViewer:GetWidth()
@@ -6714,7 +6595,7 @@ local function CreateCDMSetupPage(parent)
                             secondary.lockedBaseY = math.floor(essentialCenterY - screenCenterY + 0.5)
                             secondary.width = math.floor(targetWidth + 0.5)
                         else
-                            -- Horizontal bar: goes ABOVE Essential
+
                             local rowWidth = essentialViewer.__cdmRow1Width or essentialViewer.__cdmIconWidth or 300
                             local barHeight = secondary.height or 8
                             local targetWidth = rowWidth + (2 * row1BorderSize) - (2 * barBorderSize)
@@ -6724,7 +6605,7 @@ local function CreateCDMSetupPage(parent)
                             secondary.lockedBaseX = math.floor(essentialCenterX - screenCenterX + 0.5)
                             secondary.width = math.floor(targetWidth + 0.5)
                         end
-                        secondary.offsetX = 0  -- Reset user adjustment
+                        secondary.offsetX = 0
                         secondary.offsetY = 0
                         secondary.autoAttach = false
                         secondary.useRawPixels = true
@@ -6744,7 +6625,7 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Lock to Utility click handler
+
         lockSecUtilityBtn:SetScript("OnClick", function()
             if secondary.lockedToUtility then
                 secondary.lockedToUtility = false
@@ -6766,7 +6647,7 @@ local function CreateCDMSetupPage(parent)
                         local isVertical = secondary.orientation == "VERTICAL"
 
                         if isVertical then
-                            -- Vertical bar: goes to the LEFT of Utility
+
                             local row1BorderSize = utilityViewer.__cdmRow1BorderSize or 0
                             local targetWidth = totalHeight + (2 * row1BorderSize) - (2 * barBorderSize)
                             local totalWidth = utilityViewer.__cdmIconWidth or utilityViewer:GetWidth()
@@ -6777,7 +6658,7 @@ local function CreateCDMSetupPage(parent)
                             secondary.lockedBaseY = math.floor(utilityCenterY - screenCenterY + 0.5)
                             secondary.width = math.floor(targetWidth + 0.5)
                         else
-                            -- Horizontal bar: goes BELOW Utility
+
                             local rowWidth = utilityViewer.__cdmBottomRowWidth or utilityViewer.__cdmIconWidth or 300
                             local barHeight = secondary.height or 8
                             local targetWidth = rowWidth + (2 * bottomRowBorderSize) - (2 * barBorderSize)
@@ -6787,7 +6668,7 @@ local function CreateCDMSetupPage(parent)
                             secondary.lockedBaseX = math.floor(utilityCenterX - screenCenterX + 0.5)
                             secondary.width = math.floor(targetWidth + 0.5)
                         end
-                        secondary.offsetX = 0  -- Reset user adjustment
+                        secondary.offsetX = 0
                         secondary.offsetY = 0
                         secondary.autoAttach = false
                         secondary.useRawPixels = true
@@ -6807,7 +6688,7 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Lock to Primary click handler
+
         lockSecPrimaryBtn:SetScript("OnClick", function()
             if secondary.lockedToPrimary then
                 secondary.lockedToPrimary = false
@@ -6841,7 +6722,7 @@ local function CreateCDMSetupPage(parent)
                         end
                     end
 
-                    -- Reset user adjustment (base position is calculated live from primary bar)
+
                     secondary.offsetX = 0
                     secondary.offsetY = 0
                     secondary.lockedToPrimary = true
@@ -6859,11 +6740,11 @@ local function CreateCDMSetupPage(parent)
             end
         end)
 
-        -- Initialize button states
+
         UpdateSecLockButtonStates()
         y = y - FORM_ROW
 
-        -- Color options (form style) - radio-button behavior: clicking one turns off the others
+
         local customColorPickerSecondary
 
         local powerColorSecondary = GUI:CreateFormCheckbox(tabContent, "Use Resource Type Color", "usePowerColor", secondary, function()
@@ -6872,7 +6753,7 @@ local function CreateCDMSetupPage(parent)
                 secondary.useCustomColor = false
                 secondary.colorMode = "power"
             else
-                -- Fallback: if turning off and nothing else is on, re-enable this
+
                 if not secondary.useClassColor and not secondary.useCustomColor then
                     secondary.usePowerColor = true
                 end
@@ -6899,7 +6780,7 @@ local function CreateCDMSetupPage(parent)
                 secondary.useCustomColor = false
                 secondary.colorMode = "class"
             else
-                -- Fallback: if turning off and nothing else is on, enable Resource Type Color
+
                 if not secondary.usePowerColor and not secondary.useCustomColor then
                     secondary.usePowerColor = true
                 end
@@ -6924,7 +6805,7 @@ local function CreateCDMSetupPage(parent)
                 secondary.useClassColor = false
                 secondary.colorMode = "custom"
             else
-                -- Fallback: if turning off and nothing else is on, enable Resource Type Color
+
                 if not secondary.usePowerColor and not secondary.useClassColor then
                     secondary.usePowerColor = true
                 end
@@ -6944,7 +6825,7 @@ local function CreateCDMSetupPage(parent)
         customColorPickerSecondary:SetEnabled(secondary.useCustomColor)
         y = y - FORM_ROW
 
-        -- Text display options
+
         local showTextSecondary = GUI:CreateFormCheckbox(tabContent, "Show Number", "showText", secondary, RefreshPowerBars)
         showTextSecondary:SetPoint("TOPLEFT", PAD, y)
         showTextSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -6962,7 +6843,7 @@ local function CreateCDMSetupPage(parent)
         showRuneTextSecondary:SetEnabled(playerClass == "DEATHKNIGHT")
         y = y - FORM_ROW
 
-        -- Tick marks
+
         local showTicksSecondary = GUI:CreateFormCheckbox(tabContent, "Show Tick Marks", "showTicks", secondary, RefreshPowerBars)
         showTicksSecondary:SetPoint("TOPLEFT", PAD, y)
         showTicksSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -6978,7 +6859,7 @@ local function CreateCDMSetupPage(parent)
         tickColorSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Size sliders (form style)
+
         widthSecondarySlider = GUI:CreateFormSlider(tabContent, "Width", 0, 2000, 1, "width", secondary, RefreshPowerBars)
         widthSecondarySlider:SetPoint("TOPLEFT", PAD, y)
         widthSecondarySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -6994,7 +6875,7 @@ local function CreateCDMSetupPage(parent)
         borderSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Position sliders
+
         local xOffsetSecondarySlider = GUI:CreateFormSlider(tabContent, "X Offset", -1000, 1000, 1, "offsetX", secondary, RefreshPowerBars)
         xOffsetSecondarySlider:SetPoint("TOPLEFT", PAD, y)
         xOffsetSecondarySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -7005,12 +6886,12 @@ local function CreateCDMSetupPage(parent)
         yOffsetSecondarySlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Register sliders for real-time sync during Edit Mode
+
         if _G.PreyUI and _G.PreyUI.PREYCore and _G.PreyUI.PREYCore.RegisterPowerBarEditModeSliders then
             _G.PreyUI.PREYCore:RegisterPowerBarEditModeSliders("secondary", xOffsetSecondarySlider, yOffsetSecondarySlider)
         end
 
-        -- Text sliders
+
         local textSizeSecondary = GUI:CreateFormSlider(tabContent, "Text Size", 8, 50, 1, "textSize", secondary, RefreshPowerBars)
         textSizeSecondary:SetPoint("TOPLEFT", PAD, y)
         textSizeSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -7026,8 +6907,8 @@ local function CreateCDMSetupPage(parent)
         textYSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Text color settings
-        local textCustomColorSecondary  -- Forward declare for mutual reference
+
+        local textCustomColorSecondary
 
         local textUseClassColorSecondary = GUI:CreateFormCheckbox(tabContent, "Use Class Color for Text", "textUseClassColor", secondary, function()
             if textCustomColorSecondary then
@@ -7042,7 +6923,7 @@ local function CreateCDMSetupPage(parent)
         textCustomColorSecondary = GUI:CreateFormColorPicker(tabContent, "Custom Text Color", "textCustomColor", secondary, RefreshPowerBars)
         textCustomColorSecondary:SetPoint("TOPLEFT", PAD, y)
         textCustomColorSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        textCustomColorSecondary:SetEnabled(not secondary.textUseClassColor)  -- Initial state
+        textCustomColorSecondary:SetEnabled(not secondary.textUseClassColor)
         y = y - FORM_ROW
 
         local textureSecondary = GUI:CreateFormDropdown(tabContent, "Bar Texture", GetTextureList(), "texture", secondary, RefreshPowerBars)
@@ -7050,23 +6931,21 @@ local function CreateCDMSetupPage(parent)
         textureSecondary:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- =====================================================
-        -- POWER COLORS (Global - affects both bars)
-        -- =====================================================
-        y = y - 20  -- Spacer between sections
+
+        y = y - 20
 
         local powerColorsHeader = GUI:CreateSectionHeader(tabContent, "Reset Resource Bar Colors To Default")
         powerColorsHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - powerColorsHeader.gap
 
-        -- Get powerColors DB table
+
         local pc = db.powerColors
         if not pc then
             db.powerColors = {}
             pc = db.powerColors
         end
 
-        -- Default power colors (used for Reset button)
+
         local defaultPowerColors = {
             rage = { 1.00, 0.00, 0.00, 1 },
             energy = { 1.00, 1.00, 0.00, 1 },
@@ -7091,15 +6970,15 @@ local function CreateCDMSetupPage(parent)
             unholyRunes = { 0.00, 0.80, 0.00, 1 },
         }
 
-        -- Initialize defaults if missing
+
         for key, value in pairs(defaultPowerColors) do
             if pc[key] == nil then pc[key] = {value[1], value[2], value[3], value[4]} end
         end
 
-        -- Store widget references for Reset button
+
         local powerColorWidgets = {}
 
-        -- Reset to Defaults button
+
         local resetPowerColorsContainer = CreateFrame("Frame", nil, tabContent)
         resetPowerColorsContainer:SetHeight(FORM_ROW)
         resetPowerColorsContainer:SetPoint("TOPLEFT", PAD, y)
@@ -7136,7 +7015,7 @@ local function CreateCDMSetupPage(parent)
             for key, value in pairs(defaultPowerColors) do
                 pc[key] = {value[1], value[2], value[3], value[4]}
             end
-            -- Refresh color swatches
+
             for _, widget in ipairs(powerColorWidgets) do
                 if widget.swatch and pc[widget.dbKey] then
                     local col = pc[widget.dbKey]
@@ -7148,9 +7027,7 @@ local function CreateCDMSetupPage(parent)
         end)
         y = y - FORM_ROW
 
-        -- =====================================================
-        -- SUB-SECTION: Core Resources
-        -- =====================================================
+
         y = y - 8
         local coreHeader = GUI:CreateSectionHeader(tabContent, "Bar Colors for Core Resources")
         coreHeader:SetPoint("TOPLEFT", PAD, y)
@@ -7219,9 +7096,7 @@ local function CreateCDMSetupPage(parent)
         table.insert(powerColorWidgets, lunarPowerColor)
         y = y - FORM_ROW
 
-        -- =====================================================
-        -- SUB-SECTION: Builder Resources
-        -- =====================================================
+
         y = y - 8
         local builderHeader = GUI:CreateSectionHeader(tabContent, "Bar Colors for Builder Resources")
         builderHeader:SetPoint("TOPLEFT", PAD, y)
@@ -7269,9 +7144,7 @@ local function CreateCDMSetupPage(parent)
         table.insert(powerColorWidgets, essenceColor)
         y = y - FORM_ROW
 
-        -- =====================================================
-        -- SUB-SECTION: Specialized Resources
-        -- =====================================================
+
         y = y - 8
         local specialHeader = GUI:CreateSectionHeader(tabContent, "Bar Colors for Specialized Resources")
         specialHeader:SetPoint("TOPLEFT", PAD, y)
@@ -7345,11 +7218,11 @@ local function CreateCDMSetupPage(parent)
         table.insert(powerColorWidgets, unholyRunesColor)
         y = y - FORM_ROW
 
-        -- Extra padding at bottom for dropdown menus to expand into
+
         tabContent:SetHeight(math.abs(y) + 60)
     end
 
-    -- Create sub-tabs
+
     local subTabs = GUI:CreateSubTabs(content, {
         {name = "Essential", builder = BuildEssentialTab},
         {name = "Utility", builder = BuildUtilityTab},
@@ -7359,23 +7232,21 @@ local function CreateCDMSetupPage(parent)
     subTabs:SetPoint("TOPLEFT", 5, -5)
     subTabs:SetPoint("TOPRIGHT", -5, -5)
     subTabs:SetHeight(700)
-    
+
     content:SetHeight(750)
 end
 
----------------------------------------------------------------------------
--- PAGE: CD Effects + Glow
----------------------------------------------------------------------------
+
 local function CreateCDEffectsPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
     local y = -15
     local FORM_ROW = 32
 
-    -- Set search context for auto-registration
+
     GUI:SetSearchContext({tabIndex = 7, tabName = "CDM GCD & Effects"})
 
-    -- Refresh functions
+
     local function RefreshSwipe()
         if _G.PreyUI_RefreshCooldownSwipe then _G.PreyUI_RefreshCooldownSwipe() end
     end
@@ -7385,17 +7256,15 @@ local function CreateCDEffectsPage(parent)
     local function RefreshGlows()
         if _G.PreyUI_RefreshCustomGlows then _G.PreyUI_RefreshCustomGlows() end
     end
-    
-    -- Initialize tables if needed
+
+
     if db then
         if not db.cooldownSwipe then db.cooldownSwipe = {} end
         if not db.cooldownEffects then db.cooldownEffects = {} end
         if not db.customGlow then db.customGlow = {} end
     end
 
-    -- =====================================================
-    -- COOLDOWN SWIPE
-    -- =====================================================
+
     local swipeHeader = GUI:CreateSectionHeader(content, "COOLDOWN SWIPE")
     swipeHeader:SetPoint("TOPLEFT", PADDING, y)
     y = y - swipeHeader.gap
@@ -7457,14 +7326,12 @@ local function CreateCDEffectsPage(parent)
         rechargeEdgeDesc:SetJustifyH("LEFT")
         y = y - 14
     end
-    
-    -- =====================================================
-    -- COOLDOWN EFFECTS
-    -- =====================================================
+
+
     local effectsHeader = GUI:CreateSectionHeader(content, "COOLDOWN EFFECTS")
     effectsHeader:SetPoint("TOPLEFT", PADDING, y)
     y = y - effectsHeader.gap
-    
+
     local effectsDesc = GUI:CreateLabel(content, "Hides intrusive Blizzard effects: red flashes, golden proc glows, spell activation alerts.", 11, C.textMuted)
     effectsDesc:SetPoint("TOPLEFT", PADDING, y)
     effectsDesc:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
@@ -7498,10 +7365,8 @@ local function CreateCDEffectsPage(parent)
         effectsWarning:SetJustifyH("LEFT")
         y = y - 24
     end
-    
-    -- =====================================================
-    -- CUSTOM GLOW - ESSENTIAL
-    -- =====================================================
+
+
     local essentialGlowHeader = GUI:CreateSectionHeader(content, "ESSENTIAL COOLDOWNS - CUSTOM GLOW")
     essentialGlowHeader:SetPoint("TOPLEFT", PADDING, y)
     y = y - essentialGlowHeader.gap
@@ -7513,31 +7378,31 @@ local function CreateCDEffectsPage(parent)
     y = y - 24
 
     if db and db.customGlow then
-        -- Enable toggle
+
         local essentialGlowEnable = GUI:CreateFormCheckbox(content, "Enable Custom Glow", "essentialEnabled", db.customGlow, RefreshGlows)
         essentialGlowEnable:SetPoint("TOPLEFT", PADDING, y)
         essentialGlowEnable:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- Glow Type dropdown
+
         local glowTypeOptions = {
             {value = "Pixel Glow", text = "Pixel Glow"},
             {value = "Autocast Shine", text = "Autocast Shine"},
-            -- {value = "Button Glow", text = "Button Glow"},  -- Bugged, disabled for now
+
         }
 
-        -- Store references to conditional widgets for visibility updates
+
         local essentialWidgets = {}
 
         local essentialGlowType = GUI:CreateFormDropdown(content, "Glow Type", glowTypeOptions, "essentialGlowType", db.customGlow, function()
             RefreshGlows()
-            -- Update widget visibility based on selected glow type
+
             local glowType = db.customGlow.essentialGlowType or "Pixel Glow"
             local isPixel = glowType == "Pixel Glow"
             local isAutocast = glowType == "Autocast Shine"
             local isButton = glowType == "Button Glow"
 
-            -- Enable/disable widgets based on glow type (all stay visible)
+
             if essentialWidgets.lines then essentialWidgets.lines:SetEnabled(isPixel or isAutocast) end
             if essentialWidgets.thickness then essentialWidgets.thickness:SetEnabled(isPixel) end
             if essentialWidgets.scale then essentialWidgets.scale:SetEnabled(isAutocast) end
@@ -7549,55 +7414,55 @@ local function CreateCDEffectsPage(parent)
         essentialGlowType:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- Color picker
+
         local essentialGlowColor = GUI:CreateFormColorPicker(content, "Glow Color", "essentialColor", db.customGlow, RefreshGlows)
         essentialGlowColor:SetPoint("TOPLEFT", PADDING, y)
         essentialGlowColor:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- Lines (Pixel Glow and Autocast Shine)
+
         local essentialLines = GUI:CreateFormSlider(content, "Lines", 1, 30, 1, "essentialLines", db.customGlow, RefreshGlows)
         essentialLines:SetPoint("TOPLEFT", PADDING, y)
         essentialLines:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         essentialWidgets.lines = essentialLines
         y = y - FORM_ROW
 
-        -- Thickness (Pixel Glow only)
+
         local essentialThickness = GUI:CreateFormSlider(content, "Thickness", 1, 10, 1, "essentialThickness", db.customGlow, RefreshGlows)
         essentialThickness:SetPoint("TOPLEFT", PADDING, y)
         essentialThickness:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         essentialWidgets.thickness = essentialThickness
         y = y - FORM_ROW
 
-        -- Scale (Autocast Shine only)
+
         local essentialScale = GUI:CreateFormSlider(content, "Shine Scale", 0.5, 3.0, 0.1, "essentialScale", db.customGlow, RefreshGlows)
         essentialScale:SetPoint("TOPLEFT", PADDING, y)
         essentialScale:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         essentialWidgets.scale = essentialScale
         y = y - FORM_ROW
 
-        -- Animation Speed
+
         local essentialSpeed = GUI:CreateFormSlider(content, "Animation Speed", 0.1, 2.0, 0.05, "essentialFrequency", db.customGlow, RefreshGlows)
         essentialSpeed:SetPoint("TOPLEFT", PADDING, y)
         essentialSpeed:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         essentialWidgets.speed = essentialSpeed
         y = y - FORM_ROW
 
-        -- X Offset
+
         local essentialXOffset = GUI:CreateFormSlider(content, "X Offset", -20, 20, 1, "essentialXOffset", db.customGlow, RefreshGlows)
         essentialXOffset:SetPoint("TOPLEFT", PADDING, y)
         essentialXOffset:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         essentialWidgets.xOffset = essentialXOffset
         y = y - FORM_ROW
 
-        -- Y Offset
+
         local essentialYOffset = GUI:CreateFormSlider(content, "Y Offset", -20, 20, 1, "essentialYOffset", db.customGlow, RefreshGlows)
         essentialYOffset:SetPoint("TOPLEFT", PADDING, y)
         essentialYOffset:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         essentialWidgets.yOffset = essentialYOffset
         y = y - FORM_ROW
 
-        -- Initial enable/disable state based on glow type
+
         local glowType = db.customGlow.essentialGlowType or "Pixel Glow"
         local isPixel = glowType == "Pixel Glow"
         local isAutocast = glowType == "Autocast Shine"
@@ -7611,9 +7476,7 @@ local function CreateCDEffectsPage(parent)
         essentialWidgets.yOffset:SetEnabled(not isButton)
     end
 
-    -- =====================================================
-    -- CUSTOM GLOW - UTILITY
-    -- =====================================================
+
     local utilityGlowHeader = GUI:CreateSectionHeader(content, "UTILITY COOLDOWNS - CUSTOM GLOW")
     utilityGlowHeader:SetPoint("TOPLEFT", PADDING, y)
     y = y - utilityGlowHeader.gap
@@ -7625,31 +7488,31 @@ local function CreateCDEffectsPage(parent)
     y = y - 24
 
     if db and db.customGlow then
-        -- Enable toggle
+
         local utilityGlowEnable = GUI:CreateFormCheckbox(content, "Enable Custom Glow", "utilityEnabled", db.customGlow, RefreshGlows)
         utilityGlowEnable:SetPoint("TOPLEFT", PADDING, y)
         utilityGlowEnable:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- Glow Type dropdown (reuse options from Essential section)
+
         local utilityGlowTypeOptions = {
             {value = "Pixel Glow", text = "Pixel Glow"},
             {value = "Autocast Shine", text = "Autocast Shine"},
-            -- {value = "Button Glow", text = "Button Glow"},  -- Bugged, disabled for now
+
         }
 
-        -- Store references to conditional widgets for visibility updates
+
         local utilityWidgets = {}
 
         local utilityGlowType = GUI:CreateFormDropdown(content, "Glow Type", utilityGlowTypeOptions, "utilityGlowType", db.customGlow, function()
             RefreshGlows()
-            -- Update widget visibility based on selected glow type
+
             local glowType = db.customGlow.utilityGlowType or "Pixel Glow"
             local isPixel = glowType == "Pixel Glow"
             local isAutocast = glowType == "Autocast Shine"
             local isButton = glowType == "Button Glow"
 
-            -- Enable/disable widgets based on glow type (all stay visible)
+
             if utilityWidgets.lines then utilityWidgets.lines:SetEnabled(isPixel or isAutocast) end
             if utilityWidgets.thickness then utilityWidgets.thickness:SetEnabled(isPixel) end
             if utilityWidgets.scale then utilityWidgets.scale:SetEnabled(isAutocast) end
@@ -7661,55 +7524,55 @@ local function CreateCDEffectsPage(parent)
         utilityGlowType:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- Color picker
+
         local utilityGlowColor = GUI:CreateFormColorPicker(content, "Glow Color", "utilityColor", db.customGlow, RefreshGlows)
         utilityGlowColor:SetPoint("TOPLEFT", PADDING, y)
         utilityGlowColor:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- Lines (Pixel Glow and Autocast Shine)
+
         local utilityLines = GUI:CreateFormSlider(content, "Lines", 1, 30, 1, "utilityLines", db.customGlow, RefreshGlows)
         utilityLines:SetPoint("TOPLEFT", PADDING, y)
         utilityLines:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         utilityWidgets.lines = utilityLines
         y = y - FORM_ROW
 
-        -- Thickness (Pixel Glow only)
+
         local utilityThickness = GUI:CreateFormSlider(content, "Thickness", 1, 10, 1, "utilityThickness", db.customGlow, RefreshGlows)
         utilityThickness:SetPoint("TOPLEFT", PADDING, y)
         utilityThickness:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         utilityWidgets.thickness = utilityThickness
         y = y - FORM_ROW
 
-        -- Scale (Autocast Shine only)
+
         local utilityScale = GUI:CreateFormSlider(content, "Shine Scale", 0.5, 3.0, 0.1, "utilityScale", db.customGlow, RefreshGlows)
         utilityScale:SetPoint("TOPLEFT", PADDING, y)
         utilityScale:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         utilityWidgets.scale = utilityScale
         y = y - FORM_ROW
 
-        -- Animation Speed
+
         local utilitySpeed = GUI:CreateFormSlider(content, "Animation Speed", 0.1, 2.0, 0.05, "utilityFrequency", db.customGlow, RefreshGlows)
         utilitySpeed:SetPoint("TOPLEFT", PADDING, y)
         utilitySpeed:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         utilityWidgets.speed = utilitySpeed
         y = y - FORM_ROW
 
-        -- X Offset
+
         local utilityXOffset = GUI:CreateFormSlider(content, "X Offset", -20, 20, 1, "utilityXOffset", db.customGlow, RefreshGlows)
         utilityXOffset:SetPoint("TOPLEFT", PADDING, y)
         utilityXOffset:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         utilityWidgets.xOffset = utilityXOffset
         y = y - FORM_ROW
 
-        -- Y Offset
+
         local utilityYOffset = GUI:CreateFormSlider(content, "Y Offset", -20, 20, 1, "utilityYOffset", db.customGlow, RefreshGlows)
         utilityYOffset:SetPoint("TOPLEFT", PADDING, y)
         utilityYOffset:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         utilityWidgets.yOffset = utilityYOffset
         y = y - FORM_ROW
 
-        -- Initial enable/disable state based on glow type
+
         local glowType = db.customGlow.utilityGlowType or "Pixel Glow"
         local isPixel = glowType == "Pixel Glow"
         local isAutocast = glowType == "Autocast Shine"
@@ -7726,46 +7589,42 @@ local function CreateCDEffectsPage(parent)
     content:SetHeight(math.abs(y) + 50)
 end
 
----------------------------------------------------------------------------
--- PAGE: CDM Keybind & Rotation
----------------------------------------------------------------------------
+
 local function CreateCDKeybindsPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
     local y = -15
     local FORM_ROW = 32
 
-    -- Set search context for auto-registration
+
     GUI:SetSearchContext({tabIndex = 8, tabName = "CDM Keybind & Rotation"})
 
-    -- Refresh function for keybinds
+
     local function RefreshKeybinds()
         if _G.PreyUI_RefreshKeybinds then
             _G.PreyUI_RefreshKeybinds()
         end
     end
 
-    -- Refresh function for rotation helper
+
     local function RefreshRotationHelper()
         if _G.PreyUI_RefreshRotationHelper then
             _G.PreyUI_RefreshRotationHelper()
         end
     end
 
-    -- Info text at top
+
     local info = GUI:CreateLabel(content, "Keybind display - shows ability keybinds on cooldown icons", 11, C.textMuted)
     info:SetPoint("TOPLEFT", PADDING, y)
     info:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
     info:SetJustifyH("LEFT")
     y = y - 28
-    
+
     if db and db.viewers then
         local essentialViewer = db.viewers.EssentialCooldownViewer
         local utilityViewer = db.viewers.UtilityCooldownViewer
-        
-        -- =====================================================
-        -- ESSENTIAL KEYBIND DISPLAY
-        -- =====================================================
+
+
         local essentialHeader = GUI:CreateSectionHeader(content, "ESSENTIAL KEYBIND DISPLAY")
         essentialHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - essentialHeader.gap
@@ -7806,11 +7665,9 @@ local function CreateCDKeybindsPage(parent)
         essentialOffsetYSlider:SetPoint("TOPLEFT", PADDING, y)
         essentialOffsetYSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
-        
-        -- =====================================================
-        -- UTILITY KEYBIND DISPLAY
-        -- =====================================================
-        y = y - 10 -- Section spacing
+
+
+        y = y - 10
         local utilityHeader = GUI:CreateSectionHeader(content, "UTILITY KEYBIND DISPLAY")
         utilityHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - utilityHeader.gap
@@ -7844,11 +7701,9 @@ local function CreateCDKeybindsPage(parent)
         utilityOffsetYSlider:SetPoint("TOPLEFT", PADDING, y)
         utilityOffsetYSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
-        
-        -- =====================================================
-        -- CUSTOM TRACKER KEYBIND DISPLAYS
-        -- =====================================================
-        y = y - 10 -- Section spacing
+
+
+        y = y - 10
         local ctKeybindHeader = GUI:CreateSectionHeader(content, "CUSTOM TRACKER KEYBIND DISPLAYS")
         ctKeybindHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - ctKeybindHeader.gap
@@ -7859,10 +7714,10 @@ local function CreateCDKeybindsPage(parent)
         ctKeybindInfo:SetJustifyH("LEFT")
         y = y - 28
 
-        -- Get custom tracker keybind settings from DB
+
         local ctKeybindDB = db and db.customTrackers and db.customTrackers.keybinds
         if not ctKeybindDB and db and db.customTrackers then
-            -- Initialize defaults if missing
+
             db.customTrackers.keybinds = {
                 showKeybinds = false,
                 keybindTextSize = 10,
@@ -7873,7 +7728,7 @@ local function CreateCDKeybindsPage(parent)
             ctKeybindDB = db.customTrackers.keybinds
         end
 
-        -- Refresh function for custom tracker keybinds
+
         local function RefreshCustomTrackerKeybinds()
             if _G.PreyUI_RefreshCustomTrackerKeybinds then
                 _G.PreyUI_RefreshCustomTrackerKeybinds()
@@ -7907,10 +7762,8 @@ local function CreateCDKeybindsPage(parent)
             y = y - FORM_ROW
         end
 
-        -- =====================================================
-        -- ROTATION HELPER OVERLAY
-        -- =====================================================
-        y = y - 10 -- Section spacing
+
+        y = y - 10
         local rotationHeader = GUI:CreateSectionHeader(content, "ROTATION HELPER OVERLAY")
         rotationHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - rotationHeader.gap
@@ -7951,18 +7804,16 @@ local function CreateCDKeybindsPage(parent)
         utilityThicknessSlider:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
         y = y - FORM_ROW
 
-        -- =====================================================
-        -- ROTATION ASSIST ICON
-        -- =====================================================
-        y = y - 10 -- Extra spacing
+
+        y = y - 10
         local raiHeader = GUI:CreateSectionHeader(content, "ROTATION ASSIST ICON")
         raiHeader:SetPoint("TOPLEFT", PADDING, y)
         y = y - raiHeader.gap
 
-        -- Get rotation assist icon DB
+
         local raiDB = db and db.rotationAssistIcon
 
-        -- Refresh function
+
         local function RefreshRAI()
             if _G.PreyUI_RefreshRotationAssistIcon then
                 _G.PreyUI_RefreshRotationAssistIcon()
@@ -7970,10 +7821,10 @@ local function CreateCDKeybindsPage(parent)
         end
 
         if raiDB then
-            -- Form layout constants
-            local FORM_ROW = 32  -- Height per form row
 
-            -- Info text
+            local FORM_ROW = 32
+
+
             local raiInfo = GUI:CreateLabel(content, "Displays a standalone movable icon showing Blizzard's next recommended ability.", 11, C.textMuted)
             raiInfo:SetPoint("TOPLEFT", PADDING, y)
             y = y - 18
@@ -7982,7 +7833,7 @@ local function CreateCDKeybindsPage(parent)
             raiInfo2:SetPoint("TOPLEFT", PADDING, y)
             y = y - 30
 
-            -- Form rows (label on left, widget on right)
+
             local raiEnable = GUI:CreateFormCheckbox(content, "Enable", "enabled", raiDB, RefreshRAI)
             raiEnable:SetPoint("TOPLEFT", PADDING, y)
             raiEnable:SetPoint("RIGHT", content, "RIGHT", -PADDING, 0)
@@ -8080,23 +7931,18 @@ local function CreateCDKeybindsPage(parent)
         local noDataLabel = GUI:CreateLabel(content, "Keybind settings not available - database not loaded", 12, C.textMuted)
         noDataLabel:SetPoint("TOPLEFT", PADDING, y)
     end
-    
+
     content:SetHeight(math.abs(y) + 50)
 end
 
----------------------------------------------------------------------------
--- PAGE: Custom Trackers (Consumables, Trinkets, Custom Spells)
--- Tab-per-bar layout with form widgets
----------------------------------------------------------------------------
 
--- Refresh callback for Custom Trackers
 local function RefreshCustomTrackers()
     if PREYCore and PREYCore.CustomTrackers then
         PREYCore.CustomTrackers:RefreshAll()
     end
 end
 
--- Refresh bar position when anchor settings change
+
 local function RefreshTrackerPosition(barID)
     if PREYCore and PREYCore.CustomTrackers then
         PREYCore.CustomTrackers:RefreshBarPosition(barID)
@@ -8107,10 +7953,10 @@ local function CreateCustomTrackersPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
 
-    -- Set search context for auto-registration
+
     GUI:SetSearchContext({tabIndex = 9, tabName = "Custom Items/Spells/Buffs"})
 
-    -- Ensure customTrackers.bars exists
+
     if not db.customTrackers then
         db.customTrackers = {bars = {}}
     end
@@ -8122,14 +7968,11 @@ local function CreateCustomTrackersPage(parent)
     local PAD = 10
     local FORM_ROW = 32
 
-    ---------------------------------------------------------------------------
-    -- Helper: Calculate offset relative to PREY_Player frame's top-left corner
-    -- Returns screen-center offsets that position a bar relative to player frame
-    ---------------------------------------------------------------------------
+
     local function CalculatePlayerRelativeOffset(playerOffsetX, playerOffsetY)
         local playerFrame = _G.PREY_Player
         if not playerFrame then
-            -- Fallback: use default screen-center offsets
+
             return -406, -152
         end
 
@@ -8141,29 +7984,27 @@ local function CreateCustomTrackersPage(parent)
             return -406, -152
         end
 
-        -- Bar position = player top-left + desired offset
+
         local barCenterX = playerLeft + playerOffsetX
         local barCenterY = playerTop + playerOffsetY
 
-        -- Convert to screen-center offsets
+
         local offsetX = math.floor(barCenterX - screenCenterX + 0.5)
         local offsetY = math.floor(barCenterY - screenCenterY + 0.5)
 
         return offsetX, offsetY
     end
 
-    ---------------------------------------------------------------------------
-    -- Helper: Create drop zone for adding items/spells via drag-and-drop
-    ---------------------------------------------------------------------------
+
     local function CreateAddEntrySection(parentFrame, barID, refreshCallback)
         local container = CreateFrame("Frame", nil, parentFrame)
-        container:SetHeight(83)  -- 50% taller than original 55
+        container:SetHeight(83)
 
-        -- DROP ZONE: Click here while holding an item/spell on cursor
+
         local dropZone = CreateFrame("Button", nil, container, "BackdropTemplate")
-        dropZone:SetHeight(68)  -- 50% taller than original 45
+        dropZone:SetHeight(68)
         dropZone:SetPoint("TOPLEFT", 0, 0)
-        dropZone:SetPoint("RIGHT", container, "RIGHT", 0, 0)  -- Full width
+        dropZone:SetPoint("RIGHT", container, "RIGHT", 0, 0)
         dropZone:SetBackdrop({
             bgFile = "Interface\\Buttons\\WHITE8x8",
             edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -8177,7 +8018,7 @@ local function CreateCustomTrackersPage(parent)
         dropLabel:SetText("Drop Items or Spells here")
         dropLabel:SetTextColor(C.textMuted[1], C.textMuted[2], C.textMuted[3], 1)
 
-        -- Handle drop on mouse release (OnReceiveDrag fires when releasing with item on cursor)
+
         dropZone:SetScript("OnReceiveDrag", function(self)
             local cursorType, id1, id2, id3, id4 = GetCursorInfo()
             if cursorType == "item" then
@@ -8191,13 +8032,13 @@ local function CreateCustomTrackersPage(parent)
                     end
                 end
             elseif cursorType == "spell" then
-                -- id1 is slot index, id2 is bookType ("spell" or "pet")
-                -- Need to look up actual spellID from spellbook
+
+
                 local slotIndex = id1
                 local bookType = id2 or "spell"
-                local spellID = id4  -- Try direct spellID first (older API)
+                local spellID = id4
 
-                -- If no direct spellID, look it up from spellbook
+
                 if not spellID and slotIndex then
                     local spellBank = (bookType == "pet") and Enum.SpellBookSpellBank.Pet or Enum.SpellBookSpellBank.Player
                     local spellBookInfo = C_SpellBook.GetSpellBookItemInfo(slotIndex, spellBank)
@@ -8206,7 +8047,7 @@ local function CreateCustomTrackersPage(parent)
                     end
                 end
 
-                -- Resolve override spell (talents that replace base spells)
+
                 if spellID then
                     local overrideID = C_Spell.GetOverrideSpell(spellID)
                     if overrideID and overrideID ~= spellID then
@@ -8225,17 +8066,17 @@ local function CreateCustomTrackersPage(parent)
             end
         end)
 
-        -- Also handle OnMouseUp as fallback (some drag modes use this)
+
         dropZone:SetScript("OnMouseUp", function(self)
             local cursorType = GetCursorInfo()
             if cursorType == "item" or cursorType == "spell" then
-                -- Trigger the same logic as OnReceiveDrag
+
                 local handler = dropZone:GetScript("OnReceiveDrag")
                 if handler then handler(self) end
             end
         end)
 
-        -- Highlight on hover when cursor has item/spell
+
         dropZone:SetScript("OnEnter", function(self)
             local cursorType = GetCursorInfo()
             if cursorType == "item" or cursorType == "spell" then
@@ -8251,13 +8092,13 @@ local function CreateCustomTrackersPage(parent)
         return container
     end
 
-    -- Helper: Get entry display name (prefers customName if set)
+
     local function GetEntryDisplayName(entry)
-        -- Use custom name if set
+
         if entry.customName and entry.customName ~= "" then
             return entry.customName
         end
-        -- Otherwise, auto-detect from spell/item info
+
         if entry.type == "spell" then
             local info = C_Spell.GetSpellInfo(entry.id)
             return info and info.name or ("Spell " .. entry.id)
@@ -8267,29 +8108,25 @@ local function CreateCustomTrackersPage(parent)
         end
     end
 
-    ---------------------------------------------------------------------------
-    -- Build tab content for a single tracker bar
-    ---------------------------------------------------------------------------
+
     local function BuildTrackerBarTab(tabContent, barConfig, barIndex, subTabsRef)
         GUI:SetSearchContext({tabIndex = 9, tabName = "Custom Items/Spells/Buffs", subTabIndex = barIndex + 1, subTabName = barConfig.name or ("Bar " .. barIndex)})
         local y = -10
-        local entryListFrame  -- Forward declaration for refresh callback
+        local entryListFrame
 
-        -- Refresh callback for this bar
+
         local function RefreshThisBar()
             if PREYCore and PREYCore.CustomTrackers then
                 PREYCore.CustomTrackers:UpdateBar(barConfig.id)
             end
         end
 
-        -- Refresh position callback
+
         local function RefreshPosition()
             RefreshTrackerPosition(barConfig.id)
         end
 
-        -----------------------------------------------------------------------
-        -- GENERAL SECTION
-        -----------------------------------------------------------------------
+
         local generalHeader = GUI:CreateSectionHeader(tabContent, "General")
         generalHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - generalHeader.gap
@@ -8302,13 +8139,13 @@ local function CreateCustomTrackersPage(parent)
         generalHint:SetHeight(30)
         y = y - 40
 
-        -- Enable Bar
+
         local enableCheck = GUI:CreateFormCheckbox(tabContent, "Enable Bar", "enabled", barConfig, RefreshThisBar)
         enableCheck:SetPoint("TOPLEFT", PAD, y)
         enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Bar Name (editable, updates tab text instantly)
+
         local nameContainer = CreateFrame("Frame", nil, tabContent)
         nameContainer:SetHeight(FORM_ROW)
         nameContainer:SetPoint("TOPLEFT", PAD, y)
@@ -8319,7 +8156,7 @@ local function CreateCustomTrackersPage(parent)
         nameLabel:SetText("Bar Name")
         nameLabel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Custom styled editbox (matches PREY dropdown styling)
+
         local nameInputBg = CreateFrame("Frame", nil, nameContainer, "BackdropTemplate")
         nameInputBg:SetPoint("LEFT", nameContainer, "LEFT", 180, 0)
         nameInputBg:SetSize(200, 24)
@@ -8352,7 +8189,7 @@ local function CreateCustomTrackersPage(parent)
             if newName == "" then newName = "Tracker" end
             barConfig.name = newName
 
-            -- Update sub-tab text instantly
+
             if subTabsRef and subTabsRef.tabButtons and subTabsRef.tabButtons[barIndex] then
                 local displayName = newName
                 if #displayName > 20 then
@@ -8363,7 +8200,7 @@ local function CreateCustomTrackersPage(parent)
         end)
         y = y - FORM_ROW
 
-        -- Delete Bar button
+
         y = y - 10
         local deleteBtn = GUI:CreateButton(tabContent, "Delete Bar", 120, 26, function()
             GUI:ShowConfirmation({
@@ -8374,18 +8211,18 @@ local function CreateCustomTrackersPage(parent)
                 cancelText = "Cancel",
                 isDestructive = true,
                 onAccept = function()
-                    -- Remove from DB
+
                     for i, bc in ipairs(db.customTrackers.bars) do
                         if bc.id == barConfig.id then
                             table.remove(db.customTrackers.bars, i)
                             break
                         end
                     end
-                    -- Delete the active bar frame
+
                     if PREYCore and PREYCore.CustomTrackers then
                         PREYCore.CustomTrackers:DeleteBar(barConfig.id)
                     end
-                    -- Prompt reload to rebuild tabs
+
                     GUI:ShowConfirmation({
                         title = "Reload UI?",
                         message = "Tracker deleted. Reload UI to see changes?",
@@ -8400,27 +8237,25 @@ local function CreateCustomTrackersPage(parent)
         deleteBtn:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - 36
 
-        -----------------------------------------------------------------------
-        -- ADD ITEMS/SPELLS SECTION (moved up for better UX flow)
-        -----------------------------------------------------------------------
+
         local addHeader = GUI:CreateSectionHeader(tabContent, "Add Trinkets/Consumables/Spells")
         addHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - addHeader.gap
 
-        -- Forward declarations for spec-specific helpers (needed by RefreshEntryList)
+
         local specInfoLabel = nil
         local copyFromDropdown = nil
 
-        -- Get tracker module reference
+
         local trackerModule = PREYCore and PREYCore.CustomTrackers
 
-        -- Helper to get current spec key (always uses actual current spec)
+
         local function getCurrentSpecKey()
-            -- Use tracker module's helper if available
+
             if trackerModule and trackerModule.GetCurrentSpecKey then
                 return trackerModule.GetCurrentSpecKey()
             end
-            -- Fallback
+
             local _, className = UnitClass("player")
             local specIndex = GetSpecialization()
             if specIndex then
@@ -8432,7 +8267,7 @@ local function CreateCustomTrackersPage(parent)
             return nil
         end
 
-        -- Helper to get readable spec name
+
         local function getSpecDisplayName(specKey)
             if trackerModule and trackerModule.GetClassSpecName then
                 return trackerModule.GetClassSpecName(specKey)
@@ -8440,7 +8275,7 @@ local function CreateCustomTrackersPage(parent)
             return specKey or "Unknown"
         end
 
-        -- Update info label
+
         local function updateSpecInfoLabel()
             if specInfoLabel then
                 if barConfig.specSpecificSpells then
@@ -8453,11 +8288,11 @@ local function CreateCustomTrackersPage(parent)
             end
         end
 
-        -- Refresh entry list when spec changes
+
         local function refreshForSpec()
             RefreshThisBar()
             updateSpecInfoLabel()
-            -- Note: Entry list refresh is handled by entryListFrame recreation
+
         end
 
         local hintText = GUI:CreateLabel(tabContent, "Drag items from your bags or character pane, spells from your spellbook into the box below.", 11, C.textMuted)
@@ -8467,20 +8302,20 @@ local function CreateCustomTrackersPage(parent)
         hintText:SetWordWrap(true)
         hintText:SetHeight(30)
 
-        -- Function to refresh entry list (defined later, used in add section)
+
         local function RefreshEntryList()
             if not entryListFrame then return end
-            -- Clear existing children
+
             for _, child in ipairs({entryListFrame:GetChildren()}) do
                 child:Hide()
                 child:SetParent(nil)
             end
 
-            -- Use GetBarEntries for spec-aware loading (always uses current spec)
+
             local entries
             local trackerMod = PREYCore and PREYCore.CustomTrackers
             if trackerMod and trackerMod.GetBarEntries then
-                -- Pass nil to use current spec
+
                 entries = trackerMod.GetBarEntries(barConfig, nil)
             else
                 entries = barConfig.entries or {}
@@ -8491,7 +8326,7 @@ local function CreateCustomTrackersPage(parent)
                 entryFrame:SetSize(320, 28)
                 entryFrame:SetPoint("TOPLEFT", 0, listY)
 
-                -- Icon
+
                 local iconTex = entryFrame:CreateTexture(nil, "ARTWORK")
                 iconTex:SetSize(24, 24)
                 iconTex:SetPoint("LEFT", 0, 0)
@@ -8503,9 +8338,9 @@ local function CreateCustomTrackersPage(parent)
                     iconTex:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
                 end
                 iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-                entryFrame.iconTex = iconTex  -- Store reference for name resolution
+                entryFrame.iconTex = iconTex
 
-                -- Name (editable input box with subtle styling)
+
                 local nameInputBg = CreateFrame("Frame", nil, entryFrame, "BackdropTemplate")
                 nameInputBg:SetPoint("LEFT", iconTex, "RIGHT", 6, 0)
                 nameInputBg:SetSize(176, 22)
@@ -8527,7 +8362,7 @@ local function CreateCustomTrackersPage(parent)
                 nameInput:SetText(GetEntryDisplayName(entry))
                 nameInput:SetCursorPosition(0)
 
-                -- Store reference to entry for saving
+
                 nameInput.entry = entry
                 nameInput.barConfig = barConfig
 
@@ -8536,11 +8371,11 @@ local function CreateCustomTrackersPage(parent)
                     self:ClearFocus()
                 end)
 
-                -- Helper to resolve name to spell/item and update entry
+
                 local function ResolveAndUpdateEntry(self)
                     local newName = self:GetText()
                     if newName == "" then
-                        -- Clear custom name to restore auto-detected
+
                         self.entry.customName = nil
                         self:SetText(GetEntryDisplayName(self.entry))
                         return
@@ -8548,28 +8383,28 @@ local function CreateCustomTrackersPage(parent)
 
                     local currentName = GetEntryDisplayName(self.entry)
                     if newName == currentName then
-                        -- No change, don't process
+
                         return
                     end
 
-                    -- Try to resolve the name to a spell/item ID
+
                     local resolved = false
 
                     if self.entry.type == "spell" then
-                        -- Try to look up spell by name using C_Spell API
+
                         local newSpellID = C_Spell.GetSpellIDForSpellIdentifier(newName)
                         if newSpellID then
-                            -- Found the spell - update the entry ID
+
                             self.entry.id = newSpellID
-                            self.entry.customName = nil  -- Clear custom name since we resolved
+                            self.entry.customName = nil
                             resolved = true
-                            -- Refresh the bar to use new spell
+
                             if PREYCore and PREYCore.CustomTrackers then
                                 PREYCore.CustomTrackers:UpdateBar(self.barConfig.id)
                             end
-                            -- Update display to show resolved name
+
                             self:SetText(GetEntryDisplayName(self.entry))
-                            -- Update icon
+
                             local iconTexRef = self:GetParent():GetParent().iconTex
                             if iconTexRef then
                                 local info = C_Spell.GetSpellInfo(newSpellID)
@@ -8579,20 +8414,20 @@ local function CreateCustomTrackersPage(parent)
                             end
                         end
                     elseif self.entry.type == "item" then
-                        -- Try to look up item by name
+
                         local newItemID = C_Item.GetItemIDForItemInfo(newName)
                         if newItemID then
-                            -- Found the item - update the entry ID
+
                             self.entry.id = newItemID
                             self.entry.customName = nil
                             resolved = true
-                            -- Refresh the bar
+
                             if PREYCore and PREYCore.CustomTrackers then
                                 PREYCore.CustomTrackers:UpdateBar(self.barConfig.id)
                             end
-                            -- Update display
+
                             self:SetText(GetEntryDisplayName(self.entry))
-                            -- Update icon
+
                             local iconTexRef = self:GetParent():GetParent().iconTex
                             if iconTexRef then
                                 local _, _, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(newItemID)
@@ -8604,7 +8439,7 @@ local function CreateCustomTrackersPage(parent)
                     end
 
                     if not resolved then
-                        -- Could not resolve - revert to original name
+
                         self:SetText(GetEntryDisplayName(self.entry))
                     end
                 end
@@ -8622,10 +8457,10 @@ local function CreateCustomTrackersPage(parent)
                     ResolveAndUpdateEntry(self)
                 end)
 
-                -- Store reference for button positioning
+
                 local entryName = nameInputBg
 
-                -- Helper: Create styled chevron button (matches dropdown style)
+
                 local function CreateChevronButton(parent, direction, onClick)
                     local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
                     btn:SetSize(22, 22)
@@ -8637,7 +8472,7 @@ local function CreateCustomTrackersPage(parent)
                     btn:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
                     btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
 
-                    -- Chevron made of two rotated lines
+
                     local chevronLeft = btn:CreateTexture(nil, "OVERLAY")
                     chevronLeft:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.7)
                     chevronLeft:SetSize(6, 2)
@@ -8675,7 +8510,7 @@ local function CreateCustomTrackersPage(parent)
                     return btn
                 end
 
-                -- Move Up button (anchored after fixed-width name)
+
                 local upBtn = CreateChevronButton(entryFrame, "up", function()
                     if PREYCore and PREYCore.CustomTrackers then
                         PREYCore.CustomTrackers:MoveEntry(barConfig.id, j, -1, nil)
@@ -8688,7 +8523,7 @@ local function CreateCustomTrackersPage(parent)
                     upBtn:EnableMouse(false)
                 end
 
-                -- Move Down button
+
                 local downBtn = CreateChevronButton(entryFrame, "down", function()
                     if PREYCore and PREYCore.CustomTrackers then
                         PREYCore.CustomTrackers:MoveEntry(barConfig.id, j, 1, nil)
@@ -8701,7 +8536,7 @@ local function CreateCustomTrackersPage(parent)
                     downBtn:EnableMouse(false)
                 end
 
-                -- Remove button (styled to match chevrons)
+
                 local removeBtn = CreateFrame("Button", nil, entryFrame, "BackdropTemplate")
                 removeBtn:SetSize(22, 22)
                 removeBtn:SetBackdrop({
@@ -8734,44 +8569,38 @@ local function CreateCustomTrackersPage(parent)
                 listY = listY - 30
             end
 
-            -- Update entry list frame height
+
             local listHeight = math.max(20, math.abs(listY))
             entryListFrame:SetHeight(listHeight)
         end
 
-        -- Create add entry section (drop zone) - anchored to hintText
+
         local addSection = CreateAddEntrySection(tabContent, barConfig.id, RefreshEntryList)
         addSection:SetPoint("TOPLEFT", hintText, "BOTTOMLEFT", 0, -10)
-        addSection:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)  -- Full width
+        addSection:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
 
-        -----------------------------------------------------------------------
-        -- TRACKED ITEMS SECTION
-        -----------------------------------------------------------------------
+
         local trackedHeader = GUI:CreateSectionHeader(tabContent, "Tracked Items And Spells")
         trackedHeader:SetPoint("TOPLEFT", addSection, "BOTTOMLEFT", 0, -15)
 
-        -- Entry list container
+
         entryListFrame = CreateFrame("Frame", nil, tabContent)
         entryListFrame:SetPoint("TOPLEFT", trackedHeader, "BOTTOMLEFT", 0, -8)
         entryListFrame:SetSize(400, 20)
         RefreshEntryList()
 
-        -----------------------------------------------------------------------
-        -- LOWER SECTIONS CONTAINER (anchored to entry list for dynamic positioning)
-        -----------------------------------------------------------------------
+
         local lowerContainer = CreateFrame("Frame", nil, tabContent)
         lowerContainer:SetPoint("TOPLEFT", entryListFrame, "BOTTOMLEFT", 0, -10)
         lowerContainer:SetPoint("RIGHT", tabContent, "RIGHT", 0, 0)
-        lowerContainer:SetHeight(600)  -- Will contain all sections below
-        lowerContainer:EnableMouse(false)  -- Let clicks pass through to widgets
-        y = 0  -- Reset y for positioning within lowerContainer
+        lowerContainer:SetHeight(600)
+        lowerContainer:EnableMouse(false)
+        y = 0
 
-        -----------------------------------------------------------------------
-        -- AUTOHIDE NON-USABLES SECTION (moved up per user request - highly useful feature)
-        -----------------------------------------------------------------------
+
         local autohideHeader = GUI:CreateSectionHeader(lowerContainer, "Autohide Non-Usables")
         autohideHeader:SetPoint("TOPLEFT", 0, y)
-        y = y - autohideHeader.gap + 12  -- Tighter spacing for description text
+        y = y - autohideHeader.gap + 12
 
         local autohideDesc = GUI:CreateLabel(lowerContainer, "By default, when a consumable has 0 stacks in your bags, a trinket is unequipped from your character, or you have unlearned a spell, those tracked elements are merely desaturated. Toggling this on will hide them entirely.", 11, C.textMuted)
         autohideDesc:SetPoint("TOPLEFT", 0, y)
@@ -8786,9 +8615,7 @@ local function CreateCustomTrackersPage(parent)
         hideNonUsableCheck:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -----------------------------------------------------------------------
-        -- POSITIONING SECTION (moved to lowerContainer for better flow)
-        -----------------------------------------------------------------------
+
         local posHeader = GUI:CreateSectionHeader(lowerContainer, "Positioning")
         posHeader:SetPoint("TOPLEFT", 0, y)
         y = y - posHeader.gap
@@ -8801,14 +8628,14 @@ local function CreateCustomTrackersPage(parent)
         posHint:SetHeight(45)
         y = y - 55
 
-        -- Ensure offset fields exist (migration)
+
         if not barConfig.offsetX then barConfig.offsetX = 0 end
         if not barConfig.offsetY then barConfig.offsetY = -300 end
 
-        -- Store slider references for external updates (when bar is dragged)
+
         local xOffsetSlider, yOffsetSlider
 
-        -- Register callback to update sliders when bar is dragged
+
         if trackerModule then
             trackerModule.onPositionChanged = function(draggedBarID, newX, newY)
                 if draggedBarID == barConfig.id and xOffsetSlider and yOffsetSlider then
@@ -8818,7 +8645,7 @@ local function CreateCustomTrackersPage(parent)
             end
         end
 
-        -- Lock to Player Frame section
+
         local btnGap = 4
         local rowGap = 4
 
@@ -8832,15 +8659,15 @@ local function CreateCustomTrackersPage(parent)
         lockLabel:SetText("Lock to Player Frame")
         lockLabel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Store button references for state updates
+
         local lockButtons = {}
 
-        -- Function to update slider enabled state based on lock
+
         local function UpdateLockState()
-            -- No-op: sliders always enabled for fine-tuning locked positions
+
         end
 
-        -- Function to update button border colors and text based on lock state
+
         local function UpdateLockButtonStates()
             local currentPos = barConfig.lockedToPlayer and barConfig.lockPosition or nil
             for pos, btn in pairs(lockButtons) do
@@ -8854,10 +8681,10 @@ local function CreateCustomTrackersPage(parent)
             end
         end
 
-        -- Forward declaration for mutual exclusion (defined in target lock section)
+
         local UpdateTargetLockButtonStates
 
-        -- Toggle lock: click same button to unlock
+
         local function LockToPlayer(corner)
             if barConfig.lockedToPlayer and barConfig.lockPosition == corner then
                 local bar = PREYCore and PREYCore.CustomTrackers and PREYCore.CustomTrackers.activeBars and PREYCore.CustomTrackers.activeBars[barConfig.id]
@@ -8896,7 +8723,7 @@ local function CreateCustomTrackersPage(parent)
             UpdateLockButtonStates()
         end
 
-        -- Helper to create lock button
+
         local function CreateLockButton(parent, label, corner)
             local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
             btn:SetSize(75, 22)
@@ -8961,7 +8788,7 @@ local function CreateCustomTrackersPage(parent)
 
         y = y - (FORM_ROW + 22 + rowGap + 4)
 
-        -- Lock to Target Frame section
+
         local targetLockContainer = CreateFrame("Frame", nil, lowerContainer)
         targetLockContainer:SetHeight(FORM_ROW + 22 + rowGap)
         targetLockContainer:SetPoint("TOPLEFT", 0, y)
@@ -9088,7 +8915,7 @@ local function CreateCustomTrackersPage(parent)
 
         y = y - (FORM_ROW + 22 + rowGap + 8)
 
-        -- X/Y Offset sliders
+
         xOffsetSlider = GUI:CreateFormSlider(lowerContainer, "X Offset", -2000, 2000, 1, "offsetX", barConfig, RefreshPosition)
         xOffsetSlider:SetPoint("TOPLEFT", 0, y)
         xOffsetSlider:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
@@ -9101,20 +8928,18 @@ local function CreateCustomTrackersPage(parent)
 
         UpdateLockState()
 
-        -- Prevent Mouse Dragging checkbox
+
         local lockCheck = GUI:CreateFormCheckbox(lowerContainer, "Prevent Mouse Dragging", "locked", barConfig)
         lockCheck:SetPoint("TOPLEFT", 0, y)
         lockCheck:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -----------------------------------------------------------------------
-        -- LAYOUT SECTION
-        -----------------------------------------------------------------------
+
         local layoutHeader = GUI:CreateSectionHeader(lowerContainer, "Layout")
         layoutHeader:SetPoint("TOPLEFT", 0, y)
         y = y - layoutHeader.gap
 
-        -- Grow Direction dropdown
+
         local growOptions = {
             {value = "RIGHT", text = "Right"},
             {value = "LEFT", text = "Left"},
@@ -9141,7 +8966,7 @@ local function CreateCustomTrackersPage(parent)
         dynamicLayoutDesc:SetHeight(40)
         y = y - 50
 
-        -- Icon Shape slider
+
         local shapeSlider = GUI:CreateFormSlider(lowerContainer, "Icon Shape", 1.0, 2.0, 0.01, "aspectRatioCrop", barConfig, RefreshThisBar)
         shapeSlider:SetPoint("TOPLEFT", 0, y)
         shapeSlider:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
@@ -9153,40 +8978,36 @@ local function CreateCustomTrackersPage(parent)
         shapeTip:SetJustifyH("LEFT")
         y = y - 20
 
-        -- Icon Size slider
+
         local sizeSlider = GUI:CreateFormSlider(lowerContainer, "Icon Size", 16, 64, 1, "iconSize", barConfig, RefreshThisBar)
         sizeSlider:SetPoint("TOPLEFT", 0, y)
         sizeSlider:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Spacing slider
+
         local spacingSlider = GUI:CreateFormSlider(lowerContainer, "Spacing", 0, 20, 1, "spacing", barConfig, RefreshThisBar)
         spacingSlider:SetPoint("TOPLEFT", 0, y)
         spacingSlider:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -----------------------------------------------------------------------
-        -- ICON STYLE SECTION
-        -----------------------------------------------------------------------
+
         local styleHeader = GUI:CreateSectionHeader(lowerContainer, "Icon Style")
         styleHeader:SetPoint("TOPLEFT", 0, y)
         y = y - styleHeader.gap
 
-        -- Border Size slider
+
         local borderSlider = GUI:CreateFormSlider(lowerContainer, "Border Size", 0, 8, 1, "borderSize", barConfig, RefreshThisBar)
         borderSlider:SetPoint("TOPLEFT", 0, y)
         borderSlider:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Zoom slider
+
         local zoomSlider = GUI:CreateFormSlider(lowerContainer, "Zoom", 0, 0.2, 0.01, "zoom", barConfig, RefreshThisBar)
         zoomSlider:SetPoint("TOPLEFT", 0, y)
         zoomSlider:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -----------------------------------------------------------------------
-        -- DURATION TEXT SECTION
-        -----------------------------------------------------------------------
+
         local durHeader = GUI:CreateSectionHeader(lowerContainer, "Duration Text")
         durHeader:SetPoint("TOPLEFT", 0, y)
         y = y - durHeader.gap
@@ -9216,18 +9037,16 @@ local function CreateCustomTrackersPage(parent)
         durYSlider:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -----------------------------------------------------------------------
-        -- STACK TEXT SECTION
-        -----------------------------------------------------------------------
+
         local stackHeader = GUI:CreateSectionHeader(lowerContainer, "Stack Text")
         stackHeader:SetPoint("TOPLEFT", 0, y)
         y = y - stackHeader.gap
 
-        local showChargesCheck  -- Forward declare for callback reference
+        local showChargesCheck
 
         local hideStackCheck = GUI:CreateFormCheckbox(lowerContainer, "Hide Text", "hideStackText", barConfig, function(val)
             RefreshThisBar()
-            -- Disable "Show Item Charges" when text is hidden (it has no effect)
+
             if showChargesCheck and showChargesCheck.SetEnabled then
                 showChargesCheck:SetEnabled(not val)
             end
@@ -9239,7 +9058,7 @@ local function CreateCustomTrackersPage(parent)
         showChargesCheck = GUI:CreateFormCheckbox(lowerContainer, "Show Item Charges", "showItemCharges", barConfig, RefreshThisBar)
         showChargesCheck:SetPoint("TOPLEFT", 0, y)
         showChargesCheck:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
-        -- Initial state: disabled if text is hidden
+
         if showChargesCheck.SetEnabled then
             showChargesCheck:SetEnabled(not barConfig.hideStackText)
         end
@@ -9265,9 +9084,7 @@ local function CreateCustomTrackersPage(parent)
         stackYSlider:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -----------------------------------------------------------------------
-        -- BUFF ACTIVE SETTINGS SECTION
-        -----------------------------------------------------------------------
+
         local buffActiveHeader = GUI:CreateSectionHeader(lowerContainer, "Buff Active Settings")
         buffActiveHeader:SetPoint("TOPLEFT", 0, y)
         y = y - buffActiveHeader.gap
@@ -9312,9 +9129,7 @@ local function CreateCustomTrackersPage(parent)
         glowScaleSlider:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -----------------------------------------------------------------------
-        -- ICON VISIBILITY SECTION (moved after Buff Active per plan)
-        -----------------------------------------------------------------------
+
         local cooldownOnlyHeader = GUI:CreateSectionHeader(lowerContainer, "Icon Visibility")
         cooldownOnlyHeader:SetPoint("TOPLEFT", 0, y)
         y = y - cooldownOnlyHeader.gap + 10
@@ -9347,9 +9162,7 @@ local function CreateCustomTrackersPage(parent)
         showOnlyWhenOffCooldownCheck:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Mutual exclusion handlers for cooldown/active visibility checkboxes
-        -- showOnlyOnCooldown, showOnlyWhenActive, showOnlyWhenOffCooldown are mutually exclusive
-        -- showOnlyInCombat can be combined with any of them
+
         if showOnlyOnCooldownCheck.track then
             showOnlyOnCooldownCheck.track:SetScript("OnClick", function()
                 local newVal = not showOnlyOnCooldownCheck.GetValue()
@@ -9391,25 +9204,23 @@ local function CreateCustomTrackersPage(parent)
             end)
         end
 
-        -----------------------------------------------------------------------
-        -- ADVANCED SETTINGS SECTION
-        -----------------------------------------------------------------------
+
         local advancedHeader = GUI:CreateSectionHeader(lowerContainer, "Advanced Settings")
         advancedHeader:SetPoint("TOPLEFT", 0, y)
         y = y - advancedHeader.gap
 
-        -- Show Recharge Swipe checkbox
+
         local showRechargeSwipe = GUI:CreateFormCheckbox(lowerContainer, "Show Recharge Swipe", "showRechargeSwipe", barConfig, RefreshThisBar)
         showRechargeSwipe:SetPoint("TOPLEFT", 0, y)
         showRechargeSwipe:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Recharge swipe description (below toggle)
+
         local rechargeSwipeDesc = GUI:CreateLabel(lowerContainer, "DO NOT turn on unless you know what you're doing. Shows GCD and radial swipe animations when spells are recharging.", 10, C.textMuted)
         rechargeSwipeDesc:SetPoint("TOPLEFT", 0, y + 4)
         y = y - 18
 
-        -- Enable Spec-Specific Spells checkbox
+
         local specEnableCheck = GUI:CreateFormCheckbox(lowerContainer, "Enable Spec-Specific Spells", "specSpecificSpells", barConfig, function()
             if barConfig.specSpecificSpells then
                 local specKey = getCurrentSpecKey()
@@ -9430,7 +9241,7 @@ local function CreateCustomTrackersPage(parent)
         specEnableCheck:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Spec-specific description (below toggle)
+
         local specHint = GUI:CreateLabel(lowerContainer, "When enabled, the spell list for this bar is saved separately for each spec. The bar's layout settings remain shared.", 10, C.textMuted)
         specHint:SetPoint("TOPLEFT", 0, y + 4)
         specHint:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
@@ -9439,7 +9250,7 @@ local function CreateCustomTrackersPage(parent)
         specHint:SetHeight(26)
         y = y - 34
 
-        -- Build specs list for copy dropdown
+
         local allSpecs = {}
         if trackerModule and trackerModule.GetAllClassSpecs then
             allSpecs = trackerModule.GetAllClassSpecs()
@@ -9457,7 +9268,7 @@ local function CreateCustomTrackersPage(parent)
             end
         end
 
-        -- Info label (shows currently editing spec)
+
         specInfoLabel = GUI:CreateLabel(lowerContainer, "", 11, C.accent)
         specInfoLabel:SetPoint("TOPLEFT", 0, y)
         specInfoLabel:SetPoint("RIGHT", lowerContainer, "RIGHT", -PAD, 0)
@@ -9465,7 +9276,7 @@ local function CreateCustomTrackersPage(parent)
         updateSpecInfoLabel()
         y = y - 18
 
-        -- Copy From dropdown container
+
         local copyContainer = CreateFrame("Frame", nil, lowerContainer)
         copyContainer:SetHeight(FORM_ROW)
         copyContainer:SetPoint("TOPLEFT", 0, y)
@@ -9517,43 +9328,38 @@ local function CreateCustomTrackersPage(parent)
         copyFromDropdown = copyContainer
         y = y - FORM_ROW
 
-        -- Set lowerContainer height based on content (increased for new sections)
+
         lowerContainer:SetHeight(math.abs(y) + 40)
 
-        -- tabContent height needs to accommodate more content now
+
         tabContent:SetHeight(1200)
     end
 
-    ---------------------------------------------------------------------------
-    -- Build sub-tabs dynamically from bars
-    ---------------------------------------------------------------------------
-    -- Reference to be populated after subTabs creation (for live tab text updates)
+
     local subTabsRef = {}
 
     local tabDefs = {}
 
-    ---------------------------------------------------------------------------
-    -- SPELL SCANNER TAB (always first)
-    ---------------------------------------------------------------------------
+
     table.insert(tabDefs, {
         name = "Setup Custom Buff Tracking",
         builder = function(tabContent)
             GUI:SetSearchContext({tabIndex = 9, tabName = "Custom Items/Spells/Buffs", subTabIndex = 1, subTabName = "Spell Scanner"})
             local y = -10
             local scanner = PREY.SpellScanner
-            local scannedListFrame  -- Forward declaration for refresh
+            local scannedListFrame
 
-            -- Header
+
             local header = GUI:CreateSectionHeader(tabContent, "Spell Scanner")
             header:SetPoint("TOPLEFT", PAD, y)
             y = y - header.gap
 
-            -- "How It Works" mini-header
+
             local howItWorks = GUI:CreateLabel(tabContent, "How It Works", 11, C.accentLight)
             howItWorks:SetPoint("TOPLEFT", PAD, y)
             y = y - 16
 
-            -- Step 1
+
             local step1 = GUI:CreateLabel(tabContent, "1. Enable Scan Mode and cast spells or items out of combat to record their buff durations", 11, C.text)
             step1:SetPoint("TOPLEFT", PAD, y)
             step1:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -9562,21 +9368,21 @@ local function CreateCustomTrackersPage(parent)
             step1:SetHeight(28)
             y = y - 32
 
-            -- Step 2
+
             local step2 = GUI:CreateLabel(tabContent, "2. Add those spells/items to a Custom Tracker bar", 11, C.text)
             step2:SetPoint("TOPLEFT", PAD, y)
             step2:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             step2:SetJustifyH("LEFT")
             y = y - 20
 
-            -- Step 3
+
             local step3 = GUI:CreateLabel(tabContent, "3. The icons on your Custom Bars will now show accurate custom buff timers in combat", 11, C.text)
             step3:SetPoint("TOPLEFT", PAD, y)
             step3:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             step3:SetJustifyH("LEFT")
             y = y - 26
 
-            -- Scan Mode Toggle
+
             local scanModeContainer = CreateFrame("Frame", nil, tabContent)
             scanModeContainer:SetHeight(FORM_ROW)
             scanModeContainer:SetPoint("TOPLEFT", PAD, y)
@@ -9600,7 +9406,7 @@ local function CreateCustomTrackersPage(parent)
                 end
             end)
             scanBtn:SetPoint("LEFT", 180, 0)
-            -- Set initial state
+
             if scanner and scanner.scanMode then
                 scanBtn.text:SetText("Disable")
                 scanBtn:SetBackdropColor(0.2, 0.6, 0.2, 1)
@@ -9608,19 +9414,18 @@ local function CreateCustomTrackersPage(parent)
 
             y = y - FORM_ROW
 
-            -- Auto-Scan Toggle (persistent setting) - using proper switch toggle
-            -- Ensure spellScanner db exists with proper defaults
+
             if not PREY.db.global.spellScanner then
                 PREY.db.global.spellScanner = { spells = {}, items = {}, autoScan = false }
             end
-            -- Ensure autoScan key exists (could be nil from older version)
+
             if PREY.db.global.spellScanner.autoScan == nil then
                 PREY.db.global.spellScanner.autoScan = false
             end
 
             local autoScanToggle = GUI:CreateFormToggle(tabContent, "Auto-Scan (silent)", "autoScan", PREY.db.global.spellScanner, function(val)
                 if scanner then
-                    scanner.autoScan = val  -- Keep runtime state in sync
+                    scanner.autoScan = val
                 end
             end)
             autoScanToggle:SetPoint("TOPLEFT", PAD, y)
@@ -9628,16 +9433,16 @@ local function CreateCustomTrackersPage(parent)
 
             y = y - FORM_ROW - 10
 
-            -- Scanned Spells Header
+
             local scannedHeader = GUI:CreateSectionHeader(tabContent, "Scanned Spells & Items")
             scannedHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - scannedHeader.gap
 
-            -- Refresh function for the list (matches Tracked Items pattern)
+
             local function RefreshScannedList()
                 if not scannedListFrame then return end
 
-                -- Clear existing child frames
+
                 for _, child in ipairs({scannedListFrame:GetChildren()}) do
                     child:Hide()
                     child:SetParent(nil)
@@ -9647,20 +9452,20 @@ local function CreateCustomTrackersPage(parent)
                 local listY = 0
                 local rowHeight = 30
 
-                -- Helper to create a row (matches Tracked Items style)
+
                 local function CreateScannedRow(id, data, isItem)
                     local entryFrame = CreateFrame("Frame", nil, scannedListFrame)
                     entryFrame:SetSize(320, 28)
                     entryFrame:SetPoint("TOPLEFT", 0, listY)
 
-                    -- Icon (24x24)
+
                     local iconTex = entryFrame:CreateTexture(nil, "ARTWORK")
                     iconTex:SetSize(24, 24)
                     iconTex:SetPoint("LEFT", 0, 0)
                     iconTex:SetTexture(data.icon or 134400)
                     iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-                    -- Name display (input-box style background)
+
                     local nameBg = CreateFrame("Frame", nil, entryFrame, "BackdropTemplate")
                     nameBg:SetPoint("LEFT", iconTex, "RIGHT", 6, 0)
                     nameBg:SetSize(200, 22)
@@ -9681,7 +9486,7 @@ local function CreateCustomTrackersPage(parent)
                     nameText:SetText(displayName .. "  |cff888888" .. durationStr .. "|r")
                     nameText:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-                    -- Delete button (X) - matches Tracked Items style
+
                     local removeBtn = CreateFrame("Button", nil, entryFrame, "BackdropTemplate")
                     removeBtn:SetSize(22, 22)
                     removeBtn:SetPoint("LEFT", nameBg, "RIGHT", 6, 0)
@@ -9718,42 +9523,42 @@ local function CreateCustomTrackersPage(parent)
                     listY = listY - rowHeight
                 end
 
-                -- List spells
+
                 for spellID, data in pairs((scannerDB and scannerDB.spells) or {}) do
                     CreateScannedRow(spellID, data, false)
                 end
 
-                -- List items
+
                 for itemID, data in pairs((scannerDB and scannerDB.items) or {}) do
                     CreateScannedRow(itemID, data, true)
                 end
 
-                -- Update list frame height
+
                 local listHeight = math.max(20, math.abs(listY))
                 scannedListFrame:SetHeight(listHeight)
             end
 
-            -- Scanned list container (no backdrop, matches Tracked Items style)
+
             scannedListFrame = CreateFrame("Frame", nil, tabContent)
             scannedListFrame:SetPoint("TOPLEFT", PAD, y)
             scannedListFrame:SetSize(400, 20)
 
-            -- Register callback for real-time updates when spells are scanned
+
             if scanner then
                 scanner.onScanCallback = RefreshScannedList
             end
 
-            -- Populate the list
+
             RefreshScannedList()
 
-            -- Lower container anchored to list (shifts down when list grows)
+
             local lowerContainer = CreateFrame("Frame", nil, tabContent)
             lowerContainer:SetPoint("TOPLEFT", scannedListFrame, "BOTTOMLEFT", 0, -15)
             lowerContainer:SetPoint("RIGHT", tabContent, "RIGHT", 0, 0)
             lowerContainer:SetHeight(100)
             lowerContainer:EnableMouse(false)
 
-            -- Clear all button (in lower container)
+
             local clearBtn = GUI:CreateButton(lowerContainer, "Clear All Scanned", 140, 24, function()
                 GUI:ShowConfirmation({
                     title = "Clear All Scanned Spells?",
@@ -9776,23 +9581,23 @@ local function CreateCustomTrackersPage(parent)
         end,
     })
 
-    -- Add a tab for each existing bar
+
     for i, barConfig in ipairs(bars) do
         local tabName = barConfig.name or ("Tracker " .. i)
-        -- Truncate long names for tab display
+
         if #tabName > 20 then
             tabName = tabName:sub(1, 17) .. "..."
         end
         table.insert(tabDefs, {
             name = tabName,
             builder = function(tabContent)
-                -- Pass i+1 for subTabIndex since Spell Scanner is tab 1
+
                 BuildTrackerBarTab(tabContent, barConfig, i + 1, subTabsRef)
             end,
         })
     end
 
-    -- If no bars exist (only Spell Scanner tab), show empty state
+
     if #tabDefs == 1 then
         local emptyHeader = GUI:CreateSectionHeader(content, "Custom Tracker Bars")
         emptyHeader:SetPoint("TOPLEFT", PAD, -15)
@@ -9802,10 +9607,10 @@ local function CreateCustomTrackersPage(parent)
         emptyLabel:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
         emptyLabel:SetJustifyH("LEFT")
 
-        -- Add bar button
+
         local addBtn = GUI:CreateButton(content, "+ Add Tracker Bar", 160, 28, function()
             local newID = "tracker" .. (time() % 100000)
-            -- Calculate position relative to player frame
+
             local newOffsetX, newOffsetY = CalculatePlayerRelativeOffset(-20, -50)
             local newBar = {
                 id = newID,
@@ -9848,7 +9653,7 @@ local function CreateCustomTrackersPage(parent)
         addBtn:SetPoint("TOPLEFT", PAD, -100)
         content:SetHeight(200)
     else
-        -- Add a "+" tab to create new bars
+
         table.insert(tabDefs, {
             name = "+ Add Bar",
             builder = function(tabContent)
@@ -9865,8 +9670,8 @@ local function CreateCustomTrackersPage(parent)
 
                 local addBtn = GUI:CreateButton(tabContent, "Create New Tracker Bar", 180, 28, function()
                     local newID = "tracker" .. (time() % 100000)
-                    -- Calculate position relative to player frame (stagger by bar count)
-                    local staggerY = #bars * 40  -- Each new bar 40px lower
+
+                    local staggerY = #bars * 40
                     local newOffsetX, newOffsetY = CalculatePlayerRelativeOffset(-20, -50 - staggerY)
                     local newBar = {
                         id = newID,
@@ -9911,9 +9716,9 @@ local function CreateCustomTrackersPage(parent)
             end,
         })
 
-        -- Create sub-tabs
+
         local subTabs = GUI:CreateSubTabs(content, tabDefs)
-        subTabsRef.tabButtons = subTabs.tabButtons  -- Populate reference for live tab text updates
+        subTabsRef.tabButtons = subTabs.tabButtons
         subTabs:SetPoint("TOPLEFT", 5, -5)
         subTabs:SetPoint("TOPRIGHT", -5, -5)
         subTabs:SetHeight(750)
@@ -9922,33 +9727,31 @@ local function CreateCustomTrackersPage(parent)
     end
 end
 
----------------------------------------------------------------------------
--- PAGE: UnitFrames (uses legacy quiUnitFrames database key for compatibility)
----------------------------------------------------------------------------
+
 local function CreateUnitFramesPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
-    
-    -- Get the new unit frames database
+
+
     local function GetUFDB()
         return db and db.quiUnitFrames
     end
-    
-    -- Refresh function for new unit frames
+
+
     local function RefreshNewUF()
         if _G.PreyUI_RefreshUnitFrames then
             _G.PreyUI_RefreshUnitFrames()
         end
     end
-    
-    -- Build the General tab content
+
+
     local function BuildGeneralTab(tabContent)
         local y = -10
         local PAD = 10
         local FORM_ROW = 32
         local ufdb = GetUFDB()
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 2, tabName = "Single Frames & Castbars", subTabIndex = 1, subTabName = "General"})
 
         if not ufdb then
@@ -9958,20 +9761,20 @@ local function CreateUnitFramesPage(parent)
             return
         end
 
-        -- Use the main profile general settings (not ufdb.general)
+
         local general = db.general
         if not general then
             db.general = {}
             general = db.general
         end
 
-        -- Enable checkbox
+
         local enableCheck = GUI:CreateFormCheckbox(tabContent, "Enable Unitframes (Req. Reload)", "enabled", ufdb, RefreshNewUF)
         enableCheck:SetPoint("TOPLEFT", PAD, y)
         enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- EDIT MODE section
+
         local editHeader = GUI:CreateSectionHeader(tabContent, "Positioning")
         editHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - editHeader.gap
@@ -9982,7 +9785,7 @@ local function CreateUnitFramesPage(parent)
         editDesc:SetJustifyH("LEFT")
         y = y - 24
 
-        -- Edit Mode button (form style)
+
         local editContainer = CreateFrame("Frame", nil, tabContent)
         editContainer:SetHeight(FORM_ROW)
         editContainer:SetPoint("TOPLEFT", PAD, y)
@@ -10022,24 +9825,24 @@ local function CreateUnitFramesPage(parent)
         end)
         y = y - FORM_ROW - 10
 
-        -- Store widget refs for BOTH sections (bidirectional conditional disable)
+
         local defaultWidgets = {}
         local darkModeWidgets = {}
 
-        -- Helper to update enable states based on dark mode toggle
+
         local function UpdateDarkModeWidgetStates()
             local darkModeOn = general.darkMode
-            -- Default widgets: enabled when dark mode OFF
+
             if defaultWidgets.healthColor then defaultWidgets.healthColor:SetEnabled(not darkModeOn) end
             if defaultWidgets.bgColor then defaultWidgets.bgColor:SetEnabled(not darkModeOn) end
             if defaultWidgets.opacity then defaultWidgets.opacity:SetEnabled(not darkModeOn) end
-            -- Darkmode widgets: enabled when dark mode ON
+
             if darkModeWidgets.healthColor then darkModeWidgets.healthColor:SetEnabled(darkModeOn) end
             if darkModeWidgets.bgColor then darkModeWidgets.bgColor:SetEnabled(darkModeOn) end
             if darkModeWidgets.opacity then darkModeWidgets.opacity:SetEnabled(darkModeOn) end
         end
 
-        -- DEFAULT UNITFRAME COLORS section
+
         local defaultHeader = GUI:CreateSectionHeader(tabContent, "Default Unitframe Colors")
         defaultHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - defaultHeader.gap
@@ -10050,10 +9853,10 @@ local function CreateUnitFramesPage(parent)
         defaultDesc:SetJustifyH("LEFT")
         y = y - 24
 
-        -- Use Class Colors toggle (greys out Default Health Color when ON)
+
         local defUseClassColor = GUI:CreateFormCheckbox(tabContent, "Use Class Colors", "defaultUseClassColor", general, function()
             RefreshNewUF()
-            -- Grey out health color picker when class colors is enabled
+
             if defaultWidgets.healthColor then
                 defaultWidgets.healthColor:SetEnabled(not general.defaultUseClassColor)
             end
@@ -10063,36 +9866,36 @@ local function CreateUnitFramesPage(parent)
         defaultWidgets.useClassColor = defUseClassColor
         y = y - FORM_ROW
 
-        -- Default Health Color (greyed out when Use Class Colors is ON)
+
         local defHealthColor = GUI:CreateFormColorPicker(tabContent, "Default Health Color", "defaultHealthColor", general, RefreshNewUF, { noAlpha = true })
         defHealthColor:SetPoint("TOPLEFT", PAD, y)
         defHealthColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         defaultWidgets.healthColor = defHealthColor
-        defHealthColor:SetEnabled(not general.defaultUseClassColor)  -- Initial state
+        defHealthColor:SetEnabled(not general.defaultUseClassColor)
         y = y - FORM_ROW
 
-        -- Default Background Color
+
         local defBgColor = GUI:CreateFormColorPicker(tabContent, "Default Background Color", "defaultBgColor", general, RefreshNewUF, { noAlpha = true })
         defBgColor:SetPoint("TOPLEFT", PAD, y)
         defBgColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         defaultWidgets.bgColor = defBgColor
         y = y - FORM_ROW
 
-        -- Health Opacity slider
+
         local defHealthOpacity = GUI:CreateFormSlider(tabContent, "Health Opacity", 0.1, 1.0, 0.01, "defaultHealthOpacity", general, RefreshNewUF)
         defHealthOpacity:SetPoint("TOPLEFT", PAD, y)
         defHealthOpacity:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         defaultWidgets.healthOpacity = defHealthOpacity
         y = y - FORM_ROW
 
-        -- Background Opacity slider
+
         local defBgOpacity = GUI:CreateFormSlider(tabContent, "Background Opacity", 0.1, 1.0, 0.01, "defaultBgOpacity", general, RefreshNewUF)
         defBgOpacity:SetPoint("TOPLEFT", PAD, y)
         defBgOpacity:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         defaultWidgets.bgOpacity = defBgOpacity
         y = y - FORM_ROW - 10
 
-        -- DARK MODE section
+
         local darkHeader = GUI:CreateSectionHeader(tabContent, "Darkmode For Unitframes")
         darkHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - darkHeader.gap
@@ -10111,38 +9914,38 @@ local function CreateUnitFramesPage(parent)
         darkEnable:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Darkmode Health Color (no alpha - pure RGB)
+
         local healthColor = GUI:CreateFormColorPicker(tabContent, "Darkmode Health Color", "darkModeHealthColor", general, RefreshNewUF, { noAlpha = true })
         healthColor:SetPoint("TOPLEFT", PAD, y)
         healthColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         darkModeWidgets.healthColor = healthColor
         y = y - FORM_ROW
 
-        -- Darkmode Background Color (no alpha - pure RGB)
+
         local bgColor = GUI:CreateFormColorPicker(tabContent, "Darkmode Background Color", "darkModeBgColor", general, RefreshNewUF, { noAlpha = true })
         bgColor:SetPoint("TOPLEFT", PAD, y)
         bgColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         darkModeWidgets.bgColor = bgColor
         y = y - FORM_ROW
 
-        -- Darkmode Health Opacity slider
+
         local dmHealthOpacity = GUI:CreateFormSlider(tabContent, "Darkmode Health Opacity", 0.1, 1.0, 0.01, "darkModeHealthOpacity", general, RefreshNewUF)
         dmHealthOpacity:SetPoint("TOPLEFT", PAD, y)
         dmHealthOpacity:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         darkModeWidgets.healthOpacity = dmHealthOpacity
         y = y - FORM_ROW
 
-        -- Darkmode Background Opacity slider
+
         local dmBgOpacity = GUI:CreateFormSlider(tabContent, "Darkmode Background Opacity", 0.1, 1.0, 0.01, "darkModeBgOpacity", general, RefreshNewUF)
         dmBgOpacity:SetPoint("TOPLEFT", PAD, y)
         dmBgOpacity:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         darkModeWidgets.bgOpacity = dmBgOpacity
         y = y - FORM_ROW - 10
 
-        -- Set initial enable/disable states for both sections
+
         UpdateDarkModeWidgetStates()
 
-        -- MASTER TEXT COLOR OVERRIDES section
+
         local textHeader = GUI:CreateSectionHeader(tabContent, "Text Class Color/React Color Overrides (Recommended For Dark Mode)")
         textHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - textHeader.gap
@@ -10180,7 +9983,7 @@ local function CreateUnitFramesPage(parent)
         masterToTText:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- TOOLTIPS SECTION
+
         y = y - 10
 
         local tooltipHeader = GUI:CreateSectionHeader(tabContent, "Tooltips on PREY Unitframes")
@@ -10192,7 +9995,7 @@ local function CreateUnitFramesPage(parent)
         tooltipCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Smoother Updates section
+
         local smoothHeader = GUI:CreateSectionHeader(tabContent, "Smoother Updates")
         smoothHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - smoothHeader.gap
@@ -10208,7 +10011,7 @@ local function CreateUnitFramesPage(parent)
         smoothCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Hostility Color Customization section
+
         local hostilityHeader = GUI:CreateSectionHeader(tabContent, "Hostility Color Customization")
         hostilityHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - hostilityHeader.gap
@@ -10236,15 +10039,15 @@ local function CreateUnitFramesPage(parent)
 
         tabContent:SetHeight(math.abs(y) + 20)
     end
-    
-    -- Build unit-specific tab content (Player, Target, etc.)
+
+
     local function BuildUnitTab(tabContent, unitKey)
         local y = -10
         local PAD = 10
         local FORM_ROW = 32
         local ufdb = GetUFDB()
 
-        -- Set search context for widget auto-registration (dynamic based on unitKey)
+
         local unitSubTabs = {
             player = {index = 2, name = "Player"},
             target = {index = 3, name = "Target"},
@@ -10265,16 +10068,16 @@ local function CreateUnitFramesPage(parent)
 
         local unitDB = ufdb[unitKey]
 
-        -- Refresh function for this specific unit
+
         local function RefreshUnit()
             RefreshNewUF()
-            -- Preview state is now in database, CreateCastbar will handle it
+
         end
 
-        -- Refresh function specifically for aura settings
+
         local function RefreshAuras()
             RefreshNewUF()
-            -- Refresh aura preview if active (re-render with new settings)
+
             local PREY_UF = ns.PREY_UnitFrames
             if PREY_UF and PREY_UF.auraPreviewMode then
                 if PREY_UF.auraPreviewMode[unitKey .. "_debuff"] then
@@ -10284,13 +10087,13 @@ local function CreateUnitFramesPage(parent)
                     _G.PreyUI_ShowAuraPreview(unitKey, "buff")
                 end
             end
-            -- Refresh real auras if not in preview mode
+
             if _G.PreyUI_RefreshAuras then
                 _G.PreyUI_RefreshAuras(unitKey)
             end
         end
 
-        -- Preview button row (form style)
+
         local previewContainer = CreateFrame("Frame", nil, tabContent)
         previewContainer:SetHeight(FORM_ROW)
         previewContainer:SetPoint("TOPLEFT", PAD, y)
@@ -10301,13 +10104,13 @@ local function CreateUnitFramesPage(parent)
         previewLabel:SetText("Frame Preview")
         previewLabel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-        -- Toggle track (pill-shaped, matches CreateFormToggle)
+
         local previewTrack = CreateFrame("Button", nil, previewContainer, "BackdropTemplate")
         previewTrack:SetSize(40, 20)
         previewTrack:SetPoint("LEFT", previewContainer, "LEFT", 180, 0)
         previewTrack:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1})
 
-        -- Thumb (sliding circle)
+
         local previewThumb = CreateFrame("Frame", nil, previewTrack, "BackdropTemplate")
         previewThumb:SetSize(16, 16)
         previewThumb:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1})
@@ -10315,7 +10118,7 @@ local function CreateUnitFramesPage(parent)
         previewThumb:SetBackdropBorderColor(0.85, 0.85, 0.85, 1)
         previewThumb:SetFrameLevel(previewTrack:GetFrameLevel() + 1)
 
-        -- Initialize state (preview defaults to off when panel opens)
+
         local isPreviewOn = false
         local function UpdatePreviewToggle(on)
             if on then
@@ -10343,7 +10146,7 @@ local function CreateUnitFramesPage(parent)
         end)
         y = y - FORM_ROW
 
-        -- Enable checkbox (requires reload)
+
         local displayNames = {targettarget = "Target of Target"}
         local frameName = displayNames[unitKey] or unitKey:gsub("^%l", string.upper)
         local enableCheck = GUI:CreateFormCheckbox(tabContent, "Enable " .. frameName .. " Frame", "enabled", unitDB, function()
@@ -10358,14 +10161,13 @@ local function CreateUnitFramesPage(parent)
         enableCheck:SetPoint("TOPLEFT", PAD, y)
         enableCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
-        
-        -- FRAME SIZE section
+
+
         local sizeHeader = GUI:CreateSectionHeader(tabContent, "Frame Size & Position")
         sizeHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - sizeHeader.gap
 
-        -- Size sliders (form style)
-        -- For player unit, wrap callback to also update locked castbar width
+
         local widthCallback = RefreshUnit
         if unitKey == "player" then
             widthCallback = function()
@@ -10390,7 +10192,7 @@ local function CreateUnitFramesPage(parent)
         borderSizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Boss frames get spacing slider
+
         if unitKey == "boss" then
             local spacingSlider = GUI:CreateFormSlider(tabContent, "Spacing", 0, 100, 1, "spacing", unitDB, RefreshUnit)
             spacingSlider:SetPoint("TOPLEFT", PAD, y)
@@ -10398,7 +10200,7 @@ local function CreateUnitFramesPage(parent)
             y = y - FORM_ROW
         end
 
-        -- Position sliders
+
         local offsetXSlider = GUI:CreateFormSlider(tabContent, "X Offset", -3000, 3000, 1, "offsetX", unitDB, RefreshUnit)
         offsetXSlider:SetPoint("TOPLEFT", PAD, y)
         offsetXSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -10409,23 +10211,23 @@ local function CreateUnitFramesPage(parent)
         offsetYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Register sliders for real-time sync during Edit Mode
+
         if _G.PreyUI_RegisterEditModeSliders then
             _G.PreyUI_RegisterEditModeSliders(unitKey, offsetXSlider, offsetYSlider)
         end
 
-        -- Frame Anchoring section (only for player and target)
+
         if unitKey == "player" or unitKey == "target" then
             local anchorHeader = GUI:CreateSectionHeader(tabContent, "Frame Anchoring")
             anchorHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - anchorHeader.gap
 
-            -- Initialize defaults if needed
+
             if unitDB.anchorTo == nil then unitDB.anchorTo = "disabled" end
             if unitDB.anchorGap == nil then unitDB.anchorGap = 10 end
             if unitDB.anchorYOffset == nil then unitDB.anchorYOffset = 0 end
 
-            -- Description text
+
             local anchorDesc = GUI:CreateLabel(tabContent,
                 unitKey == "player"
                     and "Anchors frame to the LEFT edge of selected target. As the anchor width changes, this frame will reposition automatically."
@@ -10436,10 +10238,10 @@ local function CreateUnitFramesPage(parent)
             anchorDesc:SetJustifyH("LEFT")
             y = y - 36
 
-            -- Forward declarations for sliders
+
             local anchorGapSlider, anchorYOffsetSlider
 
-            -- Helper function to update slider enabled states
+
             local function UpdateAnchorSliderStates()
                 local isAnchored = unitDB.anchorTo and unitDB.anchorTo ~= "disabled"
                 if isAnchored then
@@ -10463,7 +10265,7 @@ local function CreateUnitFramesPage(parent)
                 end
             end
 
-            -- Anchor dropdown with 5 options
+
             local anchorOptions = {
                 {value = "disabled", text = "Disabled"},
                 {value = "essential", text = "Essential CDM"},
@@ -10482,7 +10284,7 @@ local function CreateUnitFramesPage(parent)
             anchorDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Horizontal gap slider
+
             anchorGapSlider = GUI:CreateFormSlider(tabContent, "Horizontal Gap", 0, 100, 1, "anchorGap", unitDB, function()
                 if _G.PreyUI_UpdateAnchoredUnitFrames then
                     _G.PreyUI_UpdateAnchoredUnitFrames()
@@ -10492,7 +10294,7 @@ local function CreateUnitFramesPage(parent)
             anchorGapSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Vertical offset slider
+
             anchorYOffsetSlider = GUI:CreateFormSlider(tabContent, "Vertical Offset", -200, 200, 1, "anchorYOffset", unitDB, function()
                 if _G.PreyUI_UpdateAnchoredUnitFrames then
                     _G.PreyUI_UpdateAnchoredUnitFrames()
@@ -10502,22 +10304,22 @@ local function CreateUnitFramesPage(parent)
             anchorYOffsetSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Set initial enabled state
+
             UpdateAnchorSliderStates()
         end
 
-        -- Texture dropdown
+
         local textureDropdown = GUI:CreateFormDropdown(tabContent, "Bar Texture", GetTextureList(), "texture", unitDB, RefreshUnit)
         textureDropdown:SetPoint("TOPLEFT", PAD, y)
         textureDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
-        
-        -- COLORS section
+
+
         local colorHeader = GUI:CreateSectionHeader(tabContent, "Health Bar Colors")
         colorHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - colorHeader.gap
 
-        -- Helper text explaining color priority (only for frames with hostility option)
+
         if unitKey ~= "player" then
             local colorDesc = GUI:CreateLabel(tabContent, "Class color for players, hostility color for NPCs. Custom color is the fallback.", 11, C.textMuted)
             colorDesc:SetPoint("TOPLEFT", PAD, y)
@@ -10526,7 +10328,7 @@ local function CreateUnitFramesPage(parent)
             y = y - 24
         end
 
-        -- Store custom color reference for conditional disable
+
         local customColor = nil
 
         local classColorCheck = GUI:CreateFormCheckbox(tabContent, "Use Class Color", "useClassColor", unitDB, RefreshUnit)
@@ -10534,11 +10336,11 @@ local function CreateUnitFramesPage(parent)
         classColorCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Hostility Color checkbox (for frames that can show varied unit types)
+
         if unitKey == "target" or unitKey == "focus" or unitKey == "targettarget" or unitKey == "pet" or unitKey == "boss" then
             local hostilityColorCheck = GUI:CreateFormCheckbox(tabContent, "Use Hostility Color", "useHostilityColor", unitDB, function()
                 RefreshUnit()
-                -- Disable custom color when hostility is ON (covers all units)
+
                 if customColor then
                     customColor:SetEnabled(not unitDB.useHostilityColor)
                 end
@@ -10551,13 +10353,13 @@ local function CreateUnitFramesPage(parent)
         customColor = GUI:CreateFormColorPicker(tabContent, "Custom Color", "customHealthColor", unitDB, RefreshUnit)
         customColor:SetPoint("TOPLEFT", PAD, y)
         customColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        -- Set initial enabled state based on hostility setting
+
         if unitKey == "target" or unitKey == "focus" or unitKey == "targettarget" or unitKey == "pet" or unitKey == "boss" then
             customColor:SetEnabled(not unitDB.useHostilityColor)
         end
         y = y - FORM_ROW
 
-        -- ABSORB INDICATOR section
+
         local absorbHeader = GUI:CreateSectionHeader(tabContent, "Absorb Indicator")
         absorbHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - absorbHeader.gap
@@ -10597,7 +10399,7 @@ local function CreateUnitFramesPage(parent)
         absorbTextureDesc:SetJustifyH("LEFT")
         y = y - 20
 
-        -- NAME TEXT section
+
         local nameHeader = GUI:CreateSectionHeader(tabContent, "Name Text")
         nameHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - nameHeader.gap
@@ -10607,7 +10409,7 @@ local function CreateUnitFramesPage(parent)
         showNameCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Anchor options for text positioning
+
         local anchorOptions = {
             {value = "TOPLEFT", text = "Top Left"},
             {value = "TOP", text = "Top Center"},
@@ -10650,7 +10452,7 @@ local function CreateUnitFramesPage(parent)
         nameTruncSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- TARGET OF TARGET TEXT section (target only)
+
         if unitKey == "target" then
             local totHeader = GUI:CreateSectionHeader(tabContent, "Target Of Target Text")
             totHeader:SetPoint("TOPLEFT", PAD, y)
@@ -10675,13 +10477,13 @@ local function CreateUnitFramesPage(parent)
             totSepDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Store reference for enable/disable logic
+
             local totDividerWidgets = {}
 
-            -- Toggle: Color Divider By Class/React
+
             local totDividerClassCheck = GUI:CreateFormCheckbox(tabContent, "Color Divider By Class/React", "totDividerUseClassColor", unitDB, function()
                 RefreshUnit()
-                -- Disable custom color picker when class color is enabled
+
                 if totDividerWidgets.customColor then
                     totDividerWidgets.customColor:SetEnabled(not unitDB.totDividerUseClassColor)
                 end
@@ -10690,12 +10492,12 @@ local function CreateUnitFramesPage(parent)
             totDividerClassCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Color Picker: Custom Divider Color (disabled when class color toggle is ON)
+
             local totDividerColor = GUI:CreateFormColorPicker(tabContent, "Custom Divider Color", "totDividerColor", unitDB, RefreshUnit)
             totDividerColor:SetPoint("TOPLEFT", PAD, y)
             totDividerColor:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             totDividerWidgets.customColor = totDividerColor
-            totDividerColor:SetEnabled(not unitDB.totDividerUseClassColor)  -- Initial state
+            totDividerColor:SetEnabled(not unitDB.totDividerUseClassColor)
             y = y - FORM_ROW
 
             local totCharLimitSlider = GUI:CreateFormSlider(tabContent, "ToT Name Character Limit", 0, 100, 1, "totNameCharLimit", unitDB, RefreshUnit)
@@ -10704,7 +10506,7 @@ local function CreateUnitFramesPage(parent)
             y = y - FORM_ROW
         end
 
-        -- HEALTH TEXT section
+
         local healthHeader = GUI:CreateSectionHeader(tabContent, "Health Text")
         healthHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - healthHeader.gap
@@ -10763,7 +10565,7 @@ local function CreateUnitFramesPage(parent)
         healthYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- POWER BAR section
+
         local powerHeader = GUI:CreateSectionHeader(tabContent, "Power Bar")
         powerHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - powerHeader.gap
@@ -10783,11 +10585,11 @@ local function CreateUnitFramesPage(parent)
         powerBorderCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        local powerBarColorPicker  -- Forward declare for closure
+        local powerBarColorPicker
 
         local powerBarUsePowerColor = GUI:CreateFormCheckbox(tabContent, "Use Power Type Color", "powerBarUsePowerColor", unitDB, function()
             RefreshUnit()
-            -- Grey out color picker when power type color is enabled
+
             if powerBarColorPicker then
                 powerBarColorPicker:SetEnabled(not unitDB.powerBarUsePowerColor)
             end
@@ -10799,11 +10601,11 @@ local function CreateUnitFramesPage(parent)
         powerBarColorPicker = GUI:CreateFormColorPicker(tabContent, "Custom Bar Color", "powerBarColor", unitDB, RefreshUnit)
         powerBarColorPicker:SetPoint("TOPLEFT", PAD, y)
         powerBarColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        -- Set initial state (greyed out if power type color is enabled)
+
         powerBarColorPicker:SetEnabled(not unitDB.powerBarUsePowerColor)
         y = y - FORM_ROW
 
-        -- POWER TEXT section
+
         local powerTextHeader = GUI:CreateSectionHeader(tabContent, "Power Text")
         powerTextHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - powerTextHeader.gap
@@ -10823,7 +10625,7 @@ local function CreateUnitFramesPage(parent)
         powerTextFormatDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        local powerTextColorPicker  -- Forward declare for closure
+        local powerTextColorPicker
 
         local powerTextUsePowerColor = GUI:CreateFormCheckbox(tabContent, "Use Power Type Color", "powerTextUsePowerColor", unitDB, function()
             RefreshUnit()
@@ -10861,7 +10663,7 @@ local function CreateUnitFramesPage(parent)
         powerTextYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Helper to copy castbar settings from one unit to another
+
         local function CopyCastbarSettings(sourceDB, targetDB)
             if not sourceDB or not targetDB then return end
             local keys = {"width", "height", "offsetX", "offsetY", "fontSize", "borderSize", "maxLength", "texture", "showIcon", "enabled"}
@@ -10878,15 +10680,15 @@ local function CreateUnitFramesPage(parent)
             end
         end
 
-        -- CASTBAR section (for player, target, targettarget, focus, pet, boss)
+
         if unitKey == "player" or unitKey == "target" or unitKey == "targettarget" or unitKey == "focus" or unitKey == "pet" or unitKey == "boss" then
-            -- Use dedicated castbar options module (it creates its own header)
+
             if ns.PREY_CastbarOptions and ns.PREY_CastbarOptions.BuildCastbarOptions then
                 y = ns.PREY_CastbarOptions.BuildCastbarOptions(tabContent, unitKey, y, PAD, FORM_ROW, RefreshUnit, GetTextureList, NINE_POINT_ANCHOR_OPTIONS, GetUFDB, GetDB)
             end
         end
 
-        -- Aura settings (all single unit frames)
+
         if unitKey == "player" or unitKey == "target" or unitKey == "focus"
            or unitKey == "pet" or unitKey == "targettarget" or unitKey == "boss" then
             if not unitDB.auras then unitDB.auras = {} end
@@ -10933,7 +10735,7 @@ local function CreateUnitFramesPage(parent)
                 {value = "BOTTOMRIGHT", text = "Bottom Right"},
             }
 
-            -- === DEBUFF ICONS SECTION ===
+
             local debuffHeader = GUI:CreateSectionHeader(tabContent, "Debuff Icons")
             debuffHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - debuffHeader.gap
@@ -10955,7 +10757,7 @@ local function CreateUnitFramesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- Debuff Preview toggle (pill-shaped, matches Castbar Preview style)
+
             local debuffPreviewContainer = CreateFrame("Frame", nil, tabContent)
             debuffPreviewContainer:SetHeight(FORM_ROW)
             debuffPreviewContainer:SetPoint("TOPLEFT", PAD, y)
@@ -11039,9 +10841,9 @@ local function CreateUnitFramesPage(parent)
             debuffYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Debuff-specific text customization (stack and duration)
+
             if unitKey == "target" or unitKey == "player" or unitKey == "focus" or unitKey == "targettarget" or unitKey == "boss" then
-                -- Initialize debuff-specific defaults
+
                 if auraDB.debuffSpacing == nil then auraDB.debuffSpacing = 2 end
                 if auraDB.debuffShowStack == nil then auraDB.debuffShowStack = true end
                 if auraDB.debuffStackSize == nil then auraDB.debuffStackSize = 10 end
@@ -11049,7 +10851,7 @@ local function CreateUnitFramesPage(parent)
                 if auraDB.debuffStackOffsetX == nil then auraDB.debuffStackOffsetX = -1 end
                 if auraDB.debuffStackOffsetY == nil then auraDB.debuffStackOffsetY = 1 end
                 if auraDB.debuffStackColor == nil then auraDB.debuffStackColor = {1, 1, 1, 1} end
-                -- Duration defaults
+
                 if auraDB.debuffShowDuration == nil then auraDB.debuffShowDuration = true end
                 if auraDB.debuffDurationSize == nil then auraDB.debuffDurationSize = 12 end
                 if auraDB.debuffDurationAnchor == nil then auraDB.debuffDurationAnchor = "CENTER" end
@@ -11092,7 +10894,7 @@ local function CreateUnitFramesPage(parent)
                 debuffStackColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
                 y = y - FORM_ROW
 
-                -- Duration text settings
+
                 local debuffShowDurationCheck = GUI:CreateFormCheckbox(tabContent, "Duration Show", "debuffShowDuration", auraDB, RefreshAuras)
                 debuffShowDurationCheck:SetPoint("TOPLEFT", PAD, y)
                 debuffShowDurationCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -11124,7 +10926,7 @@ local function CreateUnitFramesPage(parent)
                 y = y - FORM_ROW
             end
 
-            -- === BUFF ICONS SECTION ===
+
             local buffHeader = GUI:CreateSectionHeader(tabContent, "Buff Icons")
             buffHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - buffHeader.gap
@@ -11139,7 +10941,7 @@ local function CreateUnitFramesPage(parent)
             buffHideSwipe:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Buff Preview toggle (pill-shaped, matches Castbar Preview style)
+
             local buffPreviewContainer = CreateFrame("Frame", nil, tabContent)
             buffPreviewContainer:SetHeight(FORM_ROW)
             buffPreviewContainer:SetPoint("TOPLEFT", PAD, y)
@@ -11223,9 +11025,9 @@ local function CreateUnitFramesPage(parent)
             buffYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Buff-specific text customization (stack and duration)
+
             if unitKey == "target" or unitKey == "player" or unitKey == "focus" or unitKey == "targettarget" or unitKey == "boss" then
-                -- Initialize buff-specific defaults
+
                 if auraDB.buffSpacing == nil then auraDB.buffSpacing = 2 end
                 if auraDB.buffShowStack == nil then auraDB.buffShowStack = true end
                 if auraDB.buffStackSize == nil then auraDB.buffStackSize = 10 end
@@ -11233,7 +11035,7 @@ local function CreateUnitFramesPage(parent)
                 if auraDB.buffStackOffsetX == nil then auraDB.buffStackOffsetX = -1 end
                 if auraDB.buffStackOffsetY == nil then auraDB.buffStackOffsetY = 1 end
                 if auraDB.buffStackColor == nil then auraDB.buffStackColor = {1, 1, 1, 1} end
-                -- Duration defaults
+
                 if auraDB.buffShowDuration == nil then auraDB.buffShowDuration = true end
                 if auraDB.buffDurationSize == nil then auraDB.buffDurationSize = 12 end
                 if auraDB.buffDurationAnchor == nil then auraDB.buffDurationAnchor = "CENTER" end
@@ -11276,7 +11078,7 @@ local function CreateUnitFramesPage(parent)
                 buffStackColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
                 y = y - FORM_ROW
 
-                -- Duration text settings
+
                 local buffShowDurationCheck = GUI:CreateFormCheckbox(tabContent, "Duration Show", "buffShowDuration", auraDB, RefreshAuras)
                 buffShowDurationCheck:SetPoint("TOPLEFT", PAD, y)
                 buffShowDurationCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -11309,13 +11111,13 @@ local function CreateUnitFramesPage(parent)
             end
         end
 
-        -- STATUS INDICATORS section (player only)
+
         if unitKey == "player" then
             local indicatorsHeader = GUI:CreateSectionHeader(tabContent, "Status Indicators")
             indicatorsHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - indicatorsHeader.gap
 
-            -- Ensure indicators table exists
+
             if not unitDB.indicators then
                 unitDB.indicators = {
                     rested = { enabled = true, size = 16, anchor = "TOPLEFT", offsetX = -2, offsetY = 2 },
@@ -11323,7 +11125,7 @@ local function CreateUnitFramesPage(parent)
                 }
             end
 
-            -- Rested indicator
+
             local restedDesc = GUI:CreateLabel(tabContent, "Rested: Shows when in a rested area (disabled by default).", 11, C.textMuted)
             restedDesc:SetPoint("TOPLEFT", PAD, y)
             restedDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -11355,7 +11157,7 @@ local function CreateUnitFramesPage(parent)
             restedYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Combat indicator
+
             local combatDesc = GUI:CreateLabel(tabContent, "Combat: Shows during combat (disabled by default).", 11, C.textMuted)
             combatDesc:SetPoint("TOPLEFT", PAD, y)
             combatDesc:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
@@ -11387,14 +11189,12 @@ local function CreateUnitFramesPage(parent)
             combatYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- ═══════════════════════════════════════════════════════════════
-            -- STANCE/FORM TEXT SECTION (player only)
-            -- ═══════════════════════════════════════════════════════════════
+
             local stanceHeader = GUI:CreateSectionHeader(tabContent, "Stance / Form Text")
             stanceHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - stanceHeader.gap
 
-            -- Ensure stance table exists
+
             if not unitDB.indicators.stance then
                 unitDB.indicators.stance = {
                     enabled = false,
@@ -11467,12 +11267,12 @@ local function CreateUnitFramesPage(parent)
             y = y - FORM_ROW
         end
 
-        -- TARGET MARKER section (all unit frames)
+
         local markerHeader = GUI:CreateSectionHeader(tabContent, "Target Marker")
         markerHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - markerHeader.gap
 
-        -- Ensure targetMarker table exists
+
         if not unitDB.targetMarker then
             unitDB.targetMarker = { enabled = false, size = 20, anchor = "TOP", xOffset = 0, yOffset = 8 }
         end
@@ -11508,13 +11308,13 @@ local function CreateUnitFramesPage(parent)
         markerYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- LEADER ICON section (player, target, focus only)
+
         if unitKey == "player" or unitKey == "target" or unitKey == "focus" then
             local leaderHeader = GUI:CreateSectionHeader(tabContent, "Leader/Assistant Icon")
             leaderHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - leaderHeader.gap
 
-            -- Ensure leaderIcon table exists
+
             if not unitDB.leaderIcon then
                 unitDB.leaderIcon = { enabled = false, size = 16, anchor = "TOPLEFT", xOffset = -8, yOffset = 8 }
             end
@@ -11551,18 +11351,18 @@ local function CreateUnitFramesPage(parent)
             y = y - FORM_ROW
         end
 
-        -- Portrait section (player, target, focus only)
+
         if unitKey == "player" or unitKey == "target" or unitKey == "focus" then
             local portraitHeader = GUI:CreateSectionHeader(tabContent, "Portrait")
             portraitHeader:SetPoint("TOPLEFT", PAD, y)
             y = y - portraitHeader.gap
 
-            -- Initialize defaults
+
             if unitDB.showPortrait == nil then unitDB.showPortrait = false end
             if unitDB.portraitSide == nil then
                 unitDB.portraitSide = (unitKey == "player") and "LEFT" or "RIGHT"
             end
-            -- Migrate from portraitScale to portraitSize (pixels)
+
             if unitDB.portraitSize == nil then
                 if unitDB.portraitScale then
                     local frameHeight = unitDB.height or 40
@@ -11573,13 +11373,13 @@ local function CreateUnitFramesPage(parent)
             end
             if unitDB.portraitBorderSize == nil then unitDB.portraitBorderSize = 1 end
 
-            -- Show Portrait checkbox
+
             local showPortraitCheck = GUI:CreateFormCheckbox(tabContent, "Show Portrait", "showPortrait", unitDB, RefreshUnit)
             showPortraitCheck:SetPoint("TOPLEFT", PAD, y)
             showPortraitCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Portrait Side dropdown
+
             local sideOptions = {
                 {value = "LEFT", text = "Left"},
                 {value = "RIGHT", text = "Right"},
@@ -11589,50 +11389,50 @@ local function CreateUnitFramesPage(parent)
             sideDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Portrait Size slider (pixels)
+
             local sizeSlider = GUI:CreateFormSlider(tabContent, "Portrait Size (Pixels)", 20, 150, 1, "portraitSize", unitDB, RefreshUnit)
             sizeSlider:SetPoint("TOPLEFT", PAD, y)
             sizeSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Portrait Border Size slider
+
             local borderSlider = GUI:CreateFormSlider(tabContent, "Portrait Border", 0, 5, 1, "portraitBorderSize", unitDB, RefreshUnit)
             borderSlider:SetPoint("TOPLEFT", PAD, y)
             borderSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Portrait Gap slider
+
             if unitDB.portraitGap == nil then unitDB.portraitGap = 0 end
             local gapSlider = GUI:CreateFormSlider(tabContent, "Portrait Gap", 0, 10, 1, "portraitGap", unitDB, RefreshUnit)
             gapSlider:SetPoint("TOPLEFT", PAD, y)
             gapSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Portrait Offset X slider
+
             if unitDB.portraitOffsetX == nil then unitDB.portraitOffsetX = 0 end
             local offsetXSlider = GUI:CreateFormSlider(tabContent, "Portrait Offset X", -500, 500, 1, "portraitOffsetX", unitDB, RefreshUnit)
             offsetXSlider:SetPoint("TOPLEFT", PAD, y)
             offsetXSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Portrait Offset Y slider
+
             if unitDB.portraitOffsetY == nil then unitDB.portraitOffsetY = 0 end
             local offsetYSlider = GUI:CreateFormSlider(tabContent, "Portrait Offset Y", -500, 500, 1, "portraitOffsetY", unitDB, RefreshUnit)
             offsetYSlider:SetPoint("TOPLEFT", PAD, y)
             offsetYSlider:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Initialize border color defaults
+
             if unitDB.portraitBorderUseClassColor == nil then unitDB.portraitBorderUseClassColor = false end
             if unitDB.portraitBorderColor == nil then unitDB.portraitBorderColor = { 0, 0, 0, 1 } end
 
-            -- Forward declare color picker for conditional enable/disable
+
             local borderColorPicker
 
-            -- Use Class Color for Border checkbox
+
             local useClassColorCheck = GUI:CreateFormCheckbox(tabContent, "Use Class Color for Border", "portraitBorderUseClassColor", unitDB, function(val)
                 RefreshUnit()
-                -- Enable/disable color picker based on toggle
+
                 if borderColorPicker and borderColorPicker.SetEnabled then
                     borderColorPicker:SetEnabled(not val)
                 end
@@ -11641,11 +11441,11 @@ local function CreateUnitFramesPage(parent)
             useClassColorCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
             y = y - FORM_ROW
 
-            -- Custom Border Color picker
+
             borderColorPicker = GUI:CreateFormColorPicker(tabContent, "Border Color", "portraitBorderColor", unitDB, RefreshUnit)
             borderColorPicker:SetPoint("TOPLEFT", PAD, y)
             borderColorPicker:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-            -- Initial state based on class color toggle
+
             if borderColorPicker.SetEnabled then
                 borderColorPicker:SetEnabled(not unitDB.portraitBorderUseClassColor)
             end
@@ -11655,7 +11455,7 @@ local function CreateUnitFramesPage(parent)
         tabContent:SetHeight(math.abs(y) + 30)
     end
 
-    -- Create sub-tabs
+
     local subTabs = GUI:CreateSubTabs(content, {
         {name = "General", builder = BuildGeneralTab},
         {name = "Player", builder = function(c) BuildUnitTab(c, "player") end},
@@ -11668,32 +11468,28 @@ local function CreateUnitFramesPage(parent)
     subTabs:SetPoint("TOPLEFT", 5, -5)
     subTabs:SetPoint("TOPRIGHT", -5, -5)
     subTabs:SetHeight(600)
-    
+
     content:SetHeight(650)
 end
 
----------------------------------------------------------------------------
--- PAGE: Castbars
----------------------------------------------------------------------------
+
 local function CreateCastbarsPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local y = -15
-    
+
     local info = GUI:CreateLabel(content, "Castbar customization - use Edit Mode for positioning", 12, C.textMuted)
     info:SetPoint("TOPLEFT", PADDING, y)
     y = y - ROW_GAP
-    
+
     content:SetHeight(100)
 end
 
----------------------------------------------------------------------------
--- PAGE: Action Bars
----------------------------------------------------------------------------
+
 local function CreateActionBarsPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
 
-    -- Safety check
+
     if not db or not db.actionBars then
         local errorLabel = GUI:CreateLabel(content, "Action Bars settings not available. Please reload UI.", 12, C.text)
         errorLabel:SetPoint("TOPLEFT", PADDING, -15)
@@ -11706,27 +11502,23 @@ local function CreateActionBarsPage(parent)
     local fade = actionBars.fade
     local bars = actionBars.bars
 
-    -- Refresh callback
+
     local function RefreshActionBars()
         if _G.PreyUI_RefreshActionBars then
             _G.PreyUI_RefreshActionBars()
         end
     end
 
-    ---------------------------------------------------------
-    -- SUB-TAB: Mouseover Hide
-    ---------------------------------------------------------
+
     local function BuildMouseoverHideTab(tabContent)
         local y = -15
         local PAD = PADDING
         local FORM_ROW = 32
 
-        -- Set search context for widget auto-registration
+
         GUI:SetSearchContext({tabIndex = 4, tabName = "Action Bars", subTabIndex = 2, subTabName = "Mouseover Hide"})
 
-        ---------------------------------------------------------
-        -- Warning: Enable Blizzard Action Bars
-        ---------------------------------------------------------
+
         local warningText = GUI:CreateLabel(tabContent,
             "Important: Enable all 8 action bars in Game Menu > Options > Gameplay > Action Bars for mouseover hide to work correctly. To remove the default dragon texture, open Edit Mode, select Action Bar 1, check 'Hide Bar Art', then reload.",
             11, C.warning)
@@ -11744,11 +11536,9 @@ local function CreateActionBarsPage(parent)
         end)
         openSettingsBtn:SetPoint("TOPLEFT", PAD, y)
         openSettingsBtn:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        y = y - 46  -- Extra spacing before main content
+        y = y - 46
 
-        ---------------------------------------------------------
-        -- Section: Mouseover Hide
-        ---------------------------------------------------------
+
         local fadeHeader = GUI:CreateSectionHeader(tabContent, "Mouseover Hide")
         fadeHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - fadeHeader.gap
@@ -11811,7 +11601,7 @@ local function CreateActionBarsPage(parent)
         linkBarsDesc:SetJustifyH("LEFT")
         y = y - 24
 
-        -- Always Show toggles (bars that ignore mouseover hide)
+
         local alwaysShowTip = GUI:CreateLabel(tabContent,
             "Bars checked below will always remain visible, ignoring mouseover hide.",
             11, C.textMuted)
@@ -11849,20 +11639,18 @@ local function CreateActionBarsPage(parent)
         end
 
         tabContent:SetHeight(math.abs(y) + 50)
-    end  -- End BuildMouseoverHideTab
+    end
 
-    ---------------------------------------------------------
-    -- SUB-TAB: Master Visual Settings (existing global settings)
-    ---------------------------------------------------------
+
     local function BuildMasterSettingsTab(tabContent)
         local y = -15
         local PAD = PADDING
         local FORM_ROW = 32
 
-        -- Set search context for auto-registration
+
         GUI:SetSearchContext({tabIndex = 4, tabName = "Action Bars", subTabIndex = 1, subTabName = "Master Settings"})
 
-        -- 9-point anchor options for text positioning
+
         local anchorOptions = {
             {value = "TOPLEFT", text = "Top Left"},
             {value = "TOP", text = "Top"},
@@ -11875,9 +11663,7 @@ local function CreateActionBarsPage(parent)
             {value = "BOTTOMRIGHT", text = "Bottom Right"},
         }
 
-        ---------------------------------------------------------
-        -- Quick Keybind Mode (prominent tool at top)
-        ---------------------------------------------------------
+
         local keybindModeBtn = GUI:CreateButton(tabContent, "Quick Keybind Mode", 180, 28, function()
             local LibKeyBound = LibStub("LibKeyBound-1.0", true)
             if LibKeyBound then
@@ -11899,9 +11685,7 @@ local function CreateActionBarsPage(parent)
         keybindTip:SetHeight(15)
         y = y - 30
 
-        ---------------------------------------------------------
-        -- Section: General
-        ---------------------------------------------------------
+
         local generalHeader = GUI:CreateSectionHeader(tabContent, "General")
         generalHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - generalHeader.gap
@@ -11933,9 +11717,7 @@ local function CreateActionBarsPage(parent)
         tipText:SetHeight(45)
         y = y - 55
 
-        ---------------------------------------------------------
-        -- Section: Button Appearance
-        ---------------------------------------------------------
+
         local appearanceHeader = GUI:CreateSectionHeader(tabContent, "Button Appearance")
         appearanceHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - appearanceHeader.gap
@@ -11976,9 +11758,7 @@ local function CreateActionBarsPage(parent)
         bordersCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        ---------------------------------------------------------
-        -- Section: Bar Layout
-        ---------------------------------------------------------
+
         local layoutHeader = GUI:CreateSectionHeader(tabContent, "Bar Layout")
         layoutHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - layoutHeader.gap
@@ -11997,7 +11777,7 @@ local function CreateActionBarsPage(parent)
         hideEmptySlotsCheck:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
         y = y - FORM_ROW
 
-        -- Action Button Lock - combined lock + override key in one clear dropdown
+
         local lockOptions = {
             {value = "unlocked", text = "Unlocked"},
             {value = "shift", text = "Locked - Shift to drag"},
@@ -12005,7 +11785,7 @@ local function CreateActionBarsPage(parent)
             {value = "ctrl", text = "Locked - Ctrl to drag"},
             {value = "none", text = "Fully Locked"},
         }
-        -- Proxy that reads/writes to Blizzard's CVars
+
         local lockProxy = setmetatable({}, {
             __index = function(t, k)
                 if k == "buttonLock" then
@@ -12033,7 +11813,7 @@ local function CreateActionBarsPage(parent)
             "buttonLock", lockProxy, RefreshActionBars)
         lockDropdown:SetPoint("TOPLEFT", PAD, y)
         lockDropdown:SetPoint("RIGHT", tabContent, "RIGHT", -PAD, 0)
-        -- Refresh from Blizzard settings on show
+
         lockDropdown:HookScript("OnShow", function(self)
             self.SetValue(lockProxy.buttonLock, true)
         end)
@@ -12086,9 +11866,7 @@ local function CreateActionBarsPage(parent)
         layoutTipText:SetWordWrap(true)
         y = y - 40
 
-        ---------------------------------------------------------
-        -- Section: Text Display
-        ---------------------------------------------------------
+
         local textHeader = GUI:CreateSectionHeader(tabContent, "Text Display")
         textHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - textHeader.gap
@@ -12208,22 +11986,20 @@ local function CreateActionBarsPage(parent)
         y = y - FORM_ROW
 
         tabContent:SetHeight(math.abs(y) + 50)
-    end  -- End BuildMasterSettingsTab
+    end
 
-    ---------------------------------------------------------
-    -- SUB-TAB: Per-Bar Overrides (Accordion Style)
-    ---------------------------------------------------------
+
     local function BuildPerBarOverridesTab(tabContent)
-        -- Set search context for widget auto-registration
+
         GUI:SetSearchContext({tabIndex = 4, tabName = "Action Bars", subTabIndex = 3, subTabName = "Per-Bar Overrides"})
 
-        -- Use tabContent directly - parent Action Bars page already has scroll
+
         local content = tabContent
         local PAD = PADDING
         local FORM_ROW = 32
         local SECTION_GAP = 4
 
-        -- 9-point anchor options for text positioning
+
         local anchorOptions = {
             {value = "TOPLEFT", text = "Top Left"},
             {value = "TOP", text = "Top"},
@@ -12236,7 +12012,7 @@ local function CreateActionBarsPage(parent)
             {value = "BOTTOMRIGHT", text = "Bottom Right"},
         }
 
-        -- Bar info for accordion sections
+
         local barInfo = {
             {key = "bar1", label = "Action Bar 1"},
             {key = "bar2", label = "Action Bar 2"},
@@ -12248,10 +12024,10 @@ local function CreateActionBarsPage(parent)
             {key = "bar8", label = "Action Bar 8"},
         }
 
-        -- Track sections for accordion behavior
+
         local sections = {}
 
-        -- Keys to copy when using Copy From
+
         local copyKeys = {
             "iconZoom", "showBackdrop", "backdropAlpha", "showGloss", "glossAlpha",
             "showKeybinds", "hideEmptyKeybinds", "keybindFontSize", "keybindColor",
@@ -12262,7 +12038,7 @@ local function CreateActionBarsPage(parent)
             "countAnchor", "countOffsetX", "countOffsetY",
         }
 
-        -- Helper to update scroll content height
+
         local function UpdateScrollHeight()
             local totalHeight = 15
             for _, section in ipairs(sections) do
@@ -12271,15 +12047,15 @@ local function CreateActionBarsPage(parent)
             content:SetHeight(totalHeight + 15)
         end
 
-        -- Function to build settings into a container
+
         local function BuildBarSettingsIntoContainer(barKey, container, onOverrideChanged)
             local barDB = bars[barKey]
             if not barDB then return end
 
-            local sy = -8  -- Start with small padding inside content area
+            local sy = -8
             local widgetRefs = {}
 
-            -- Hide Page Arrow toggle (bar1 only)
+
             if barKey == "bar1" then
                 local pageArrowToggle = GUI:CreateFormCheckbox(container,
                     "Hide Default Paging Arrow", "hidePageArrow", barDB,
@@ -12293,7 +12069,7 @@ local function CreateActionBarsPage(parent)
                 sy = sy - FORM_ROW
             end
 
-            -- Row 1: Override Master Settings toggle
+
             local overrideToggle = GUI:CreateFormCheckbox(container,
                 "Override Master Settings", "overrideEnabled", barDB,
                 function(val)
@@ -12309,7 +12085,7 @@ local function CreateActionBarsPage(parent)
             overrideToggle:SetPoint("RIGHT", container, "RIGHT", 0, 0)
             sy = sy - FORM_ROW
 
-            -- Row 2: Copy From dropdown
+
             local copyOptions = {
                 {value = "master", text = "Master Settings"},
                 {value = "bar1", text = "Bar 1"},
@@ -12343,7 +12119,7 @@ local function CreateActionBarsPage(parent)
 
                     barDB.overrideEnabled = true
 
-                    -- Rebuild this section's content
+
                     for _, child in pairs({container:GetChildren()}) do
                         child:Hide()
                         child:SetParent(nil)
@@ -12359,7 +12135,7 @@ local function CreateActionBarsPage(parent)
             copyDropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
             sy = sy - FORM_ROW
 
-            -- Appearance Section
+
             local appHeader = GUI:CreateSectionHeader(container, "Appearance")
             appHeader:SetPoint("TOPLEFT", 0, sy)
             sy = sy - appHeader.gap
@@ -12406,7 +12182,7 @@ local function CreateActionBarsPage(parent)
             table.insert(widgetRefs, bordersCheck)
             sy = sy - FORM_ROW
 
-            -- Keybind Section
+
             local keyHeader = GUI:CreateSectionHeader(container, "Keybind Text")
             keyHeader:SetPoint("TOPLEFT", 0, sy)
             sy = sy - keyHeader.gap
@@ -12460,7 +12236,7 @@ local function CreateActionBarsPage(parent)
             table.insert(widgetRefs, keybindColorPicker)
             sy = sy - FORM_ROW
 
-            -- Macro Section
+
             local macroHeader = GUI:CreateSectionHeader(container, "Macro Text")
             macroHeader:SetPoint("TOPLEFT", 0, sy)
             sy = sy - macroHeader.gap
@@ -12507,7 +12283,7 @@ local function CreateActionBarsPage(parent)
             table.insert(widgetRefs, macroColorPicker)
             sy = sy - FORM_ROW
 
-            -- Count Section
+
             local countHeader = GUI:CreateSectionHeader(container, "Stack Count")
             countHeader:SetPoint("TOPLEFT", 0, sy)
             sy = sy - countHeader.gap
@@ -12554,22 +12330,22 @@ local function CreateActionBarsPage(parent)
             table.insert(widgetRefs, countColorPicker)
             sy = sy - FORM_ROW
 
-            -- Initialize enabled state
+
             for _, widget in pairs(widgetRefs) do
                 widget:SetEnabled(barDB.overrideEnabled or false)
             end
 
-            -- Set content height and update parent section
+
             container:SetHeight(math.abs(sy) + 8)
 
-            -- Update parent section height
+
             local section = container:GetParent()
             if section and section.UpdateHeight then
                 section:UpdateHeight()
             end
         end
 
-        -- Edit Mode tip
+
         local warningText = GUI:CreateLabel(content, "To modify the number of icons, growth direction, or scale of each Action Bar, use Edit Mode and click on the bar you want to configure.", 11, C.warning)
         warningText:SetPoint("TOPLEFT", PAD, -15)
         warningText:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
@@ -12577,14 +12353,13 @@ local function CreateActionBarsPage(parent)
         warningText:SetWordWrap(true)
         warningText:SetHeight(30)
 
-        -- Create 8 accordion sections with relative anchoring
-        -- Each section anchors to the previous section's bottom for dynamic repositioning
+
         local prevSection = nil
         for i, info in ipairs(barInfo) do
             local section = GUI:CreateCollapsibleSection(
                 content,
                 info.label,
-                i == 1,  -- First section expanded by default
+                i == 1,
                 {
                     text = "Override",
                     showFunc = function()
@@ -12593,7 +12368,7 @@ local function CreateActionBarsPage(parent)
                 }
             )
 
-            -- Relative anchoring: each section anchors to the previous one's bottom
+
             if i == 1 then
                 section:SetPoint("TOPLEFT", warningText, "BOTTOMLEFT", 0, -12)
             else
@@ -12601,14 +12376,14 @@ local function CreateActionBarsPage(parent)
             end
             section:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
 
-            -- Build settings into this section's content
+
             BuildBarSettingsIntoContainer(info.key, section.content, function()
                 section:UpdateBadge()
                 section:UpdateHeight()
                 UpdateScrollHeight()
             end)
 
-            -- Accordion behavior: collapse others when this expands
+
             section.OnExpandChanged = function(isExpanded)
                 if isExpanded then
                     for _, other in ipairs(sections) do
@@ -12624,29 +12399,27 @@ local function CreateActionBarsPage(parent)
             prevSection = section
         end
 
-        -- Initial height calculation (delayed to ensure layout is complete)
-        C_Timer.After(0.1, UpdateScrollHeight)
-    end  -- End BuildPerBarOverridesTab
 
-    ---------------------------------------------------------
-    -- SUB-TAB: Extra Buttons (Extra Action Button & Zone Ability)
-    ---------------------------------------------------------
+        C_Timer.After(0.1, UpdateScrollHeight)
+    end
+
+
     local function BuildExtraButtonsTab(tabContent)
         local y = -15
         local PAD = PADDING
         local FORM_ROW = 32
 
-        -- Set search context
+
         GUI:SetSearchContext({tabIndex = 4, tabName = "Action Bars", subTabIndex = 4, subTabName = "Extra Buttons"})
 
-        -- Refresh callback
+
         local function RefreshExtraButtons()
             if _G.PreyUI_RefreshExtraButtons then
                 _G.PreyUI_RefreshExtraButtons()
             end
         end
 
-        -- Description
+
         local descLabel = GUI:CreateLabel(tabContent,
             "Customize the Extra Action Button (boss encounters, quests) and Zone Ability Button (garrison, covenant, zone abilities) separately.",
             11, C.textMuted)
@@ -12657,7 +12430,7 @@ local function CreateActionBarsPage(parent)
         descLabel:SetHeight(30)
         y = y - 40
 
-        -- Toggle Movers Button
+
         local moverBtn = GUI:CreateButton(tabContent, "Toggle Position Movers", 200, 28, function()
             if _G.PreyUI_ToggleExtraButtonMovers then
                 _G.PreyUI_ToggleExtraButtonMovers()
@@ -12674,9 +12447,7 @@ local function CreateActionBarsPage(parent)
         moverTip:SetJustifyH("LEFT")
         y = y - 25
 
-        ---------------------------------------------------------
-        -- SECTION: Extra Action Button
-        ---------------------------------------------------------
+
         local extraHeader = GUI:CreateSectionHeader(tabContent, "Extra Action Button")
         extraHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - extraHeader.gap
@@ -12732,9 +12503,7 @@ local function CreateActionBarsPage(parent)
         end
         y = y - 15
 
-        ---------------------------------------------------------
-        -- SECTION: Zone Ability Button
-        ---------------------------------------------------------
+
         local zoneHeader = GUI:CreateSectionHeader(tabContent, "Zone Ability Button")
         zoneHeader:SetPoint("TOPLEFT", PAD, y)
         y = y - zoneHeader.gap
@@ -12790,11 +12559,9 @@ local function CreateActionBarsPage(parent)
         end
 
         tabContent:SetHeight(math.abs(y) + 50)
-    end  -- End BuildExtraButtonsTab
+    end
 
-    ---------------------------------------------------------
-    -- Create Sub-Tabs
-    ---------------------------------------------------------
+
     local subTabs = GUI:CreateSubTabs(content, {
         {name = "Master Settings", builder = BuildMasterSettingsTab},
         {name = "Mouseover Hide", builder = BuildMouseoverHideTab},
@@ -12809,9 +12576,7 @@ local function CreateActionBarsPage(parent)
     return scroll, content
 end
 
----------------------------------------------------------------------------
--- HELPER: Scrollable text box for import strings
----------------------------------------------------------------------------
+
 local function CreateScrollableTextBox(parent, height, text)
     local container = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     container:SetHeight(height)
@@ -12823,12 +12588,12 @@ local function CreateScrollableTextBox(parent, height, text)
     container:SetBackdropColor(0.1, 0.1, 0.1, 1)
     container:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
 
-    -- ScrollFrame to contain the EditBox
+
     local scrollFrame = CreateFrame("ScrollFrame", nil, container, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", 6, -6)
     scrollFrame:SetPoint("BOTTOMRIGHT", -26, 6)
 
-    -- Style the scroll bar
+
     local scrollBar = scrollFrame.ScrollBar or rawget(_G, scrollFrame:GetName().."ScrollBar")
     if scrollBar then
         scrollBar:ClearAllPoints()
@@ -12836,7 +12601,7 @@ local function CreateScrollableTextBox(parent, height, text)
         scrollBar:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -4, 18)
     end
 
-    -- EditBox inside ScrollFrame
+
     local editBox = CreateFrame("EditBox", nil, scrollFrame)
     editBox:SetMultiLine(true)
     editBox:SetAutoFocus(false)
@@ -12846,7 +12611,7 @@ local function CreateScrollableTextBox(parent, height, text)
     editBox:SetCursorPosition(0)
     editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
-    -- Update width when container is sized
+
     container:SetScript("OnSizeChanged", function(self)
         editBox:SetWidth(self:GetWidth() - 36)
     end)
@@ -12858,9 +12623,7 @@ local function CreateScrollableTextBox(parent, height, text)
     return container
 end
 
----------------------------------------------------------------------------
--- SUB-TAB BUILDER: Import/Export (user profile import/export)
----------------------------------------------------------------------------
+
 local function BuildImportExportTab(tabContent)
     local y = -10
     local PAD = 10
@@ -12873,12 +12636,12 @@ local function BuildImportExportTab(tabContent)
     info:SetJustifyH("LEFT")
     y = y - 28
 
-    -- Export Section Header
+
     local exportHeader = GUI:CreateSectionHeader(tabContent, "Export Current Profile")
     exportHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - exportHeader.gap
 
-    -- Create a scroll frame for the export box
+
     local exportScroll = CreateFrame("ScrollFrame", nil, tabContent, "UIPanelScrollFrameTemplate")
     exportScroll:SetPoint("TOPLEFT", PAD, y)
     exportScroll:SetPoint("TOPRIGHT", -PAD - 20, y)
@@ -12893,18 +12656,18 @@ local function BuildImportExportTab(tabContent)
     exportEditBox:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
     exportScroll:SetScrollChild(exportEditBox)
 
-    -- Set width dynamically when scroll frame is sized
+
     exportScroll:SetScript("OnSizeChanged", function(self)
         exportEditBox:SetWidth(self:GetWidth() - 10)
     end)
 
-    -- Background for export box
+
     local exportBg = tabContent:CreateTexture(nil, "BACKGROUND")
     exportBg:SetPoint("TOPLEFT", exportScroll, -5, 5)
     exportBg:SetPoint("BOTTOMRIGHT", exportScroll, 25, -5)
     exportBg:SetColorTexture(0.05, 0.07, 0.1, 0.9)
 
-    -- Border for export box
+
     local exportBorder = CreateFrame("Frame", nil, tabContent, "BackdropTemplate")
     exportBorder:SetPoint("TOPLEFT", exportScroll, -6, 6)
     exportBorder:SetPoint("BOTTOMRIGHT", exportScroll, 26, -6)
@@ -12914,7 +12677,7 @@ local function BuildImportExportTab(tabContent)
     })
     exportBorder:SetBackdropBorderColor(C.border[1], C.border[2], C.border[3], 1)
 
-    -- Populate export string
+
     local function RefreshExportString()
         local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
         if PREYCore and PREYCore.ExportProfileToString then
@@ -12928,7 +12691,7 @@ local function BuildImportExportTab(tabContent)
 
     y = y - 115
 
-    -- SELECT ALL button (themed)
+
     local selectBtn = GUI:CreateButton(tabContent, "SELECT ALL", 120, 28, function()
         RefreshExportString()
         exportEditBox:SetFocus()
@@ -12936,23 +12699,23 @@ local function BuildImportExportTab(tabContent)
     end)
     selectBtn:SetPoint("TOPLEFT", PAD, y)
 
-    -- Hint text
+
     local copyHint = GUI:CreateLabel(tabContent, "then press Ctrl+C to copy", 11, C.textMuted)
     copyHint:SetPoint("LEFT", selectBtn, "RIGHT", 12, 0)
 
     y = y - 50
 
-    -- Import Section Header
+
     local importHeader = GUI:CreateSectionHeader(tabContent, "Import Profile String")
     importHeader:SetPoint("TOPLEFT", PAD, y)
 
-    -- Paste hint next to header
+
     local pasteHint = GUI:CreateLabel(tabContent, "press Ctrl+V to paste", 11, C.textMuted)
     pasteHint:SetPoint("LEFT", importHeader, "RIGHT", 12, 0)
 
     y = y - importHeader.gap
 
-    -- Import EditBox (user pastes string here)
+
     local importScroll = CreateFrame("ScrollFrame", nil, tabContent, "UIPanelScrollFrameTemplate")
     importScroll:SetPoint("TOPLEFT", PAD, y)
     importScroll:SetPoint("TOPRIGHT", -PAD - 20, y)
@@ -12967,12 +12730,12 @@ local function BuildImportExportTab(tabContent)
     importEditBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     importScroll:SetScrollChild(importEditBox)
 
-    -- Set width dynamically when scroll frame is sized
+
     importScroll:SetScript("OnSizeChanged", function(self)
         importEditBox:SetWidth(self:GetWidth() - 10)
     end)
 
-    -- Background for import box - make it clickable to focus the editbox
+
     local importBg = CreateFrame("Button", nil, tabContent)
     importBg:SetPoint("TOPLEFT", importScroll, -5, 5)
     importBg:SetPoint("BOTTOMRIGHT", importScroll, 25, -5)
@@ -12982,7 +12745,7 @@ local function BuildImportExportTab(tabContent)
     importBgTex:SetAllPoints()
     importBgTex:SetColorTexture(0.05, 0.07, 0.1, 0.9)
 
-    -- Border for import box
+
     local importBorder = CreateFrame("Frame", nil, tabContent, "BackdropTemplate")
     importBorder:SetPoint("TOPLEFT", importScroll, -6, 6)
     importBorder:SetPoint("BOTTOMRIGHT", importScroll, 26, -6)
@@ -12994,7 +12757,7 @@ local function BuildImportExportTab(tabContent)
 
     y = y - 115
 
-    -- IMPORT AND RELOAD button (themed)
+
     local importBtn = GUI:CreateButton(tabContent, "IMPORT AND RELOAD", 200, 28, function()
         local str = importEditBox:GetText()
         if not str or str == "" then
@@ -13020,9 +12783,7 @@ local function BuildImportExportTab(tabContent)
     tabContent:SetHeight(math.abs(y) + 20)
 end
 
----------------------------------------------------------------------------
--- SUB-TAB BUILDER: Prey's Strings (preset import strings)
----------------------------------------------------------------------------
+
 local function BuildPreyStringsTab(tabContent)
     local y = -10
     local PAD = 10
@@ -13036,10 +12797,10 @@ local function BuildPreyStringsTab(tabContent)
     info:SetJustifyH("LEFT")
     y = y - 28
 
-    -- Store all text boxes for clearing selections
+
     local allTextBoxes = {}
 
-    -- Helper to clear all selections except the target
+
     local function selectOnly(targetEditBox)
         for _, editBox in ipairs(allTextBoxes) do
             if editBox ~= targetEditBox then
@@ -13051,9 +12812,7 @@ local function BuildPreyStringsTab(tabContent)
         targetEditBox:HighlightText()
     end
 
-    -- =====================================================
-    -- EDIT MODE STRING
-    -- =====================================================
+
     local editModeHeader = GUI:CreateSectionHeader(tabContent, "Prey Edit Mode String")
     editModeHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - editModeHeader.gap
@@ -13079,9 +12838,7 @@ local function BuildPreyStringsTab(tabContent)
     editModeTip:SetPoint("LEFT", editModeBtn, "RIGHT", 10, 0)
     y = y - 40
 
-    -- =====================================================
-    -- PREY IMPORT/EXPORT STRING - DEFAULT PROFILE
-    -- =====================================================
+
     local preyHeader = GUI:CreateSectionHeader(tabContent, "PREY Import/Export String - Default Profile")
     preyHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - preyHeader.gap
@@ -13107,9 +12864,7 @@ local function BuildPreyStringsTab(tabContent)
     preyTip:SetPoint("LEFT", preyBtn, "RIGHT", 10, 0)
     y = y - 40
 
-    -- =====================================================
-    -- PREY IMPORT/EXPORT STRING - DARK MODE
-    -- =====================================================
+
     local preyDarkHeader = GUI:CreateSectionHeader(tabContent, "PREY Import/Export String - Dark Mode")
     preyDarkHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - preyDarkHeader.gap
@@ -13135,9 +12890,7 @@ local function BuildPreyStringsTab(tabContent)
     preyDarkTip:SetPoint("LEFT", preyDarkBtn, "RIGHT", 10, 0)
     y = y - 40
 
-    -- =====================================================
-    -- PLATYNATOR STRING
-    -- =====================================================
+
     local platHeader = GUI:CreateSectionHeader(tabContent, "Platynator String")
     platHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - platHeader.gap
@@ -13166,9 +12919,7 @@ local function BuildPreyStringsTab(tabContent)
     tabContent:SetHeight(math.abs(y) + 20)
 end
 
----------------------------------------------------------------------------
--- PAGE: PREY Import/Export (with sub-tabs)
----------------------------------------------------------------------------
+
 local function CreateImportExportPage(parent)
     local scroll, content = CreateScrollableContent(parent)
 
@@ -13183,9 +12934,7 @@ local function CreateImportExportPage(parent)
     content:SetHeight(600)
 end
 
----------------------------------------------------------------------------
--- PAGE: Spec Profiles (Autoswap)
----------------------------------------------------------------------------
+
 local function CreateSpecProfilesPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local y = -15
@@ -13200,18 +12949,16 @@ local function CreateSpecProfilesPage(parent)
     info:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
     info:SetJustifyH("LEFT")
     y = y - 28
-    
-    -- =====================================================
-    -- CURRENT PROFILE SECTION
-    -- =====================================================
+
+
     local currentHeader = GUI:CreateSectionHeader(content, "Current Profile")
     currentHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - currentHeader.gap
 
-    -- Forward declare profileDropdown so refresh function can reference it
+
     local profileDropdown
 
-    -- Current profile display (form style row)
+
     local activeContainer = CreateFrame("Frame", nil, content)
     activeContainer:SetHeight(FORM_ROW)
     activeContainer:SetPoint("TOPLEFT", PAD, y)
@@ -13226,9 +12973,8 @@ local function CreateSpecProfilesPage(parent)
     currentProfileName:SetPoint("LEFT", activeContainer, "LEFT", 180, 0)
     currentProfileName:SetText("Loading...")
     currentProfileName:SetTextColor(C.accent[1], C.accent[2], C.accent[3], 1)
-    
-    -- Function to refresh profile display - called on show and via timer
-    -- Note: This gets replaced later after profileDropdown is created
+
+
     local function RefreshProfileDisplay()
         local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
         local freshDB = PREYCore and PREYCore.db
@@ -13237,19 +12983,19 @@ local function CreateSpecProfilesPage(parent)
             currentProfileName:SetText(currentName or "Unknown")
         end
     end
-    
-    -- Update on show
+
+
     content:SetScript("OnShow", RefreshProfileDisplay)
-    
-    -- Also update on scroll parent show (in case content is already visible)
+
+
     scroll:SetScript("OnShow", RefreshProfileDisplay)
-    
-    -- Also use a short timer to catch any race conditions
+
+
     C_Timer.After(0.1, RefreshProfileDisplay)
 
     y = y - FORM_ROW
 
-    -- Reset Profile button (form style row)
+
     local resetContainer = CreateFrame("Frame", nil, content)
     resetContainer:SetHeight(FORM_ROW)
     resetContainer:SetPoint("TOPLEFT", PAD, y)
@@ -13295,14 +13041,12 @@ local function CreateSpecProfilesPage(parent)
     end)
     y = y - FORM_ROW - 10
 
-    -- =====================================================
-    -- PROFILE SELECTION SECTION
-    -- =====================================================
+
     local selectHeader = GUI:CreateSectionHeader(content, "Switch Profile")
     selectHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - selectHeader.gap
-    
-    -- Get existing profiles
+
+
     local function GetProfileList()
         local profiles = {}
         if db then
@@ -13313,8 +13057,8 @@ local function CreateSpecProfilesPage(parent)
         end
         return profiles
     end
-    
-    -- Profile dropdown - custom styled (matches our form dropdowns)
+
+
     local profileDropdownContainer = CreateFrame("Frame", nil, content)
     profileDropdownContainer:SetHeight(FORM_ROW)
     profileDropdownContainer:SetPoint("TOPLEFT", PAD, y)
@@ -13325,7 +13069,7 @@ local function CreateSpecProfilesPage(parent)
     profileDropdownLabel:SetText("Select Profile")
     profileDropdownLabel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-    -- Custom dropdown button (styled to match our form dropdowns)
+
     local CHEVRON_ZONE_WIDTH = 28
     local CHEVRON_BG_ALPHA = 0.15
     local CHEVRON_BG_ALPHA_HOVER = 0.25
@@ -13343,7 +13087,7 @@ local function CreateSpecProfilesPage(parent)
     profileDropdown:SetBackdropColor(0.08, 0.08, 0.08, 1)
     profileDropdown:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
 
-    -- Chevron zone (right side with accent tint)
+
     local chevronZone = CreateFrame("Frame", nil, profileDropdown, "BackdropTemplate")
     chevronZone:SetWidth(CHEVRON_ZONE_WIDTH)
     chevronZone:SetPoint("TOPRIGHT", profileDropdown, "TOPRIGHT", -1, -1)
@@ -13353,14 +13097,14 @@ local function CreateSpecProfilesPage(parent)
     })
     chevronZone:SetBackdropColor(C.accent[1], C.accent[2], C.accent[3], CHEVRON_BG_ALPHA)
 
-    -- Separator line (left edge of chevron zone)
+
     local separator = chevronZone:CreateTexture(nil, "ARTWORK")
     separator:SetWidth(1)
     separator:SetPoint("TOPLEFT", chevronZone, "TOPLEFT", 0, 0)
     separator:SetPoint("BOTTOMLEFT", chevronZone, "BOTTOMLEFT", 0, 0)
     separator:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.3)
 
-    -- Line chevron (two angled lines forming a V pointing DOWN)
+
     local chevronLeft = chevronZone:CreateTexture(nil, "OVERLAY")
     chevronLeft:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], CHEVRON_TEXT_ALPHA)
     chevronLeft:SetSize(7, 2)
@@ -13395,7 +13139,7 @@ local function CreateSpecProfilesPage(parent)
         chevronRight:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], CHEVRON_TEXT_ALPHA)
     end)
 
-    -- Menu frame for profile options
+
     local profileMenu = CreateFrame("Frame", nil, profileDropdown, "BackdropTemplate")
     profileMenu:SetPoint("TOPLEFT", profileDropdown, "BOTTOMLEFT", 0, -2)
     profileMenu:SetPoint("TOPRIGHT", profileDropdown, "BOTTOMRIGHT", 0, -2)
@@ -13410,7 +13154,7 @@ local function CreateSpecProfilesPage(parent)
     profileMenu:Hide()
 
     local function BuildProfileMenu()
-        -- Clear existing items
+
         for _, child in ipairs({profileMenu:GetChildren()}) do
             child:Hide()
             child:SetParent(nil)
@@ -13471,13 +13215,13 @@ local function CreateSpecProfilesPage(parent)
         end
     end)
 
-    -- Set initial text
+
     local initCore = _G.PreyUI and _G.PreyUI.PREYCore
     local initDB = initCore and initCore.db
     local initProfile = initDB and initDB:GetCurrentProfile() or "Default"
     profileDropdownText:SetText(initProfile)
 
-    -- Update RefreshProfileDisplay to use our custom dropdown
+
     local oldRefresh = RefreshProfileDisplay
     RefreshProfileDisplay = function()
         local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
@@ -13489,27 +13233,25 @@ local function CreateSpecProfilesPage(parent)
         end
     end
 
-    -- Re-register OnShow scripts with updated function (they were set before replacement)
+
     content:SetScript("OnShow", RefreshProfileDisplay)
     scroll:SetScript("OnShow", RefreshProfileDisplay)
 
-    -- Refresh display after a short delay to ensure everything is loaded
+
     C_Timer.After(0.2, RefreshProfileDisplay)
     C_Timer.After(0.5, RefreshProfileDisplay)
 
-    -- Expose refresh function for profile change callbacks
+
     _G.PreyUI_RefreshSpecProfilesTab = RefreshProfileDisplay
 
     y = y - FORM_ROW - 10
 
-    -- =====================================================
-    -- CREATE NEW PROFILE SECTION
-    -- =====================================================
+
     local newHeader = GUI:CreateSectionHeader(content, "Create New Profile")
     newHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - newHeader.gap
 
-    -- New profile name input (form style row)
+
     local newProfileContainer = CreateFrame("Frame", nil, content)
     newProfileContainer:SetHeight(FORM_ROW)
     newProfileContainer:SetPoint("TOPLEFT", PAD, y)
@@ -13520,7 +13262,7 @@ local function CreateSpecProfilesPage(parent)
     newProfileLabel:SetText("Profile Name")
     newProfileLabel:SetTextColor(C.text[1], C.text[2], C.text[3], 1)
 
-    -- Custom styled editbox (matches dropdown styling)
+
     local newProfileBoxBg = CreateFrame("Frame", nil, newProfileContainer, "BackdropTemplate")
     newProfileBoxBg:SetPoint("LEFT", newProfileContainer, "LEFT", 180, 0)
     newProfileBoxBg:SetSize(200, 24)
@@ -13548,7 +13290,7 @@ local function CreateSpecProfilesPage(parent)
         newProfileBoxBg:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
     end)
 
-    -- Create button
+
     local createBtn = CreateFrame("Button", nil, newProfileContainer, "BackdropTemplate")
     createBtn:SetSize(80, 24)
     createBtn:SetPoint("LEFT", newProfileBoxBg, "RIGHT", 10, 0)
@@ -13572,10 +13314,8 @@ local function CreateSpecProfilesPage(parent)
         end
     end)
     y = y - FORM_ROW - 10
-    
-    -- =====================================================
-    -- COPY FROM PROFILE SECTION
-    -- =====================================================
+
+
     local copyHeader = GUI:CreateSectionHeader(content, "Copy From Profile")
     copyHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - copyHeader.gap
@@ -13586,7 +13326,7 @@ local function CreateSpecProfilesPage(parent)
     copyInfo:SetJustifyH("LEFT")
     y = y - 24
 
-    -- Copy from dropdown (form style)
+
     local copyWrapper = { selected = "" }
     local copyDropdown = GUI:CreateFormDropdown(content, "Copy From", GetProfileList(), "selected", copyWrapper, function(value)
         if db and value and value ~= "" then
@@ -13599,9 +13339,7 @@ local function CreateSpecProfilesPage(parent)
     copyDropdown:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
     y = y - FORM_ROW - 10
 
-    -- =====================================================
-    -- DELETE PROFILE SECTION
-    -- =====================================================
+
     local deleteHeader = GUI:CreateSectionHeader(content, "Delete Profile")
     deleteHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - deleteHeader.gap
@@ -13612,7 +13350,7 @@ local function CreateSpecProfilesPage(parent)
     deleteInfo:SetJustifyH("LEFT")
     y = y - 24
 
-    -- Delete dropdown (form style)
+
     local deleteWrapper = { selected = "" }
     local deleteDropdown = GUI:CreateFormDropdown(content, "Delete Profile", GetProfileList(), "selected", deleteWrapper, function(value)
         if db and value and value ~= "" then
@@ -13621,7 +13359,7 @@ local function CreateSpecProfilesPage(parent)
                 print("|cffff0000PreyUI:|r Cannot delete the active profile!")
                 deleteWrapper.selected = ""
             else
-                -- Show confirmation dialog
+
                 local profileToDelete = value
                 GUI:ShowConfirmation({
                     title = "Delete Profile?",
@@ -13643,16 +13381,14 @@ local function CreateSpecProfilesPage(parent)
     deleteDropdown:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
     y = y - FORM_ROW - 10
 
-    -- =====================================================
-    -- SPEC AUTO-SWITCH SECTION
-    -- =====================================================
+
     local specHeader = GUI:CreateSectionHeader(content, "Spec Auto-Switch")
     specHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - specHeader.gap
 
-    -- Check if LibDualSpec methods are available on db (added by EnhanceDatabase)
+
     if db and db.IsDualSpecEnabled and db.SetDualSpecEnabled and db.GetDualSpecProfile and db.SetDualSpecProfile then
-        -- Enable checkbox (form style)
+
         local enableWrapper = { enabled = db:IsDualSpecEnabled() }
         local enableCheckbox = GUI:CreateFormCheckbox(content, "Enable Spec Profiles", "enabled", enableWrapper,
             function()
@@ -13669,24 +13405,24 @@ local function CreateSpecProfilesPage(parent)
         specInfo:SetJustifyH("LEFT")
         y = y - 28
 
-        -- Get spec names for current class
+
         local numSpecs = GetNumSpecializations()
         local currentSpec = GetSpecialization()
 
         for i = 1, numSpecs do
             local specID, specName = GetSpecializationInfo(i)
             if specName then
-                -- Mark active spec
+
                 local displayName = specName
                 if i == currentSpec then
                     displayName = specName .. " (Active)"
                 end
 
-                -- Get current profile for this spec using LibDualSpec method
+
                 local currentSpecProfile = db:GetDualSpecProfile(i) or ""
                 local specWrapper = { selected = currentSpecProfile }
 
-                -- Dropdown for this spec (form style)
+
                 local specDropdown = GUI:CreateFormDropdown(content, displayName, GetProfileList(), "selected", specWrapper, function(value)
                     if value and value ~= "" then
                         db:SetDualSpecProfile(value, i)
@@ -13695,7 +13431,7 @@ local function CreateSpecProfilesPage(parent)
                 end)
                 specDropdown:SetPoint("TOPLEFT", PAD, y)
                 specDropdown:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
-                
+
                 y = y - FORM_ROW
             end
         end
@@ -13718,20 +13454,18 @@ local function CreateSpecProfilesPage(parent)
     content:SetHeight(math.abs(y) + 20)
 end
 
----------------------------------------------------------------------------
--- SEARCH TAB - Search settings across all tabs
----------------------------------------------------------------------------
+
 local function CreateSearchPage(tabContent)
     local PAD = 15
     local y = -10
 
-    -- Search input at top
+
     local searchBox = GUI:CreateSearchBox(tabContent)
     searchBox:SetSize(tabContent:GetWidth() - (PAD * 2), 28)
     searchBox:SetPoint("TOPLEFT", PAD, y)
     y = y - 40
 
-    -- Results scroll area below
+
     local scrollFrame = CreateFrame("ScrollFrame", nil, tabContent, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", PAD, y)
     scrollFrame:SetPoint("BOTTOMRIGHT", -30, 10)
@@ -13740,17 +13474,17 @@ local function CreateSearchPage(tabContent)
     resultsContent:SetWidth(scrollFrame:GetWidth() - 10)
     scrollFrame:SetScrollChild(resultsContent)
 
-    -- Scroll bar styling
+
     local scrollBar = scrollFrame.ScrollBar
     if scrollBar then
         scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", 4, -16)
         scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", 4, 16)
     end
 
-    -- Initial empty state
+
     GUI:RenderSearchResults(resultsContent, nil, nil)
 
-    -- Wire up search callbacks
+
     searchBox.onSearch = function(text)
         local results = GUI:ExecuteSearch(text)
         GUI:RenderSearchResults(resultsContent, results, text)
@@ -13764,9 +13498,7 @@ local function CreateSearchPage(tabContent)
     tabContent.resultsContent = resultsContent
 end
 
----------------------------------------------------------------------------
--- HUD LAYERING PAGE
----------------------------------------------------------------------------
+
 local function CreateHUDLayeringPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local y = -15
@@ -13776,7 +13508,7 @@ local function CreateHUDLayeringPage(parent)
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     local db = PREYCore and PREYCore.db and PREYCore.db.profile
 
-    -- Helper to get hudLayering table (with fallback initialization)
+
     local function GetLayeringDB()
         if not db then return nil end
         if not db.hudLayering then
@@ -13785,7 +13517,7 @@ local function CreateHUDLayeringPage(parent)
                 primaryPowerBar = 7, secondaryPowerBar = 6,
                 playerFrame = 4, targetFrame = 4, totFrame = 3, petFrame = 3, focusFrame = 4, bossFrames = 4,
                 playerCastbar = 5, targetCastbar = 5,
-                playerIndicators = 6,  -- Player frame indicator icons (rested, combat, stance)
+                playerIndicators = 6,
                 customBars = 5,
                 skyridingHUD = 5,
             }
@@ -13793,7 +13525,7 @@ local function CreateHUDLayeringPage(parent)
         return db.hudLayering
     end
 
-    -- Refresh functions for each component type
+
     local function RefreshCDM()
         if NCDM and NCDM.ApplySettings then
             NCDM:ApplySettings("essential")
@@ -13837,7 +13569,7 @@ local function CreateHUDLayeringPage(parent)
         end
     end
 
-    -- Header description
+
     local info = GUI:CreateLabel(content, "Control which HUD elements appear above others. Higher values render on top of lower values.", 11, C.textMuted)
     info:SetPoint("TOPLEFT", PAD, y)
     info:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
@@ -13851,9 +13583,7 @@ local function CreateHUDLayeringPage(parent)
         return scroll
     end
 
-    -- =====================================================
-    -- COOLDOWN DISPLAY MANAGER SECTION
-    -- =====================================================
+
     local cdmHeader = GUI:CreateSectionHeader(content, "Cooldown Display Manager")
     cdmHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - cdmHeader.gap
@@ -13878,11 +13608,9 @@ local function CreateHUDLayeringPage(parent)
     buffBarSlider:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
     y = y - FORM_ROW
 
-    y = y - 10  -- Section spacing
+    y = y - 10
 
-    -- =====================================================
-    -- POWER BARS SECTION
-    -- =====================================================
+
     local powerHeader = GUI:CreateSectionHeader(content, "Power Bars")
     powerHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - powerHeader.gap
@@ -13897,11 +13625,9 @@ local function CreateHUDLayeringPage(parent)
     secondaryPowerSlider:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
     y = y - FORM_ROW
 
-    y = y - 10  -- Section spacing
+    y = y - 10
 
-    -- =====================================================
-    -- UNIT FRAMES SECTION
-    -- =====================================================
+
     local ufHeader = GUI:CreateSectionHeader(content, "Unit Frames")
     ufHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - ufHeader.gap
@@ -13941,11 +13667,9 @@ local function CreateHUDLayeringPage(parent)
     bossFramesSlider:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
     y = y - FORM_ROW
 
-    y = y - 10  -- Section spacing
+    y = y - 10
 
-    -- =====================================================
-    -- CASTBARS SECTION
-    -- =====================================================
+
     local castbarHeader = GUI:CreateSectionHeader(content, "Castbars")
     castbarHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - castbarHeader.gap
@@ -13960,11 +13684,9 @@ local function CreateHUDLayeringPage(parent)
     targetCastbarSlider:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
     y = y - FORM_ROW
 
-    y = y - 10  -- Section spacing
+    y = y - 10
 
-    -- =====================================================
-    -- CUSTOM TRACKERS SECTION
-    -- =====================================================
+
     local customHeader = GUI:CreateSectionHeader(content, "Custom Trackers")
     customHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - customHeader.gap
@@ -13974,11 +13696,9 @@ local function CreateHUDLayeringPage(parent)
     customBarsSlider:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
     y = y - FORM_ROW
 
-    y = y - 10  -- Section spacing
+    y = y - 10
 
-    -- =====================================================
-    -- SKYRIDING SECTION
-    -- =====================================================
+
     local skyridingHeader = GUI:CreateSectionHeader(content, "Skyriding")
     skyridingHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - skyridingHeader.gap
@@ -13988,15 +13708,13 @@ local function CreateHUDLayeringPage(parent)
     skyridingSlider:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
     y = y - FORM_ROW
 
-    -- Set content height
+
     content:SetHeight(math.abs(y) + 20)
 
     return scroll
 end
 
----------------------------------------------------------------------------
--- STAGGER BAR PAGE (Brewmaster Monk)
----------------------------------------------------------------------------
+
 local function RefreshStaggerBar()
     local addon = _G.PreyUI
     if addon and addon.RefreshStaggerBar then
@@ -14007,31 +13725,31 @@ end
 local function CreateStaggerBarPage(parent)
     local scroll, content = CreateScrollableContent(parent)
     local db = GetDB()
-    
+
     local y = -10
     local PAD = 10
     local FORM_ROW = 32
 
-    -- Set search context
+
     GUI:SetSearchContext({tabIndex = 13, tabName = "Stagger Bar", subTabIndex = 1, subTabName = "Stagger Bar"})
 
-    -- Early return if not a Monk
+
     local _, class = UnitClass("player")
     if class ~= "MONK" then
         local notMonkLabel = GUI:CreateLabel(content, "Stagger Bar is only available for Monk characters.", 12, {1, 0.6, 0.3, 1})
         notMonkLabel:SetPoint("TOPLEFT", PAD, y)
         notMonkLabel:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
         y = y - 40
-        
+
         local infoLabel = GUI:CreateLabel(content, "Log in on a Monk to customize the Stagger Bar settings.", 11, {0.6, 0.6, 0.6, 1})
         infoLabel:SetPoint("TOPLEFT", PAD, y)
         infoLabel:SetPoint("RIGHT", content, "RIGHT", -PAD, 0)
-        
+
         content:SetHeight(100)
         return scroll
     end
 
-    -- Ensure database exists
+
     if not db then
         local errorLabel = GUI:CreateLabel(content, "Database not ready. Please /reload.", 12, {1, 0.3, 0.3, 1})
         errorLabel:SetPoint("TOPLEFT", PAD, y)
@@ -14039,7 +13757,7 @@ local function CreateStaggerBarPage(parent)
         return scroll
     end
 
-    -- Initialize stagger defaults if needed
+
     if not db.stagger then
         db.stagger = {
             enabled = true, width = 250, height = 10, borderSize = 1, scale = 1, alpha = 1,
@@ -14060,9 +13778,7 @@ local function CreateStaggerBarPage(parent)
     end
     local stagger = db.stagger
 
-    -- =====================================================
-    -- SECTION 1: ENABLE & GENERAL
-    -- =====================================================
+
     local generalHeader = GUI:CreateSectionHeader(content, "General Settings")
     generalHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - generalHeader.gap
@@ -14084,9 +13800,7 @@ local function CreateStaggerBarPage(parent)
 
     y = y - 10
 
-    -- =====================================================
-    -- SECTION 2: SIZE & POSITION
-    -- =====================================================
+
     local sizeHeader = GUI:CreateSectionHeader(content, "Size & Position")
     sizeHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - sizeHeader.gap
@@ -14128,9 +13842,7 @@ local function CreateStaggerBarPage(parent)
 
     y = y - 10
 
-    -- =====================================================
-    -- SECTION 3: TEXT & DISPLAY
-    -- =====================================================
+
     local textHeader = GUI:CreateSectionHeader(content, "Text & Display")
     textHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - textHeader.gap
@@ -14157,9 +13869,7 @@ local function CreateStaggerBarPage(parent)
 
     y = y - 10
 
-    -- =====================================================
-    -- SECTION 4: STAGGER THRESHOLDS
-    -- =====================================================
+
     local thresholdHeader = GUI:CreateSectionHeader(content, "Stagger Thresholds")
     thresholdHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - thresholdHeader.gap
@@ -14186,9 +13896,7 @@ local function CreateStaggerBarPage(parent)
 
     y = y - 10
 
-    -- =====================================================
-    -- SECTION 5: COLORS
-    -- =====================================================
+
     local colorHeader = GUI:CreateSectionHeader(content, "Stagger Colors")
     colorHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - colorHeader.gap
@@ -14210,9 +13918,7 @@ local function CreateStaggerBarPage(parent)
 
     y = y - 10
 
-    -- =====================================================
-    -- SECTION 6: EFFECTS & ANIMATIONS
-    -- =====================================================
+
     local effectsHeader = GUI:CreateSectionHeader(content, "Effects & Animations")
     effectsHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - effectsHeader.gap
@@ -14239,9 +13945,7 @@ local function CreateStaggerBarPage(parent)
 
     y = y - 10
 
-    -- =====================================================
-    -- SECTION 7: RESET BUTTON
-    -- =====================================================
+
     local resetHeader = GUI:CreateSectionHeader(content, "Reset Settings")
     resetHeader:SetPoint("TOPLEFT", PAD, y)
     y = y - resetHeader.gap
@@ -14275,38 +13979,36 @@ local function CreateStaggerBarPage(parent)
     end)
     y = y - 40
 
-    -- Set content height
+
     content:SetHeight(math.abs(y) + 20)
 
     return scroll
 end
 
----------------------------------------------------------------------------
--- INITIALIZE OPTIONS - Main tabs
----------------------------------------------------------------------------
+
 function GUI:InitializeOptions()
     local frame = self:CreateMainFrame()
 
-    -- Row 1: Core UI Elements
+
     GUI:AddTab(frame, "System, QoL, and Accessibility", CreateGeneralQoLPage)
     GUI:AddTab(frame, "Unit Frames and Castbars", CreateUnitFramesPage)
     GUI:AddTab(frame, "Minimap and Datatext", CreateMinimapPage)
     GUI:AddTab(frame, "Action Bar Layout", CreateActionBarsPage)
     GUI:AddTab(frame, "Visibility and Skin Studio", CreateAutohidesPage)
 
-    -- Row 2: Cooldown System (CDM cluster)
+
     GUI:AddTab(frame, "Cooldown Engine and Class Bars", CreateCDMSetupPage)
     GUI:AddTab(frame, "Cooldown Effects and GCD", CreateCDEffectsPage)
     GUI:AddTab(frame, "Keybind and Rotation Assist", CreateCDKeybindsPage)
     GUI:AddTab(frame, "Custom Item, Spell, and Buff Trackers", CreateCustomTrackersPage)
 
-    -- Row 3: Utilities + Action Buttons
+
     GUI:AddTab(frame, "HUD Layer Priorities", CreateHUDLayeringPage)
-    GUI:AddTab(frame, "Brewmaster Stagger", CreateStaggerBarPage)  -- Monk-only Stagger tracking
+    GUI:AddTab(frame, "Brewmaster Stagger", CreateStaggerBarPage)
     GUI:AddTab(frame, "Specialization Profiles", CreateSpecProfilesPage)
     GUI:AddTab(frame, "Profile Import and Export", CreateImportExportPage)
     GUI:AddTab(frame, "Global Settings Search", CreateSearchPage)
-    GUI._searchTabIndex = #frame.tabs  -- Store Search tab index for ForceLoadAllTabs trigger
+    GUI._searchTabIndex = #frame.tabs
 
     GUI:AddActionButton(frame, "Toggle Cooldown Settings", function()
         if CooldownViewerSettings then
@@ -14322,7 +14024,7 @@ function GUI:InitializeOptions()
         end
     end)
 
-    -- Mark that all tabs have been added (for search indexing)
+
     GUI._allTabsAdded = true
 
     return frame

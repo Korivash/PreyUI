@@ -1,4 +1,3 @@
--- Localization file for Italian/Italy
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "itIT", false, true)
 
 if L then

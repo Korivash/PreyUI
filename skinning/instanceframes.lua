@@ -1,10 +1,6 @@
 local addonName, ns = ...
 
----------------------------------------------------------------------------
--- INSTANCE FRAMES SKINNING (PVE, Dungeons & Raids, PVP, M+ Dungeons)
----------------------------------------------------------------------------
 
--- Get skinning colors
 local function GetColors()
     local PREY = _G.PreyUI
     local sr, sg, sb, sa = 0.820, 0.180, 0.220, 1
@@ -20,7 +16,7 @@ local function GetColors()
     return sr, sg, sb, sa, bgr, bgg, bgb, bga
 end
 
--- Create backdrop for a frame
+
 local function CreatePREYBackdrop(frame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not frame.preyBackdrop then
         frame.preyBackdrop = CreateFrame("Frame", nil, frame, "BackdropTemplate")
@@ -39,7 +35,7 @@ local function CreatePREYBackdrop(frame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     frame.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 end
 
--- Strip textures from a frame
+
 local function StripTextures(frame)
     if not frame then return end
 
@@ -51,7 +47,7 @@ local function StripTextures(frame)
     end
 end
 
--- Style a button
+
 local function StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not button or button.preyStyled then return end
 
@@ -75,7 +71,7 @@ local function StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     button.preyBackdrop:SetBackdropColor(btnBgR, btnBgG, btnBgB, 1)
     button.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 
-    -- Hide default textures
+
     if button.Left then button.Left:SetAlpha(0) end
     if button.Right then button.Right:SetAlpha(0) end
     if button.Middle then button.Middle:SetAlpha(0) end
@@ -88,7 +84,7 @@ local function StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     local normal = button:GetNormalTexture()
     if normal then normal:SetAlpha(0) end
 
-    -- Store colors for hover
+
     button.preySkinColor = { sr, sg, sb, sa }
 
     button:HookScript("OnEnter", function(self)
@@ -106,21 +102,21 @@ local function StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     button.preyStyled = true
 end
 
--- Style dropdown (WowStyle1DropdownTemplate)
+
 local function StyleDropdown(dropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga, width)
     if not dropdown or dropdown.preyStyled then return end
 
-    -- Set width if provided
+
     if width then
         dropdown:SetWidth(width)
     end
 
-    -- Strip textures (but keep Arrow visible)
+
     if dropdown.NineSlice then dropdown.NineSlice:SetAlpha(0) end
     if dropdown.NormalTexture then dropdown.NormalTexture:SetAlpha(0) end
     if dropdown.HighlightTexture then dropdown.HighlightTexture:SetAlpha(0) end
 
-    -- Create backdrop
+
     if not dropdown.preyBackdrop then
         dropdown.preyBackdrop = CreateFrame("Frame", nil, dropdown, "BackdropTemplate")
         dropdown.preyBackdrop:SetPoint("TOPLEFT", 0, -2)
@@ -142,7 +138,7 @@ local function StyleDropdown(dropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga, width
     dropdown.preyBackdrop:SetBackdropColor(btnBgR, btnBgG, btnBgB, 1)
     dropdown.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 
-    -- Store colors for hover
+
     dropdown.preySkinColor = { sr, sg, sb, sa }
 
     dropdown:HookScript("OnEnter", function(self)
@@ -160,11 +156,11 @@ local function StyleDropdown(dropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga, width
     dropdown.preyStyled = true
 end
 
--- Style tab button
+
 local function StyleTab(tab, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not tab or tab.preyStyled then return end
 
-    -- Hide default textures (inactive state)
+
     if tab.Left then tab.Left:SetAlpha(0) end
     if tab.Middle then tab.Middle:SetAlpha(0) end
     if tab.Right then tab.Right:SetAlpha(0) end
@@ -172,12 +168,12 @@ local function StyleTab(tab, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if tab.MiddleDisabled then tab.MiddleDisabled:SetAlpha(0) end
     if tab.RightDisabled then tab.RightDisabled:SetAlpha(0) end
 
-    -- Hide active/selected state textures (the yellow border)
+
     if tab.LeftActive then tab.LeftActive:SetAlpha(0) end
     if tab.MiddleActive then tab.MiddleActive:SetAlpha(0) end
     if tab.RightActive then tab.RightActive:SetAlpha(0) end
 
-    -- Hide highlight textures
+
     if tab.LeftHighlight then tab.LeftHighlight:SetAlpha(0) end
     if tab.MiddleHighlight then tab.MiddleHighlight:SetAlpha(0) end
     if tab.RightHighlight then tab.RightHighlight:SetAlpha(0) end
@@ -185,7 +181,7 @@ local function StyleTab(tab, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     local highlight = tab:GetHighlightTexture()
     if highlight then highlight:SetAlpha(0) end
 
-    -- Create backdrop
+
     if not tab.preyBackdrop then
         tab.preyBackdrop = CreateFrame("Frame", nil, tab, "BackdropTemplate")
         tab.preyBackdrop:SetPoint("TOPLEFT", 3, -3)
@@ -206,19 +202,19 @@ local function StyleTab(tab, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     tab.preyStyled = true
 end
 
--- Hide all Blizzard decorations on PVEFrame (following character.lua/inspect.lua patterns)
+
 local function HidePVEDecorations()
     local PVEFrame = _G.PVEFrame
     if not PVEFrame then return end
 
-    -- Main frame shadows (contains vertical divider line)
+
     if PVEFrame.shadows then
         PVEFrame.shadows:Hide()
-        -- Also strip all textures inside shadows frame
+
         StripTextures(PVEFrame.shadows)
     end
 
-    -- Blue menu backgrounds and decorations (from PVEFrame.xml)
+
     if _G.PVEFrameBlueBg then _G.PVEFrameBlueBg:Hide() end
     if _G.PVEFrameTLCorner then _G.PVEFrameTLCorner:Hide() end
     if _G.PVEFrameTRCorner then _G.PVEFrameTRCorner:Hide() end
@@ -231,7 +227,7 @@ local function HidePVEDecorations()
     if _G.PVEFrameTopFiligree then _G.PVEFrameTopFiligree:Hide() end
     if _G.PVEFrameBottomFiligree then _G.PVEFrameBottomFiligree:Hide() end
 
-    -- Left inset (contains the left panel)
+
     if _G.PVEFrameLeftInset then _G.PVEFrameLeftInset:Hide() end
     if PVEFrame.Inset then
         PVEFrame.Inset:Hide()
@@ -239,22 +235,22 @@ local function HidePVEDecorations()
         if PVEFrame.Inset.Bg then PVEFrame.Inset.Bg:Hide() end
     end
 
-    -- PortraitFrameTemplate elements
+
     if PVEFrame.NineSlice then PVEFrame.NineSlice:Hide() end
     if PVEFrame.Bg then PVEFrame.Bg:Hide() end
     if PVEFrame.Background then PVEFrame.Background:Hide() end
 
-    -- Portrait container (hide portrait but keep frame functional)
+
     if PVEFrame.PortraitContainer then PVEFrame.PortraitContainer:Hide() end
     if _G.PVEFramePortrait then _G.PVEFramePortrait:Hide() end
 
-    -- Title bar background (the yellow bar)
+
     if PVEFrame.TitleContainer then
         if PVEFrame.TitleContainer.TitleBg then PVEFrame.TitleContainer.TitleBg:Hide() end
     end
     if _G.PVEFrameTitleBg then _G.PVEFrameTitleBg:Hide() end
 
-    -- PortraitFrame border textures
+
     if _G.PVEFrameTopBorder then _G.PVEFrameTopBorder:Hide() end
     if _G.PVEFrameTopRightCorner then _G.PVEFrameTopRightCorner:Hide() end
     if _G.PVEFrameRightBorder then _G.PVEFrameRightBorder:Hide() end
@@ -266,27 +262,27 @@ local function HidePVEDecorations()
     if _G.PVEFrameBtnCornerRight then _G.PVEFrameBtnCornerRight:Hide() end
     if _G.PVEFrameButtonBottomBorder then _G.PVEFrameButtonBottomBorder:Hide() end
 
-    -- Additional backgrounds
+
     if _G.PVEFrameBg then _G.PVEFrameBg:Hide() end
     if _G.PVEFrameBackground then _G.PVEFrameBackground:Hide() end
     if _G.PVEFrameInset then _G.PVEFrameInset:Hide() end
     if _G.PVEFrameNineSlice then _G.PVEFrameNineSlice:Hide() end
 
-    -- Strip all remaining textures from main frame
+
     StripTextures(PVEFrame)
 end
 
--- Style GroupFinder buttons (LFD, Raid Finder, Premade Groups on the left)
+
 local function StyleGroupFinderButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not button or button.preyStyled then return end
 
-    -- Hide default textures - check both lowercase (11.x) and uppercase (12.x PTR) keys
+
     if button.ring then button.ring:Hide() end
     if button.Ring then button.Ring:Hide() end
     if button.bg then button.bg:SetAlpha(0) end
     if button.Background then button.Background:Hide() end
 
-    -- Create backdrop for button
+
     if not button.preyBackdrop then
         button.preyBackdrop = CreateFrame("Frame", nil, button, "BackdropTemplate")
         button.preyBackdrop:SetAllPoints()
@@ -307,14 +303,14 @@ local function StyleGroupFinderButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga
     button.preyBackdrop:SetBackdropColor(btnBgR, btnBgG, btnBgB, 1)
     button.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 
-    -- Style the icon
+
     if button.icon then
         button.icon:SetSize(40, 40)
         button.icon:ClearAllPoints()
         button.icon:SetPoint("LEFT", 8, 0)
         button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-        -- Add icon border
+
         if not button.icon.preyBackdrop then
             button.icon.preyBackdrop = CreateFrame("Frame", nil, button, "BackdropTemplate")
             button.icon.preyBackdrop:SetPoint("TOPLEFT", button.icon, -1, 1)
@@ -330,7 +326,7 @@ local function StyleGroupFinderButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga
         end
     end
 
-    -- Store colors for hover
+
     button.preySkinColor = { sr, sg, sb, sa }
 
     button:HookScript("OnEnter", function(self)
@@ -348,32 +344,32 @@ local function StyleGroupFinderButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga
     button.preyStyled = true
 end
 
--- Style close button (PREY pattern - minimal, just hide border)
+
 local function StyleCloseButton(closeButton)
     if not closeButton then return end
     if closeButton.Border then closeButton.Border:SetAlpha(0) end
 end
 
--- Skin PVEFrame (main container)
+
 local function SkinPVEFrame()
     local PVEFrame = _G.PVEFrame
     if not PVEFrame or PVEFrame.preySkinned then return end
 
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetColors()
 
-    -- Hide all Blizzard decorations
+
     HidePVEDecorations()
 
-    -- Create main backdrop
+
     CreatePREYBackdrop(PVEFrame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
 
-    -- Style close button (minimal - just hide border per PREY pattern)
+
     local closeButton = PVEFrame.CloseButton or _G.PVEFrameCloseButton
     if closeButton then
         StyleCloseButton(closeButton)
     end
 
-    -- Style tabs (use rawget for 12.0.1 compatibility)
+
     for i = 1, 4 do
         local tab = rawget(_G, "PVEFrameTab" .. i)
         if tab then
@@ -381,9 +377,7 @@ local function SkinPVEFrame()
         end
     end
 
-    -- Reposition tabs: left justify and tighten spacing
-    -- Blizzard default: Tab1 at x=19, Tab2-3 at -16px overlap, Tab4 at +3px gap
-    -- PREY: Tab1 at x=-3, tabs at -5px spacing
+
     local tab1 = rawget(_G, "PVEFrameTab1")
     local tab2 = rawget(_G, "PVEFrameTab2")
     local tab3 = rawget(_G, "PVEFrameTab3")
@@ -394,8 +388,7 @@ local function SkinPVEFrame()
     if tab2 and tab1 then tab2:SetPoint("TOPLEFT", tab1, "TOPRIGHT", -5, 0) end
     if tab3 and tab2 then tab3:SetPoint("TOPLEFT", tab2, "TOPRIGHT", -5, 0) end
 
-    -- Hook to reposition Tab4 (Delves) - Blizzard repositions it dynamically
-    -- Note: Tab4 may not exist in all WoW versions (e.g., 12.x beta)
+
     hooksecurefunc("PVEFrame_ShowFrame", function()
         local tab4 = _G.PVEFrameTab4
         if not tab4 or not tab4:IsShown() then return end
@@ -405,7 +398,7 @@ local function SkinPVEFrame()
         tab4:SetPoint("TOPLEFT", (twoShown and threeShown and _G.PVEFrameTab3) or (twoShown and not threeShown and _G.PVEFrameTab2) or _G.PVEFrameTab1, "TOPRIGHT", -5, 0)
     end)
 
-    -- Style GroupFinder buttons
+
     local GroupFinderFrame = _G.GroupFinderFrame
     if GroupFinderFrame then
         for i = 1, 4 do
@@ -419,12 +412,12 @@ local function SkinPVEFrame()
     PVEFrame.preySkinned = true
 end
 
--- Hide LFD decorations
+
 local function HideLFDDecorations()
     local LFDQueueFrame = _G.LFDQueueFrame
     if not LFDQueueFrame then return end
 
-    -- LFDParentFrame (the container for LFD content)
+
     if _G.LFDParentFrame then
         StripTextures(_G.LFDParentFrame)
     end
@@ -433,18 +426,18 @@ local function HideLFDDecorations()
         _G.LFDParentFrameInset:Hide()
     end
 
-    -- Background and inset
+
     if LFDQueueFrame.Bg then LFDQueueFrame.Bg:Hide() end
     if LFDQueueFrame.Background then LFDQueueFrame.Background:Hide() end
     if LFDQueueFrame.NineSlice then LFDQueueFrame.NineSlice:Hide() end
 
-    -- Global decorations
+
     if _G.LFDQueueFrameBackground then _G.LFDQueueFrameBackground:Hide() end
     if _G.LFDQueueFrameRandomScrollFrameScrollBarBorder then
         _G.LFDQueueFrameRandomScrollFrameScrollBarBorder:Hide()
     end
 
-    -- Specific dropdown decorations
+
     if LFDQueueFrame.Dropdown then
         if LFDQueueFrame.Dropdown.Left then LFDQueueFrame.Dropdown.Left:SetAlpha(0) end
         if LFDQueueFrame.Dropdown.Right then LFDQueueFrame.Dropdown.Right:SetAlpha(0) end
@@ -454,14 +447,14 @@ local function HideLFDDecorations()
     StripTextures(LFDQueueFrame)
 end
 
--- Hide Raid Finder decorations
+
 local function HideRaidFinderDecorations()
     local RaidFinderFrame = _G.RaidFinderFrame
     if not RaidFinderFrame then return end
 
     StripTextures(RaidFinderFrame)
 
-    -- Role background (gradient texture behind role buttons)
+
     if _G.RaidFinderFrameRoleBackground then
         _G.RaidFinderFrameRoleBackground:Hide()
     end
@@ -469,70 +462,70 @@ local function HideRaidFinderDecorations()
         RaidFinderFrame.RoleBackground:Hide()
     end
 
-    -- Role inset (top inset around role buttons) - hide the entire frame
+
     local roleInset = _G.RaidFinderFrameRoleInset or (RaidFinderFrame.Inset)
     if roleInset then
         StripTextures(roleInset)
         roleInset:Hide()
     end
 
-    -- Bottom inset (around raid selection area) - hide the entire frame
+
     local bottomInset = _G.RaidFinderFrameBottomInset
     if bottomInset then
         StripTextures(bottomInset)
         bottomInset:Hide()
     end
 
-    -- Queue frame
+
     local RaidFinderQueueFrame = _G.RaidFinderQueueFrame
     if RaidFinderQueueFrame then
         StripTextures(RaidFinderQueueFrame)
         if RaidFinderQueueFrame.Bg then RaidFinderQueueFrame.Bg:Hide() end
         if RaidFinderQueueFrame.Background then RaidFinderQueueFrame.Background:Hide() end
 
-        -- Hide scroll frame background if present
+
         local scrollFrame = _G.RaidFinderQueueFrameScrollFrame
         if scrollFrame then
             StripTextures(scrollFrame)
         end
     end
 
-    -- Background (quest paper texture)
+
     if _G.RaidFinderQueueFrameBackground then _G.RaidFinderQueueFrameBackground:Hide() end
 
-    -- Also try common child patterns
+
     for _, name in ipairs({"NineSlice", "Bg", "Border", "Background", "InsetBorderTop", "InsetBorderBottom", "InsetBorderLeft", "InsetBorderRight"}) do
         local child = RaidFinderFrame[name]
         if child and child.Hide then child:Hide() end
     end
 end
 
--- Skin LFDQueueFrame (Dungeon Finder)
+
 local function SkinLFDFrame()
     local LFDQueueFrame = _G.LFDQueueFrame
     if not LFDQueueFrame or LFDQueueFrame.preySkinned then return end
 
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetColors()
 
-    -- Hide Blizzard decorations
+
     HideLFDDecorations()
 
-    -- Style role buttons - hide decorative elements (use rawget for 12.0.1 compatibility)
+
     local roles = { "Tank", "Healer", "DPS" }
     for _, role in ipairs(roles) do
         local button = rawget(_G, "LFDQueueFrameRoleButton" .. role)
         if button then
-            -- Hide the background texture (causes doubled icon appearance)
+
             if button.background then button.background:SetAlpha(0) end
             if button.Background then button.Background:SetAlpha(0) end
-            -- Also check for global name pattern
+
             local bgTex = rawget(_G, "LFDQueueFrameRoleButton" .. role .. "Background")
             if bgTex then bgTex:SetAlpha(0) end
 
             if button.shortageBorder then button.shortageBorder:SetAlpha(0) end
             if button.cover then button.cover:SetAlpha(0) end
             if button.checkButton then
-                -- Style checkbox
+
                 local check = button.checkButton
                 if check.SetNormalTexture then check:SetNormalTexture("") end
                 if check.SetPushedTexture then check:SetPushedTexture("") end
@@ -542,12 +535,12 @@ local function SkinLFDFrame()
         end
     end
 
-    -- Style find group button
+
     if _G.LFDQueueFrameFindGroupButton then
         StyleButton(_G.LFDQueueFrameFindGroupButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     end
 
-    -- Style type dropdown
+
     local typeDropdown = LFDQueueFrame.TypeDropdown or _G.LFDQueueFrameTypeDropdown
     if typeDropdown then
         StyleDropdown(typeDropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga, 200)
@@ -556,22 +549,22 @@ local function SkinLFDFrame()
     LFDQueueFrame.preySkinned = true
 end
 
--- Skin RaidFinderQueueFrame (Raid Finder)
+
 local function SkinRaidFinderFrame()
     local RaidFinderQueueFrame = _G.RaidFinderQueueFrame
     if not RaidFinderQueueFrame or RaidFinderQueueFrame.preySkinned then return end
 
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetColors()
 
-    -- Hide Blizzard decorations
+
     HideRaidFinderDecorations()
 
-    -- Style role buttons - hide decorative elements (same as LFD, use rawget for 12.0.1)
+
     local roles = { "Tank", "Healer", "DPS" }
     for _, role in ipairs(roles) do
         local button = rawget(_G, "RaidFinderQueueFrameRoleButton" .. role)
         if button then
-            -- Hide the background texture (causes doubled icon appearance)
+
             if button.background then button.background:SetAlpha(0) end
             if button.Background then button.Background:SetAlpha(0) end
             local bgTex = rawget(_G, "RaidFinderQueueFrameRoleButton" .. role .. "Background")
@@ -589,12 +582,12 @@ local function SkinRaidFinderFrame()
         end
     end
 
-    -- Style find raid button
+
     if _G.RaidFinderFrameFindRaidButton then
         StyleButton(_G.RaidFinderFrameFindRaidButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     end
 
-    -- Style selection dropdown
+
     local selectionDropdown = RaidFinderQueueFrame.SelectionDropdown
     if selectionDropdown then
         StyleDropdown(selectionDropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga, 200)
@@ -603,17 +596,17 @@ local function SkinRaidFinderFrame()
     RaidFinderQueueFrame.preySkinned = true
 end
 
--- Hide LFGList decorations
+
 local function HideLFGListDecorations()
     local LFGListFrame = _G.LFGListFrame
     if not LFGListFrame then return end
 
-    -- Main frame decorations
+
     if LFGListFrame.Bg then LFGListFrame.Bg:Hide() end
     if LFGListFrame.Background then LFGListFrame.Background:Hide() end
     if LFGListFrame.NineSlice then LFGListFrame.NineSlice:Hide() end
 
-    -- Category selection decorations
+
     if LFGListFrame.CategorySelection then
         local cs = LFGListFrame.CategorySelection
         if cs.Inset then
@@ -623,7 +616,7 @@ local function HideLFGListDecorations()
         StripTextures(cs)
     end
 
-    -- Search panel decorations
+
     if LFGListFrame.SearchPanel then
         local sp = LFGListFrame.SearchPanel
         if sp.ResultsInset then
@@ -636,7 +629,7 @@ local function HideLFGListDecorations()
         StripTextures(sp)
     end
 
-    -- Application viewer decorations
+
     if LFGListFrame.ApplicationViewer then
         local av = LFGListFrame.ApplicationViewer
         if av.Inset then
@@ -647,7 +640,7 @@ local function HideLFGListDecorations()
         StripTextures(av)
     end
 
-    -- Entry creation decorations
+
     if LFGListFrame.EntryCreation then
         local ec = LFGListFrame.EntryCreation
         if ec.Inset then
@@ -660,17 +653,17 @@ local function HideLFGListDecorations()
     StripTextures(LFGListFrame)
 end
 
--- Skin LFGListFrame (Premade Groups)
+
 local function SkinLFGListFrame()
     local LFGListFrame = _G.LFGListFrame
     if not LFGListFrame or LFGListFrame.preySkinned then return end
 
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetColors()
 
-    -- Hide Blizzard decorations
+
     HideLFGListDecorations()
 
-    -- Style category selection
+
     if LFGListFrame.CategorySelection then
         local cs = LFGListFrame.CategorySelection
         if cs.StartGroupButton then
@@ -679,7 +672,7 @@ local function SkinLFGListFrame()
         if cs.FindGroupButton then
             StyleButton(cs.FindGroupButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
-        -- Style category buttons
+
         if cs.CategoryButtons then
             for _, catButton in pairs(cs.CategoryButtons) do
                 if catButton and not catButton.preyStyled then
@@ -690,7 +683,7 @@ local function SkinLFGListFrame()
         end
     end
 
-    -- Style search panel
+
     if LFGListFrame.SearchPanel then
         local sp = LFGListFrame.SearchPanel
         if sp.BackButton then
@@ -702,18 +695,18 @@ local function SkinLFGListFrame()
         if sp.RefreshButton then
             StyleButton(sp.RefreshButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
-        -- Style search box
+
         if sp.SearchBox then
             StripTextures(sp.SearchBox)
             CreatePREYBackdrop(sp.SearchBox, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
-        -- Style filter button
+
         if sp.FilterButton then
             StyleButton(sp.FilterButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
     end
 
-    -- Style application viewer
+
     if LFGListFrame.ApplicationViewer then
         local av = LFGListFrame.ApplicationViewer
         if av.RefreshButton then
@@ -727,7 +720,7 @@ local function SkinLFGListFrame()
         end
     end
 
-    -- Style entry creation
+
     if LFGListFrame.EntryCreation then
         local ec = LFGListFrame.EntryCreation
         if ec.ListGroupButton then
@@ -741,17 +734,17 @@ local function SkinLFGListFrame()
     LFGListFrame.preySkinned = true
 end
 
--- Hide Challenges decorations
+
 local function HideChallengesDecorations()
     local ChallengesFrame = _G.ChallengesFrame
     if not ChallengesFrame then return end
 
-    -- Main background and decorations
+
     if ChallengesFrame.Background then ChallengesFrame.Background:Hide() end
     if ChallengesFrame.Bg then ChallengesFrame.Bg:Hide() end
     if ChallengesFrame.NineSlice then ChallengesFrame.NineSlice:Hide() end
 
-    -- Seasonal affix frame
+
     if ChallengesFrame.SeasonChangeNoticeFrame then
         StripTextures(ChallengesFrame.SeasonChangeNoticeFrame)
     end
@@ -759,15 +752,15 @@ local function HideChallengesDecorations()
     StripTextures(ChallengesFrame)
 end
 
--- Style dungeon icon frame for M+
+
 local function StyleDungeonIcon(icon, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not icon or icon.preyStyled then return end
 
-    -- Hide default backgrounds
+
     if icon.Bg then icon.Bg:SetAlpha(0) end
     if icon.Background then icon.Background:SetAlpha(0) end
 
-    -- Style the icon texture
+
     if icon.Icon then
         icon.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
@@ -786,20 +779,20 @@ local function StyleDungeonIcon(icon, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
     end
 
-    -- Store colors
+
     icon.preySkinColor = { sr, sg, sb, sa }
 
     icon.preyStyled = true
 end
 
--- Style affix icon for M+
+
 local function StyleAffixIcon(affix, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not affix or affix.preyStyled then return end
 
-    -- Hide border texture
+
     if affix.Border then affix.Border:SetAlpha(0) end
 
-    -- Style portrait/icon
+
     if affix.Portrait then
         affix.Portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
@@ -821,17 +814,17 @@ local function StyleAffixIcon(affix, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     affix.preyStyled = true
 end
 
--- Skin ChallengesFrame (M+ Dungeons tab)
+
 local function SkinChallengesFrame()
     local ChallengesFrame = _G.ChallengesFrame
     if not ChallengesFrame or ChallengesFrame.preySkinned then return end
 
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetColors()
 
-    -- Hide Blizzard decorations
+
     HideChallengesDecorations()
 
-    -- Style the weekly best frame
+
     if ChallengesFrame.WeeklyInfo then
         local wi = ChallengesFrame.WeeklyInfo
         if wi.Child then
@@ -839,7 +832,7 @@ local function SkinChallengesFrame()
                 local chest = wi.Child.WeeklyChest
                 if chest.Highlight then chest.Highlight:SetAlpha(0) end
             end
-            -- Style labels
+
             if wi.Child.Label then
                 local PREY = _G.PreyUI
                 local fontPath = PREY and PREY.GetGlobalFont and PREY:GetGlobalFont() or STANDARD_TEXT_FONT
@@ -848,14 +841,14 @@ local function SkinChallengesFrame()
         end
     end
 
-    -- Style dungeon icons (dynamically created)
+
     if ChallengesFrame.DungeonIcons then
         for _, icon in pairs(ChallengesFrame.DungeonIcons) do
             StyleDungeonIcon(icon, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
     end
 
-    -- Hook to style new dungeon icons when they're created/updated
+
     if ChallengesFrame.Update and not ChallengesFrame.preyUpdateHooked then
         hooksecurefunc(ChallengesFrame, "Update", function(self)
             if self.DungeonIcons then
@@ -868,7 +861,7 @@ local function SkinChallengesFrame()
         ChallengesFrame.preyUpdateHooked = true
     end
 
-    -- Style affix frames (check for container first)
+
     if ChallengesFrame.WeeklyInfo and ChallengesFrame.WeeklyInfo.Child then
         local affixContainer = ChallengesFrame.WeeklyInfo.Child.AffixesContainer
         if affixContainer and affixContainer.Affixes then
@@ -878,7 +871,7 @@ local function SkinChallengesFrame()
         end
     end
 
-    -- Also check direct affix references (older pattern)
+
     for i = 1, 4 do
         local affix = ChallengesFrame["Affix" .. i]
         if affix then
@@ -889,22 +882,22 @@ local function SkinChallengesFrame()
     ChallengesFrame.preySkinned = true
 end
 
--- Hide PVP decorations
+
 local function HidePVPDecorations()
     local PVPQueueFrame = _G.PVPQueueFrame
     if not PVPQueueFrame then return end
 
-    -- Main frame decorations
+
     if PVPQueueFrame.Bg then PVPQueueFrame.Bg:Hide() end
     if PVPQueueFrame.Background then PVPQueueFrame.Background:Hide() end
     if PVPQueueFrame.NineSlice then PVPQueueFrame.NineSlice:Hide() end
 
-    -- HonorInset decorations
+
     if PVPQueueFrame.HonorInset then
         if PVPQueueFrame.HonorInset.NineSlice then PVPQueueFrame.HonorInset.NineSlice:Hide() end
     end
 
-    -- Honor frame decorations
+
     if _G.HonorFrame then
         local hf = _G.HonorFrame
         if hf.Bg then hf.Bg:Hide() end
@@ -914,7 +907,7 @@ local function HidePVPDecorations()
             hf.Inset:Hide()
             if hf.Inset.NineSlice then hf.Inset.NineSlice:Hide() end
         end
-        -- BonusFrame decorations
+
         if hf.BonusFrame then
             if hf.BonusFrame.ShadowOverlay then hf.BonusFrame.ShadowOverlay:Hide() end
             if hf.BonusFrame.WorldBattlesTexture then hf.BonusFrame.WorldBattlesTexture:Hide() end
@@ -923,7 +916,7 @@ local function HidePVPDecorations()
         StripTextures(hf)
     end
 
-    -- Conquest frame decorations
+
     if _G.ConquestFrame then
         local cf = _G.ConquestFrame
         if cf.Bg then cf.Bg:Hide() end
@@ -940,16 +933,16 @@ local function HidePVPDecorations()
     StripTextures(PVPQueueFrame)
 end
 
--- Style PVP bonus/activity button (right side activity buttons)
+
 local function StylePVPActivityButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not button or button.preyStyled then return end
 
-    -- Hide default textures
+
     if button.Bg then button.Bg:Hide() end
     if button.Border then button.Border:Hide() end
     if button.Ring then button.Ring:Hide() end
 
-    -- Create backdrop
+
     if not button.preyBackdrop then
         button.preyBackdrop = CreateFrame("Frame", nil, button, "BackdropTemplate")
         button.preyBackdrop:SetAllPoints()
@@ -970,12 +963,12 @@ local function StylePVPActivityButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga
     button.preyBackdrop:SetBackdropColor(btnBgR, btnBgG, btnBgB, 1)
     button.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 
-    -- Style selected texture
+
     if button.SelectedTexture then
         button.SelectedTexture:SetColorTexture(sr, sg, sb, 0.2)
     end
 
-    -- Style reward icon if present
+
     if button.Reward then
         local reward = button.Reward
         if reward.Border then reward.Border:Hide() end
@@ -998,7 +991,7 @@ local function StylePVPActivityButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga
         end
     end
 
-    -- Store colors for hover
+
     button.preySkinColor = { sr, sg, sb, sa }
 
     button:HookScript("OnEnter", function(self)
@@ -1016,11 +1009,11 @@ local function StylePVPActivityButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga
     button.preyStyled = true
 end
 
--- Style PVP role icon button
+
 local function StylePVPRoleIcon(roleIcon, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not roleIcon or roleIcon.preyStyled then return end
 
-    -- Hide decorations
+
     if roleIcon.background then roleIcon.background:SetAlpha(0) end
     if roleIcon.Background then roleIcon.Background:SetAlpha(0) end
     if roleIcon.shortageBorder then roleIcon.shortageBorder:SetAlpha(0) end
@@ -1029,16 +1022,16 @@ local function StylePVPRoleIcon(roleIcon, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     roleIcon.preyStyled = true
 end
 
--- Style specific battleground list button (PVPSpecificBattlegroundButtonTemplate)
+
 local function StyleSpecificBGButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not button or button.preyStyled then return end
 
-    -- Hide default textures
+
     if button.Bg then button.Bg:Hide() end
     if button.Border then button.Border:Hide() end
     if button.HighlightTexture then button.HighlightTexture:SetAlpha(0) end
 
-    -- Create backdrop
+
     if not button.preyBackdrop then
         button.preyBackdrop = CreateFrame("Frame", nil, button, "BackdropTemplate")
         button.preyBackdrop:SetAllPoints()
@@ -1059,13 +1052,13 @@ local function StyleSpecificBGButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     button.preyBackdrop:SetBackdropColor(btnBgR, btnBgG, btnBgB, 0.9)
     button.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 
-    -- Style selected texture
+
     if button.SelectedTexture then
         button.SelectedTexture:SetColorTexture(sr, sg, sb, 0.3)
         button.SelectedTexture:SetAllPoints()
     end
 
-    -- Style icon border
+
     if button.Icon then
         button.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         if not button.Icon.preyBackdrop then
@@ -1083,7 +1076,7 @@ local function StyleSpecificBGButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
     end
 
-    -- Add hover highlight
+
     button:HookScript("OnEnter", function(self)
         if self.preyBackdrop then
             self.preyBackdrop:SetBackdropBorderColor(1, 1, 1, 1)
@@ -1098,14 +1091,14 @@ local function StyleSpecificBGButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     button.preyStyled = true
 end
 
--- Style PVP conquest bar
+
 local function StyleConquestBar(bar, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not bar or bar.preyStyled then return end
 
     if bar.Border then bar.Border:Hide() end
     if bar.Background then bar.Background:Hide() end
 
-    -- Create backdrop
+
     if not bar.preyBackdrop then
         bar.preyBackdrop = CreateFrame("Frame", nil, bar, "BackdropTemplate")
         bar.preyBackdrop:SetAllPoints()
@@ -1122,7 +1115,7 @@ local function StyleConquestBar(bar, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     bar.preyBackdrop:SetBackdropColor(bgr, bgg, bgb, 0.8)
     bar.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 
-    -- Style reward icon
+
     if bar.Reward then
         if bar.Reward.Ring then bar.Reward.Ring:Hide() end
         if bar.Reward.CircleMask then bar.Reward.CircleMask:Hide() end
@@ -1134,20 +1127,18 @@ local function StyleConquestBar(bar, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     bar.preyStyled = true
 end
 
--- Helper: Get role icons from a frame (handles both 11.x and 12.x API)
--- 11.x: frame.TankIcon, frame.HealerIcon, frame.DPSIcon
--- 12.x: frame.RoleList.TankIcon, frame.RoleList.HealerIcon, frame.RoleList.DPSIcon
+
 local function GetRoleIcons(frame)
     if not frame then return nil, nil, nil end
-    -- Try 12.x structure first (RoleList)
+
     if frame.RoleList then
         return frame.RoleList.TankIcon, frame.RoleList.HealerIcon, frame.RoleList.DPSIcon
     end
-    -- Fall back to 11.x structure
+
     return frame.TankIcon, frame.HealerIcon, frame.DPSIcon
 end
 
--- Style role icons for a PVP frame (handles both API versions)
+
 local function StylePVPFrameRoleIcons(frame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     local tankIcon, healerIcon, dpsIcon = GetRoleIcons(frame)
     if tankIcon then StylePVPRoleIcon(tankIcon, sr, sg, sb, sa, bgr, bgg, bgb, bga) end
@@ -1155,18 +1146,17 @@ local function StylePVPFrameRoleIcons(frame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if dpsIcon then StylePVPRoleIcon(dpsIcon, sr, sg, sb, sa, bgr, bgg, bgb, bga) end
 end
 
--- Skin PVPQueueFrame
+
 local function SkinPVPFrame()
     local PVPQueueFrame = _G.PVPQueueFrame
     if not PVPQueueFrame or PVPQueueFrame.preySkinned then return end
 
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetColors()
 
-    -- Hide Blizzard decorations
+
     HidePVPDecorations()
 
-    -- Style category buttons (left side buttons) - 5 in 12.x, 4 in 11.x
-    -- PTR uses PVPQueueFrame.CategoryButton1, retail uses rawget for 12.0.1 compatibility
+
     for i = 1, 5 do
         local catButton = PVPQueueFrame["CategoryButton" .. i] or rawget(_G, "PVPQueueFrameCategoryButton" .. i)
         if catButton then
@@ -1174,24 +1164,24 @@ local function SkinPVPFrame()
         end
     end
 
-    -- Style Honor frame
+
     local HonorFrame = _G.HonorFrame
     if HonorFrame then
-        -- Queue button
+
         if _G.HonorFrameQueueButton then
             StyleButton(_G.HonorFrameQueueButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
 
-        -- Type dropdown
+
         local typeDropdown = HonorFrame.TypeDropdown or _G.HonorFrameTypeDropdown
         if typeDropdown then
             StyleDropdown(typeDropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga, 230)
         end
 
-        -- Role icons (handles both 11.x and 12.x API)
+
         StylePVPFrameRoleIcons(HonorFrame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
 
-        -- BonusFrame activity buttons
+
         if HonorFrame.BonusFrame then
             local bf = HonorFrame.BonusFrame
             local bonusButtons = { "RandomBGButton", "Arena1Button", "RandomEpicBGButton", "BrawlButton", "BrawlButton2", "SpecialEventButton" }
@@ -1202,27 +1192,27 @@ local function SkinPVPFrame()
             end
         end
 
-        -- Conquest bar
+
         if HonorFrame.ConquestBar then
             StyleConquestBar(HonorFrame.ConquestBar, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
 
-        -- Specific battleground scroll list (shown when "Specific Battlegrounds" is selected)
+
         if HonorFrame.SpecificScrollBox and not HonorFrame.SpecificScrollBox.preyHooked then
-            -- Hook to style buttons as they're created/recycled
+
             hooksecurefunc(HonorFrame.SpecificScrollBox, "Update", function(scrollBox)
                 scrollBox:ForEachFrame(function(button)
                     StyleSpecificBGButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
                 end)
             end)
-            -- Style existing buttons
+
             HonorFrame.SpecificScrollBox:ForEachFrame(function(button)
                 StyleSpecificBGButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
             end)
             HonorFrame.SpecificScrollBox.preyHooked = true
         end
 
-        -- Style scroll bar if present
+
         if HonorFrame.SpecificScrollBar then
             if HonorFrame.SpecificScrollBar.Background then
                 HonorFrame.SpecificScrollBar.Background:Hide()
@@ -1230,18 +1220,18 @@ local function SkinPVPFrame()
         end
     end
 
-    -- Style Conquest frame
+
     local ConquestFrame = _G.ConquestFrame
     if ConquestFrame then
-        -- Join button
+
         if _G.ConquestJoinButton then
             StyleButton(_G.ConquestJoinButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
 
-        -- Role icons (handles both 11.x and 12.x API)
+
         StylePVPFrameRoleIcons(ConquestFrame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
 
-        -- Activity buttons
+
         local conquestButtons = { "RatedSoloShuffle", "RatedBGBlitz", "Arena2v2", "Arena3v3", "RatedBG" }
         for _, btnName in ipairs(conquestButtons) do
             if ConquestFrame[btnName] then
@@ -1249,21 +1239,21 @@ local function SkinPVPFrame()
             end
         end
 
-        -- Conquest bar
+
         if ConquestFrame.ConquestBar then
             StyleConquestBar(ConquestFrame.ConquestBar, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
     end
 
-    -- Style Training Grounds frame (12.x only - CategoryButton4)
+
     local TrainingGroundsFrame = _G.TrainingGroundsFrame
     if TrainingGroundsFrame then
-        -- Hide decorations
+
         StripTextures(TrainingGroundsFrame)
         if TrainingGroundsFrame.Bg then TrainingGroundsFrame.Bg:Hide() end
         if TrainingGroundsFrame.Background then TrainingGroundsFrame.Background:Hide() end
 
-        -- Hide Inset frame (InsetFrameTemplate has NineSlice border)
+
         if TrainingGroundsFrame.Inset then
             StripTextures(TrainingGroundsFrame.Inset)
             if TrainingGroundsFrame.Inset.NineSlice then
@@ -1271,51 +1261,51 @@ local function SkinPVPFrame()
             end
         end
 
-        -- Hide BonusTrainingGroundList decorations
+
         local bonusList = TrainingGroundsFrame.BonusTrainingGroundList
         if bonusList then
             if bonusList.WorldBattlesTexture then bonusList.WorldBattlesTexture:Hide() end
             if bonusList.ShadowOverlay then bonusList.ShadowOverlay:Hide() end
-            -- Style the Random Training Ground button
+
             if bonusList.RandomTrainingGroundButton then
                 StylePVPActivityButton(bonusList.RandomTrainingGroundButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
             end
         end
 
-        -- Queue button
+
         if TrainingGroundsFrame.QueueButton then
             StyleButton(TrainingGroundsFrame.QueueButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
 
-        -- Type dropdown
+
         if TrainingGroundsFrame.TypeDropdown then
             StyleDropdown(TrainingGroundsFrame.TypeDropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga, 230)
         end
 
-        -- Role icons
+
         StylePVPFrameRoleIcons(TrainingGroundsFrame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
 
-        -- Conquest bar
+
         if TrainingGroundsFrame.ConquestBar then
             StyleConquestBar(TrainingGroundsFrame.ConquestBar, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
 
-        -- Specific Training Ground scroll list (12.x)
+
         local specificList = TrainingGroundsFrame.SpecificTrainingGroundList
         if specificList and specificList.ScrollBox and not specificList.ScrollBox.preyHooked then
-            -- Hook to style buttons as they're created/recycled
+
             hooksecurefunc(specificList.ScrollBox, "Update", function(scrollBox)
                 scrollBox:ForEachFrame(function(button)
                     StyleSpecificBGButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
                 end)
             end)
-            -- Style existing buttons
+
             specificList.ScrollBox:ForEachFrame(function(button)
                 StyleSpecificBGButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
             end)
             specificList.ScrollBox.preyHooked = true
 
-            -- Style scroll bar
+
             if specificList.ScrollBar and specificList.ScrollBar.Background then
                 specificList.ScrollBar.Background:Hide()
             end
@@ -1324,15 +1314,15 @@ local function SkinPVPFrame()
         TrainingGroundsFrame.preySkinned = true
     end
 
-    -- Style Plunderstorm frame (12.x only - CategoryButton5)
+
     local PlunderstormFrame = _G.PlunderstormFrame
     if PlunderstormFrame then
-        -- Hide decorations
+
         StripTextures(PlunderstormFrame)
         if PlunderstormFrame.Bg then PlunderstormFrame.Bg:Hide() end
         if PlunderstormFrame.Background then PlunderstormFrame.Background:Hide() end
 
-        -- Queue button (if exists)
+
         if PlunderstormFrame.QueueButton then
             StyleButton(PlunderstormFrame.QueueButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
@@ -1343,7 +1333,7 @@ local function SkinPVPFrame()
     PVPQueueFrame.preySkinned = true
 end
 
--- Main skinning function
+
 local function SkinInstanceFrames()
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     local settings = PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.general
@@ -1357,7 +1347,7 @@ local function SkinInstanceFrames()
     SkinPVPFrame()
 end
 
--- Helper to update a styled button's colors
+
 local function UpdateButtonColors(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not button or not button.preyBackdrop then return end
     local btnBgR = math.min(bgr + 0.07, 1)
@@ -1368,14 +1358,14 @@ local function UpdateButtonColors(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     button.preySkinColor = { sr, sg, sb, sa }
 end
 
--- Helper to update a tab's colors
+
 local function UpdateTabColors(tab, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not tab or not tab.preyBackdrop then return end
     tab.preyBackdrop:SetBackdropColor(bgr, bgg, bgb, 0.9)
     tab.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 end
 
--- Helper to update GroupFinder button colors
+
 local function UpdateGroupFinderButtonColors(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not button or not button.preyBackdrop then return end
     local btnBgR = math.min(bgr + 0.07, 1)
@@ -1384,13 +1374,13 @@ local function UpdateGroupFinderButtonColors(button, sr, sg, sb, sa, bgr, bgg, b
     button.preyBackdrop:SetBackdropColor(btnBgR, btnBgG, btnBgB, 1)
     button.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
     button.preySkinColor = { sr, sg, sb, sa }
-    -- Update icon border if present
+
     if button.icon and button.icon.preyBackdrop then
         button.icon.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
     end
 end
 
--- Helper to update PVP activity button colors
+
 local function UpdatePVPActivityButtonColors(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not button or not button.preyBackdrop then return end
     local btnBgR = math.min(bgr + 0.07, 1)
@@ -1407,27 +1397,27 @@ local function UpdatePVPActivityButtonColors(button, sr, sg, sb, sa, bgr, bgg, b
     end
 end
 
--- Helper to update conquest bar colors
+
 local function UpdateConquestBarColors(bar, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not bar or not bar.preyBackdrop then return end
     bar.preyBackdrop:SetBackdropColor(bgr, bgg, bgb, 0.8)
     bar.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 end
 
--- Helper to update dungeon icon colors
+
 local function UpdateDungeonIconColors(icon, sr, sg, sb, sa)
     if not icon or not icon.Icon or not icon.Icon.preyBackdrop then return end
     icon.Icon.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
     icon.preySkinColor = { sr, sg, sb, sa }
 end
 
--- Helper to update affix icon colors
+
 local function UpdateAffixIconColors(affix, sr, sg, sb, sa)
     if not affix or not affix.Portrait or not affix.Portrait.preyBackdrop then return end
     affix.Portrait.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 end
 
--- Helper to update dropdown colors
+
 local function UpdateDropdownColors(dropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not dropdown or not dropdown.preyBackdrop then return end
     local btnBgR = math.min(bgr + 0.07, 1)
@@ -1438,25 +1428,25 @@ local function UpdateDropdownColors(dropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga
     dropdown.preySkinColor = { sr, sg, sb, sa }
 end
 
--- Refresh colors
+
 local function RefreshInstanceFramesColors()
     local PVEFrame = _G.PVEFrame
     if not PVEFrame or not PVEFrame.preySkinned then return end
 
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetColors()
 
-    -- Update PVEFrame backdrop
+
     if PVEFrame.preyBackdrop then
         PVEFrame.preyBackdrop:SetBackdropColor(bgr, bgg, bgb, bga)
         PVEFrame.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
     end
 
-    -- Update PVE tabs (use rawget for 12.0.1 compatibility)
+
     for i = 1, 4 do
         UpdateTabColors(rawget(_G, "PVEFrameTab" .. i), sr, sg, sb, sa, bgr, bgg, bgb, bga)
     end
 
-    -- Update GroupFinder buttons
+
     local GroupFinderFrame = _G.GroupFinderFrame
     if GroupFinderFrame then
         for i = 1, 4 do
@@ -1464,7 +1454,7 @@ local function RefreshInstanceFramesColors()
         end
     end
 
-    -- Update LFD buttons and dropdown
+
     UpdateButtonColors(_G.LFDQueueFrameFindGroupButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     local LFDQueueFrame = _G.LFDQueueFrame
     if LFDQueueFrame then
@@ -1474,7 +1464,7 @@ local function RefreshInstanceFramesColors()
         end
     end
 
-    -- Update Raid Finder buttons and dropdown
+
     local RaidFinderQueueFrame = _G.RaidFinderQueueFrame
     if RaidFinderQueueFrame and RaidFinderQueueFrame.preySkinned then
         UpdateButtonColors(_G.RaidFinderFrameFindRaidButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
@@ -1483,7 +1473,7 @@ local function RefreshInstanceFramesColors()
         end
     end
 
-    -- Update LFGListFrame buttons
+
     local LFGListFrame = _G.LFGListFrame
     if LFGListFrame and LFGListFrame.preySkinned then
         if LFGListFrame.CategorySelection then
@@ -1516,7 +1506,7 @@ local function RefreshInstanceFramesColors()
         end
     end
 
-    -- Update Challenges/M+ dungeon icons and affixes
+
     local ChallengesFrame = _G.ChallengesFrame
     if ChallengesFrame and ChallengesFrame.preySkinned then
         if ChallengesFrame.DungeonIcons then
@@ -1524,7 +1514,7 @@ local function RefreshInstanceFramesColors()
                 UpdateDungeonIconColors(icon, sr, sg, sb, sa)
             end
         end
-        -- Update affixes
+
         if ChallengesFrame.WeeklyInfo and ChallengesFrame.WeeklyInfo.Child then
             local affixContainer = ChallengesFrame.WeeklyInfo.Child.AffixesContainer
             if affixContainer and affixContainer.Affixes then
@@ -1541,26 +1531,26 @@ local function RefreshInstanceFramesColors()
         end
     end
 
-    -- Update PVP buttons and elements
+
     local PVPQueueFrame = _G.PVPQueueFrame
     if PVPQueueFrame and PVPQueueFrame.preySkinned then
-        -- Category buttons (5 in 12.x, 4 in 11.x)
-        -- PTR uses PVPQueueFrame.CategoryButton1, retail uses rawget for 12.0.1 compatibility
+
+
         for i = 1, 5 do
             local catButton = PVPQueueFrame["CategoryButton" .. i] or rawget(_G, "PVPQueueFrameCategoryButton" .. i)
             UpdateGroupFinderButtonColors(catButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         end
 
-        -- Honor frame
+
         local HonorFrame = _G.HonorFrame
         if HonorFrame then
             UpdateButtonColors(_G.HonorFrameQueueButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
-            -- Type dropdown
+
             local typeDropdown = HonorFrame.TypeDropdown or _G.HonorFrameTypeDropdown
             if typeDropdown then
                 UpdateDropdownColors(typeDropdown, sr, sg, sb, sa, bgr, bgg, bgb, bga)
             end
-            -- Bonus frame buttons
+
             if HonorFrame.BonusFrame then
                 local bf = HonorFrame.BonusFrame
                 local bonusButtons = { "RandomBGButton", "Arena1Button", "RandomEpicBGButton", "BrawlButton", "BrawlButton2", "SpecialEventButton" }
@@ -1570,30 +1560,30 @@ local function RefreshInstanceFramesColors()
                     end
                 end
             end
-            -- Conquest bar
+
             if HonorFrame.ConquestBar then
                 UpdateConquestBarColors(HonorFrame.ConquestBar, sr, sg, sb, sa, bgr, bgg, bgb, bga)
             end
         end
 
-        -- Conquest frame
+
         local ConquestFrame = _G.ConquestFrame
         if ConquestFrame then
             UpdateButtonColors(_G.ConquestJoinButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
-            -- Activity buttons
+
             local conquestButtons = { "RatedSoloShuffle", "RatedBGBlitz", "Arena2v2", "Arena3v3", "RatedBG" }
             for _, btnName in ipairs(conquestButtons) do
                 if ConquestFrame[btnName] then
                     UpdatePVPActivityButtonColors(ConquestFrame[btnName], sr, sg, sb, sa, bgr, bgg, bgb, bga)
                 end
             end
-            -- Conquest bar
+
             if ConquestFrame.ConquestBar then
                 UpdateConquestBarColors(ConquestFrame.ConquestBar, sr, sg, sb, sa, bgr, bgg, bgb, bga)
             end
         end
 
-        -- Training Grounds frame (12.x only)
+
         local TrainingGroundsFrame = _G.TrainingGroundsFrame
         if TrainingGroundsFrame and TrainingGroundsFrame.preySkinned then
             UpdateButtonColors(TrainingGroundsFrame.QueueButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
@@ -1605,7 +1595,7 @@ local function RefreshInstanceFramesColors()
             end
         end
 
-        -- Plunderstorm frame (12.x only)
+
         local PlunderstormFrame = _G.PlunderstormFrame
         if PlunderstormFrame and PlunderstormFrame.preySkinned then
             UpdateButtonColors(PlunderstormFrame.QueueButton, sr, sg, sb, sa, bgr, bgg, bgb, bga)
@@ -1613,12 +1603,9 @@ local function RefreshInstanceFramesColors()
     end
 end
 
--- Expose refresh function globally
+
 _G.PreyUI_RefreshInstanceFramesColors = RefreshInstanceFramesColors
 
----------------------------------------------------------------------------
--- INITIALIZATION
----------------------------------------------------------------------------
 
 local pveHooked = false
 local function HookPVEFrame()

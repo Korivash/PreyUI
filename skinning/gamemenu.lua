@@ -1,24 +1,20 @@
 local addonName, ns = ...
 
----------------------------------------------------------------------------
--- GAME MENU (ESC MENU) SKINNING + PREY UI BUTTON
----------------------------------------------------------------------------
 
--- Static colors
 local COLORS = {
     text = { 0.9, 0.9, 0.9, 1 },
 }
 
 local FONT_FLAGS = "OUTLINE"
 
--- Get game menu font size from settings
+
 local function GetGameMenuFontSize()
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     local settings = PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.general
     return settings and settings.gameMenuFontSize or 12
 end
 
--- Get skinning colors (uses unified color system)
+
 local function GetGameMenuColors()
     local PREY = _G.PreyUI
     local sr, sg, sb, sa = 0.820, 0.180, 0.220, 1
@@ -34,7 +30,7 @@ local function GetGameMenuColors()
     return sr, sg, sb, sa, bgr, bgg, bgb, bga
 end
 
--- Create a styled backdrop for frames
+
 local function CreatePREYBackdrop(frame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not frame.preyBackdrop then
         frame.preyBackdrop = CreateFrame("Frame", nil, frame, "BackdropTemplate")
@@ -53,7 +49,7 @@ local function CreatePREYBackdrop(frame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     frame.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 end
 
--- Style a button with PREY theme
+
 local function StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not button or button.preyStyled then return end
 
@@ -71,20 +67,20 @@ local function StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         insets = { left = 1, right = 1, top = 1, bottom = 1 }
     })
 
-    -- Button bg slightly lighter than main bg
+
     local btnBgR = math.min(bgr + 0.07, 1)
     local btnBgG = math.min(bgg + 0.07, 1)
     local btnBgB = math.min(bgb + 0.07, 1)
     button.preyBackdrop:SetBackdropColor(btnBgR, btnBgG, btnBgB, 1)
     button.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 
-    -- Hide default textures
+
     if button.Left then button.Left:SetAlpha(0) end
     if button.Right then button.Right:SetAlpha(0) end
     if button.Center then button.Center:SetAlpha(0) end
     if button.Middle then button.Middle:SetAlpha(0) end
 
-    -- Hide highlight/pushed/normal/disabled textures
+
     local highlight = button:GetHighlightTexture()
     if highlight then highlight:SetAlpha(0) end
     local pushed = button:GetPushedTexture()
@@ -94,7 +90,7 @@ local function StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     local disabled = button:GetDisabledTexture()
     if disabled then disabled:SetAlpha(0) end
 
-    -- Style button text
+
     local text = button:GetFontString()
     if text then
         local PREY = _G.PreyUI
@@ -104,10 +100,10 @@ local function StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
         text:SetTextColor(unpack(COLORS.text))
     end
 
-    -- Store skin color for hover effects
+
     button.preySkinColor = { sr, sg, sb, sa }
 
-    -- Hover effect (brighten border)
+
     button:HookScript("OnEnter", function(self)
         if self.preyBackdrop and self.preySkinColor then
             local r, g, b, a = unpack(self.preySkinColor)
@@ -123,7 +119,7 @@ local function StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     button.preyStyled = true
 end
 
--- Update button colors (for live refresh)
+
 local function UpdateButtonColors(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     if not button or not button.preyBackdrop then return end
 
@@ -135,13 +131,13 @@ local function UpdateButtonColors(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
     button.preySkinColor = { sr, sg, sb, sa }
 end
 
--- Hide Blizzard decorative elements
+
 local function HideBlizzardDecorations()
     if GameMenuFrame.Border then GameMenuFrame.Border:Hide() end
     if GameMenuFrame.Header then GameMenuFrame.Header:Hide() end
 end
 
--- Main skinning function
+
 local function SkinGameMenu()
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     local settings = PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.general
@@ -150,23 +146,23 @@ local function SkinGameMenu()
     if not GameMenuFrame then return end
     if GameMenuFrame.preySkinned then return end
 
-    -- Get colors based on setting
+
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetGameMenuColors()
 
-    -- Hide Blizzard decorations
+
     HideBlizzardDecorations()
 
-    -- Create backdrop
+
     CreatePREYBackdrop(GameMenuFrame, sr, sg, sb, sa, bgr, bgg, bgb, bga)
 
-    -- Adjust frame padding for cleaner look
+
     GameMenuFrame.topPadding = 15
     GameMenuFrame.bottomPadding = 15
     GameMenuFrame.leftPadding = 15
     GameMenuFrame.rightPadding = 15
     GameMenuFrame.spacing = 2
 
-    -- Style all buttons in the pool
+
     if GameMenuFrame.buttonPool then
         for button in GameMenuFrame.buttonPool:EnumerateActive() do
             StyleButton(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
@@ -177,20 +173,20 @@ local function SkinGameMenu()
     GameMenuFrame.preySkinned = true
 end
 
--- Refresh colors on already-skinned game menu (for live preview)
+
 local function RefreshGameMenuColors()
     if not GameMenuFrame or not GameMenuFrame.preySkinned then return end
 
-    -- Get colors based on setting
+
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetGameMenuColors()
 
-    -- Update main frame backdrop
+
     if GameMenuFrame.preyBackdrop then
         GameMenuFrame.preyBackdrop:SetBackdropColor(bgr, bgg, bgb, bga)
         GameMenuFrame.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
     end
 
-    -- Update all buttons
+
     if GameMenuFrame.buttonPool then
         for button in GameMenuFrame.buttonPool:EnumerateActive() do
             UpdateButtonColors(button, sr, sg, sb, sa, bgr, bgg, bgb, bga)
@@ -198,7 +194,7 @@ local function RefreshGameMenuColors()
     end
 end
 
--- Refresh font size on game menu buttons
+
 local function RefreshGameMenuFontSize()
     if not GameMenuFrame then return end
 
@@ -215,21 +211,17 @@ local function RefreshGameMenuFontSize()
         end
     end
 
-    -- Mark dirty to recalculate layout if needed
+
     if GameMenuFrame.MarkDirty then
         GameMenuFrame:MarkDirty()
     end
 end
 
--- Expose refresh functions globally
+
 _G.PreyUI_RefreshGameMenuColors = RefreshGameMenuColors
 _G.PreyUI_RefreshGameMenuFontSize = RefreshGameMenuFontSize
 
----------------------------------------------------------------------------
--- PREY UI BUTTON INJECTION
----------------------------------------------------------------------------
 
--- Inject button on every InitButtons call (buttonPool gets reset each time)
 local function InjectPreyUIButton()
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     local settings = PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.general
@@ -243,8 +235,7 @@ local function InjectPreyUIButton()
         end
     end
 
-    -- Avoid mutating Blizzard layout metadata such as layoutIndex.
-    -- Those fields are used by secure layout code and can taint unrelated UI.
+
     GameMenuFrame:AddButton("PreyUI", function()
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
         HideUIPanel(GameMenuFrame)
@@ -256,21 +247,17 @@ local function InjectPreyUIButton()
     GameMenuFrame:MarkDirty()
 end
 
----------------------------------------------------------------------------
--- INITIALIZATION
----------------------------------------------------------------------------
 
--- Hook into GameMenuFrame button initialization (with defensive check)
 if GameMenuFrame and GameMenuFrame.InitButtons then
     hooksecurefunc(GameMenuFrame, "InitButtons", function()
-        -- Inject PreyUI button (always, regardless of skinning setting)
+
         InjectPreyUIButton()
 
-        -- Skin menu if enabled (defer to ensure buttons are ready)
+
         C_Timer.After(0, function()
             SkinGameMenu()
 
-            -- Style any new buttons that were added
+
             if GameMenuFrame.preySkinned and GameMenuFrame.buttonPool then
                 local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetGameMenuColors()
 

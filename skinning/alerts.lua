@@ -1,26 +1,16 @@
---- PreyUI Alert & Toast Skinning
---- Skins Blizzard alert frames with PREY styling and adds movers
-
 local ADDON_NAME, ns = ...
 local PREYCore = ns.Addon
 
--- Module reference
+
 local Alerts = {}
 PREYCore.Alerts = Alerts
 
----------------------------------------------------------------------------
--- CONSTANTS
----------------------------------------------------------------------------
 
--- Text color
 local PREY_TEXT_COLOR = { 0.953, 0.957, 0.965, 1 }
 
--- Icon styling
+
 local ICON_TEX_COORDS = { 0.08, 0.92, 0.08, 0.92 }
 
----------------------------------------------------------------------------
--- HELPER FUNCTIONS
----------------------------------------------------------------------------
 
 local function GetDB()
     return PREYCore.db and PREYCore.db.profile or {}
@@ -33,20 +23,18 @@ end
 
 local function GetAlertSettings()
     local db = GetDB()
-    -- Alert positions stored in alerts table, but enabled flag in general.skinAlerts
+
     local alerts = db.alerts or {}
     local general = db.general or {}
     alerts.enabled = general.skinAlerts
     return alerts
 end
 
---- Get theme colors from PREY skinning system
---- @return number sr, number sg, number sb, number sa (border/accent color)
---- @return number bgr, number bgg, number bgb, number bga (background color with alpha)
+
 local function GetThemeColors()
     local PREY = _G.PreyUI
-    local sr, sg, sb, sa = 0.820, 0.180, 0.220, 1  -- Fallback blue
-    local bgr, bgg, bgb, bga = 0.05, 0.05, 0.05, 0.95  -- Fallback dark
+    local sr, sg, sb, sa = 0.820, 0.180, 0.220, 1
+    local bgr, bgg, bgb, bga = 0.05, 0.05, 0.05, 0.95
 
     if PREY and PREY.GetSkinColor then
         sr, sg, sb, sa = PREY:GetSkinColor()
@@ -58,14 +46,14 @@ local function GetThemeColors()
     return sr, sg, sb, sa, bgr, bgg, bgb, bga
 end
 
---- Force alpha to 1 (prevents Blizzard fade animations)
+
 local function ForceAlpha(frame, alpha, forced)
     if alpha ~= 1 and forced ~= true then
         frame:SetAlpha(1, true)
     end
 end
 
---- Create PREY-styled backdrop for alert frames
+
 local function CreateAlertBackdrop(frame, xOffset1, yOffset1, xOffset2, yOffset2)
     if frame.preyBackdrop then return frame.preyBackdrop end
 
@@ -87,7 +75,7 @@ local function CreateAlertBackdrop(frame, xOffset1, yOffset1, xOffset2, yOffset2
     return backdrop
 end
 
---- Update existing backdrop colors (for theme changes)
+
 local function UpdateBackdropColors(frame)
     if not frame.preyBackdrop then return end
 
@@ -96,14 +84,11 @@ local function UpdateBackdropColors(frame)
     frame.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
 end
 
---- Create icon border frame with optional quality color
---- @param icon texture The icon texture
---- @param parent frame The parent frame
---- @param qualityColor table|nil Optional {r, g, b} quality color for rarity border
+
 local function CreateIconBorder(icon, parent, qualityColor)
     local sr, sg, sb, sa = GetThemeColors()
 
-    -- If border already exists (pooled frame), just update the color
+
     if icon.preyBorder then
         if qualityColor then
             icon.preyBorder:SetBackdropBorderColor(qualityColor.r or qualityColor[1], qualityColor.g or qualityColor[2], qualityColor.b or qualityColor[3], 1)
@@ -123,7 +108,7 @@ local function CreateIconBorder(icon, parent, qualityColor)
         edgeSize = 1,
     })
 
-    -- Use quality color if provided, otherwise use skin accent
+
     if qualityColor then
         border:SetBackdropBorderColor(qualityColor.r or qualityColor[1], qualityColor.g or qualityColor[2], qualityColor.b or qualityColor[3], 1)
     else
@@ -134,7 +119,7 @@ local function CreateIconBorder(icon, parent, qualityColor)
     return border
 end
 
---- Style an icon with tex coords and border
+
 local function StyleIcon(icon, parent, qualityColor)
     if not icon then return end
 
@@ -144,7 +129,7 @@ local function StyleIcon(icon, parent, qualityColor)
     CreateIconBorder(icon, parent, qualityColor)
 end
 
---- Kill (hide) a frame or texture
+
 local function Kill(obj)
     if obj then
         if obj.UnregisterAllEvents then
@@ -162,11 +147,7 @@ local function Kill(obj)
     end
 end
 
----------------------------------------------------------------------------
--- ALERT SKINNING FUNCTIONS
----------------------------------------------------------------------------
 
---- Skin Achievement Alert
 local function SkinAchievementAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -176,25 +157,25 @@ local function SkinAchievementAlert(frame)
         frame.preyHooked = true
     end
 
-    -- Create backdrop
+
     CreateAlertBackdrop(frame, -2, -6, -2, 6)
 
-    -- Kill Blizzard artwork
+
     Kill(frame.Background)
     Kill(frame.glow)
     Kill(frame.shine)
     Kill(frame.GuildBanner)
     Kill(frame.GuildBorder)
 
-    -- Style text
+
     if frame.Unlocked then
         frame.Unlocked:SetTextColor(unpack(PREY_TEXT_COLOR))
     end
     if frame.Name then
-        frame.Name:SetTextColor(1, 0.82, 0)  -- Gold for achievement name
+        frame.Name:SetTextColor(1, 0.82, 0)
     end
 
-    -- Style icon
+
     if frame.Icon and frame.Icon.Texture then
         Kill(frame.Icon.Overlay)
         StyleIcon(frame.Icon.Texture, frame)
@@ -203,7 +184,7 @@ local function SkinAchievementAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Criteria Alert (achievement criteria)
+
 local function SkinCriteriaAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -229,7 +210,7 @@ local function SkinCriteriaAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Loot Won Alert
+
 local function SkinLootWonAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -249,7 +230,7 @@ local function SkinLootWonAlert(frame)
     Kill(lootItem.IconBorder)
     Kill(lootItem.SpecRing)
 
-    -- Get quality color from item link
+
     local qualityColor = nil
     local hyperlink = frame.hyperlink or (lootItem and lootItem.hyperlink)
     if hyperlink then
@@ -262,7 +243,7 @@ local function SkinLootWonAlert(frame)
 
     StyleIcon(lootItem.Icon, frame, qualityColor)
 
-    -- Create backdrop anchored to icon
+
     if not frame.preyBackdrop and lootItem.Icon.preyBorder then
         local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetThemeColors()
 
@@ -283,7 +264,7 @@ local function SkinLootWonAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Loot Upgrade Alert
+
 local function SkinLootUpgradeAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -300,7 +281,7 @@ local function SkinLootUpgradeAlert(frame)
     frame.Icon:SetTexCoord(unpack(ICON_TEX_COORDS))
     frame.Icon:SetDrawLayer("BORDER", 5)
 
-    -- Get quality color from item link
+
     local qualityColor = nil
     local hyperlink = frame.hyperlink
     if hyperlink then
@@ -313,7 +294,7 @@ local function SkinLootUpgradeAlert(frame)
 
     CreateIconBorder(frame.Icon, frame, qualityColor)
 
-    -- Create backdrop
+
     if not frame.preyBackdrop and frame.Icon.preyBorder then
         local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetThemeColors()
 
@@ -334,22 +315,22 @@ local function SkinLootUpgradeAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Money Won Alert
+
 local function SkinMoneyWonAlert(frame)
     if not frame or frame.preySkinned then return end
 
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetThemeColors()
 
-    -- Hide Blizzard textures
+
     if frame.Background then frame.Background:SetAlpha(0) end
     if frame.IconBorder then frame.IconBorder:SetAlpha(0) end
 
-    -- Style icon
+
     if frame.Icon then
         frame.Icon:SetTexCoord(unpack(ICON_TEX_COORDS))
     end
 
-    -- Create backdrop
+
     if not frame.preyBackdrop then
         local backdrop = CreateFrame("Frame", nil, frame, "BackdropTemplate")
         backdrop:SetFrameLevel(frame:GetFrameLevel())
@@ -368,7 +349,7 @@ local function SkinMoneyWonAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Honor Awarded Alert
+
 local function SkinHonorAwardedAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -403,7 +384,7 @@ local function SkinHonorAwardedAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin New Recipe Learned Alert
+
 local function SkinNewRecipeLearnedAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -418,7 +399,7 @@ local function SkinNewRecipeLearnedAlert(frame)
     Kill(frame.glow)
     Kill(frame.shine)
 
-    -- Kill background texture (first region)
+
     local regions = { frame:GetRegions() }
     for _, region in ipairs(regions) do
         if region:IsObjectType("Texture") then
@@ -440,7 +421,7 @@ local function SkinNewRecipeLearnedAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Dungeon Completion Alert
+
 local function SkinDungeonCompletionAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -478,7 +459,7 @@ local function SkinDungeonCompletionAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Scenario Alert
+
 local function SkinScenarioAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -490,7 +471,7 @@ local function SkinScenarioAlert(frame)
 
     CreateAlertBackdrop(frame, 4, 4, -7, 6)
 
-    -- Kill atlas backgrounds
+
     local regions = { frame:GetRegions() }
     for _, region in ipairs(regions) do
         if region:IsObjectType("Texture") then
@@ -517,7 +498,7 @@ local function SkinScenarioAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin World Quest Complete Alert
+
 local function SkinWorldQuestCompleteAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -542,7 +523,7 @@ local function SkinWorldQuestCompleteAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Legendary Item Alert
+
 local function SkinLegendaryItemAlert(frame, itemLink)
     if not frame or frame.preySkinned then return end
 
@@ -571,7 +552,7 @@ local function SkinLegendaryItemAlert(frame, itemLink)
 
         local border = CreateIconBorder(frame.Icon, frame)
 
-        -- Color border by item quality
+
         if itemLink then
             local quality = C_Item.GetItemQualityByID(itemLink)
             if quality then
@@ -584,27 +565,26 @@ local function SkinLegendaryItemAlert(frame, itemLink)
     frame.preySkinned = true
 end
 
---- Get quality color for misc alerts (mounts, toys, pets)
---- Returns nil to use the user's skin accent color
+
 local function GetMiscAlertQuality(frame)
-    -- Just use the user's skin accent color for mounts/toys/pets
-    -- Quality detection is unreliable, accent color is cleaner and consistent
+
+
     return nil
 end
 
---- Skin Misc Alerts (Pets, Mounts, Toys, Cosmetics, Warband)
+
 local function SkinMiscAlert(frame)
     if not frame then return end
 
-    -- Always update quality color (frames are pooled and reused)
+
     local qualityColor = nil
     if frame.Icon then
         qualityColor = GetMiscAlertQuality(frame)
-        -- Update existing border color or create new one
+
         CreateIconBorder(frame.Icon, frame, qualityColor)
     end
 
-    -- Skip structural changes if already skinned (pooled frame)
+
     if frame.preySkinned then return end
 
     frame:SetAlpha(1)
@@ -644,7 +624,7 @@ local function SkinMiscAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Entitlement/RAF Delivered Alert
+
 local function SkinEntitlementAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -672,7 +652,7 @@ local function SkinEntitlementAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Digsite Complete Alert
+
 local function SkinDigsiteCompleteAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -687,7 +667,7 @@ local function SkinDigsiteCompleteAlert(frame)
     Kill(frame.glow)
     Kill(frame.shine)
 
-    -- Hide background region
+
     local regions = { frame:GetRegions() }
     if regions[1] then Kill(regions[1]) end
 
@@ -698,7 +678,7 @@ local function SkinDigsiteCompleteAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Guild Challenge Alert
+
 local function SkinGuildChallengeAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -710,7 +690,7 @@ local function SkinGuildChallengeAlert(frame)
 
     CreateAlertBackdrop(frame, -2, -6, -2, 6)
 
-    -- Kill guild challenge background
+
     local region = select(2, frame:GetRegions())
     if region and region:IsObjectType("Texture") then
         if region:GetTexture() == [[Interface\GuildFrame\GuildChallenges]] then
@@ -730,7 +710,7 @@ local function SkinGuildChallengeAlert(frame)
     frame.preySkinned = true
 end
 
---- Skin Invasion Alert
+
 local function SkinInvasionAlert(frame)
     if not frame or frame.preySkinned then return end
 
@@ -742,7 +722,7 @@ local function SkinInvasionAlert(frame)
 
     CreateAlertBackdrop(frame, 4, 4, -7, 6)
 
-    -- Kill invasion background
+
     if frame.GetRegions then
         local region, icon = frame:GetRegions()
         if region and region:IsObjectType("Texture") then
@@ -752,7 +732,7 @@ local function SkinInvasionAlert(frame)
         end
 
         if icon and icon:IsObjectType("Texture") then
-            if icon:GetTexture() == 236293 then  -- interface\icons\ability_warlock_demonicpower
+            if icon:GetTexture() == 236293 then
                 CreateIconBorder(icon, frame)
                 icon:SetDrawLayer("OVERLAY")
                 icon:SetTexCoord(unpack(ICON_TEX_COORDS))
@@ -763,15 +743,12 @@ local function SkinInvasionAlert(frame)
     frame.preySkinned = true
 end
 
----------------------------------------------------------------------------
--- BONUS ROLL FRAMES (Not part of AlertSystem)
----------------------------------------------------------------------------
 
 local function SkinBonusRollFrames()
     local db = GetAlertSettings()
     if not db.enabled then return end
 
-    -- BonusRollMoneyWonFrame
+
     local moneyFrame = BonusRollMoneyWonFrame
     if moneyFrame and not moneyFrame.preySkinned then
         moneyFrame:SetAlpha(1)
@@ -798,7 +775,7 @@ local function SkinBonusRollFrames()
         moneyFrame.preySkinned = true
     end
 
-    -- BonusRollLootWonFrame
+
     local lootFrame = BonusRollLootWonFrame
     if lootFrame and not lootFrame.preySkinned then
         lootFrame:SetAlpha(1)
@@ -831,20 +808,17 @@ local function SkinBonusRollFrames()
     end
 end
 
----------------------------------------------------------------------------
--- ALERT FRAME MOVER
----------------------------------------------------------------------------
 
 local alertHolder = nil
 local alertMover = nil
 
--- Positioning constants (grow down from anchor)
+
 local POSITION, ANCHOR_POINT, Y_OFFSET = "TOP", "BOTTOM", -5
 
--- Custom AdjustAnchors for queued alert systems (most alerts)
+
 local function AdjustQueuedAnchors(self, relativeAlert)
-    -- Only use our holder for the first subsystem in the chain
-    -- (when relativeAlert is AlertFrame itself, not a previous alert)
+
+
     if alertHolder and relativeAlert == AlertFrame then
         relativeAlert = alertHolder
     end
@@ -856,9 +830,9 @@ local function AdjustQueuedAnchors(self, relativeAlert)
     return relativeAlert
 end
 
--- Custom AdjustAnchors for simple alert systems
+
 local function AdjustSimpleAnchors(self, relativeAlert)
-    -- Only use our holder for the first subsystem in the chain
+
     if alertHolder and relativeAlert == AlertFrame then
         relativeAlert = alertHolder
     end
@@ -871,9 +845,9 @@ local function AdjustSimpleAnchors(self, relativeAlert)
     return relativeAlert
 end
 
--- Custom AdjustAnchors for anchor frame systems
+
 local function AdjustAnchorFrameAnchors(self, relativeAnchor)
-    -- Only use our holder for the first subsystem in the chain
+
     if alertHolder and relativeAnchor == AlertFrame then
         relativeAnchor = alertHolder
     end
@@ -886,7 +860,7 @@ local function AdjustAnchorFrameAnchors(self, relativeAnchor)
     return relativeAnchor
 end
 
--- Check if subsystem is TalkingHeadFrame (should not be repositioned)
+
 local function IsTalkingHeadSubSystem(alertFrameSubSystem)
     if alertFrameSubSystem.anchorFrame == TalkingHeadFrame then return true end
     if alertFrameSubSystem.alertFrame == TalkingHeadFrame then return true end
@@ -895,24 +869,24 @@ local function IsTalkingHeadSubSystem(alertFrameSubSystem)
     return false
 end
 
--- Replace AdjustAnchors on an alert subsystem
+
 local function ReplaceSubSystemAnchors(alertFrameSubSystem)
-    -- Skip TalkingHeadFrame - it has its own positioning
+
     if IsTalkingHeadSubSystem(alertFrameSubSystem) then return end
 
     if alertFrameSubSystem.alertFramePool then
-        -- Queued alert system (most common)
+
         alertFrameSubSystem.AdjustAnchors = AdjustQueuedAnchors
     elseif not alertFrameSubSystem.anchorFrame then
-        -- Simple alert system
+
         alertFrameSubSystem.AdjustAnchors = AdjustSimpleAnchors
     else
-        -- Anchor frame system
+
         alertFrameSubSystem.AdjustAnchors = AdjustAnchorFrameAnchors
     end
 end
 
--- Called after AlertFrame:UpdateAnchors to reposition to our holder
+
 local function PostAlertMove()
     if not alertHolder then return end
 
@@ -929,11 +903,11 @@ local function CreateAlertMover()
     local db = GetAlertSettings()
     if not db.enabled then return end
 
-    -- Create holder frame
+
     if not alertHolder then
         alertHolder = CreateFrame("Frame", "PREY_AlertFrameHolder", UIParent)
         alertHolder:SetSize(180, 20)
-        -- Load saved position or use default
+
         local pos = db.alertPosition
         if pos and pos.point then
             alertHolder:SetPoint(pos.point, UIParent, pos.relPoint or "TOP", pos.x or 0, pos.y or -20)
@@ -943,7 +917,7 @@ local function CreateAlertMover()
         alertHolder:SetMovable(true)
         alertHolder:SetClampedToScreen(true)
 
-        -- Create mover overlay
+
         alertMover = CreateFrame("Frame", "PREY_AlertFrameMover", alertHolder, "BackdropTemplate")
         alertMover:SetAllPoints(alertHolder)
         alertMover:SetBackdrop({
@@ -959,56 +933,52 @@ local function CreateAlertMover()
         alertMover:SetFrameStrata("FULLSCREEN_DIALOG")
         alertMover:Hide()
 
-        -- Mover text
+
         local text = alertMover:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         text:SetPoint("CENTER")
         text:SetText("Alert Frames")
         alertMover.text = text
 
-        -- Drag handlers
+
         alertMover:SetScript("OnDragStart", function(self)
             alertHolder:StartMoving()
         end)
 
         alertMover:SetScript("OnDragStop", function(self)
             alertHolder:StopMovingOrSizing()
-            -- Save position to database
+
             local point, _, relPoint, x, y = alertHolder:GetPoint()
             local alertDB = GetAlertSettings()
             alertDB.alertPosition = { point = point, relPoint = relPoint, x = x, y = y }
         end)
     end
 
-    -- Replace AdjustAnchors on all existing alert subsystems
+
     for _, alertFrameSubSystem in ipairs(AlertFrame.alertFrameSubSystems) do
         ReplaceSubSystemAnchors(alertFrameSubSystem)
     end
 
-    -- Hook for any new subsystems added later
+
     hooksecurefunc(AlertFrame, "AddAlertFrameSubSystem", function(_, alertFrameSubSystem)
         ReplaceSubSystemAnchors(alertFrameSubSystem)
     end)
 
-    -- Hook UpdateAnchors to reposition after Blizzard updates
+
     hooksecurefunc(AlertFrame, "UpdateAnchors", PostAlertMove)
 
-    -- Disable mouse on GroupLootContainer for cleaner interaction
+
     if GroupLootContainer then
         GroupLootContainer:EnableMouse(false)
         GroupLootContainer.ignoreInLayout = true
     end
 
-    -- Set alert subsystem priorities (lower = appears first/top)
-    -- Ensures WQ completion appears above loot alerts
+
     if WorldQuestCompleteAlertSystem and LootAlertSystem then
         AlertFrame:SetSubSystemAnchorPriority(WorldQuestCompleteAlertSystem, 100)
         AlertFrame:SetSubSystemAnchorPriority(LootAlertSystem, 200)
     end
 end
 
----------------------------------------------------------------------------
--- EVENT TOAST MOVER
----------------------------------------------------------------------------
 
 local toastHolder = nil
 local toastMover = nil
@@ -1018,11 +988,11 @@ local function CreateEventToastMover()
     if not db.enabled then return end
     if not EventToastManagerFrame then return end
 
-    -- Create holder frame
+
     if not toastHolder then
         toastHolder = CreateFrame("Frame", "PREY_EventToastHolder", UIParent)
         toastHolder:SetSize(300, 20)
-        -- Load saved position or use default
+
         local pos = db.toastPosition
         if pos and pos.point then
             toastHolder:SetPoint(pos.point, UIParent, pos.relPoint or "TOP", pos.x or 0, pos.y or -150)
@@ -1032,7 +1002,7 @@ local function CreateEventToastMover()
         toastHolder:SetMovable(true)
         toastHolder:SetClampedToScreen(true)
 
-        -- Create mover overlay
+
         toastMover = CreateFrame("Frame", "PREY_EventToastMover", toastHolder, "BackdropTemplate")
         toastMover:SetAllPoints(toastHolder)
         toastMover:SetBackdrop({
@@ -1048,43 +1018,40 @@ local function CreateEventToastMover()
         toastMover:SetFrameStrata("FULLSCREEN_DIALOG")
         toastMover:Hide()
 
-        -- Mover text
+
         local text = toastMover:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         text:SetPoint("CENTER")
         text:SetText("Event Toasts")
         toastMover.text = text
 
-        -- Drag handlers
+
         toastMover:SetScript("OnDragStart", function(self)
             toastHolder:StartMoving()
         end)
 
         toastMover:SetScript("OnDragStop", function(self)
             toastHolder:StopMovingOrSizing()
-            -- Save position to database
+
             local point, _, relPoint, x, y = toastHolder:GetPoint()
             local alertDB = GetAlertSettings()
             alertDB.toastPosition = { point = point, relPoint = relPoint, x = x, y = y }
-            -- Reposition toast frame
+
             EventToastManagerFrame:ClearAllPoints()
             EventToastManagerFrame:SetPoint("TOP", toastHolder, "TOP")
         end)
     end
 
-    -- Hook EventToastManagerFrame:UpdateAnchor instead of SetPoint (avoids recursion)
+
     hooksecurefunc(EventToastManagerFrame, "UpdateAnchor", function(self)
         self:ClearAllPoints()
         self:SetPoint("TOP", toastHolder, "TOP")
     end)
 
-    -- Initial positioning
+
     EventToastManagerFrame:ClearAllPoints()
     EventToastManagerFrame:SetPoint("TOP", toastHolder, "TOP")
 end
 
----------------------------------------------------------------------------
--- MOVER TOGGLE (called from options)
----------------------------------------------------------------------------
 
 function Alerts:ShowMovers()
     if alertMover then alertMover:Show() end
@@ -1105,16 +1072,12 @@ function Alerts:ToggleMovers()
     end
 end
 
----------------------------------------------------------------------------
--- REFRESH FUNCTION (for live color updates from options panel)
----------------------------------------------------------------------------
 
 local function RefreshAlertColors()
-    -- Get current colors
+
     local sr, sg, sb, sa, bgr, bgg, bgb, bga = GetThemeColors()
 
-    -- Update all skinned alert backdrops
-    -- Since alerts are pooled and created dynamically, we iterate through known alert systems
+
     local alertSystems = {
         AchievementAlertSystem,
         CriteriaAlertSystem,
@@ -1147,7 +1110,7 @@ local function RefreshAlertColors()
                     frame.preyBackdrop:SetBackdropColor(bgr, bgg, bgb, bga)
                     frame.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
                 end
-                -- Update icon borders
+
                 if frame.Icon and frame.Icon.preyBorder then
                     frame.Icon.preyBorder:SetBackdropBorderColor(sr, sg, sb, sa)
                 end
@@ -1155,7 +1118,7 @@ local function RefreshAlertColors()
         end
     end
 
-    -- Update bonus roll frames
+
     if BonusRollMoneyWonFrame and BonusRollMoneyWonFrame.preyBackdrop then
         BonusRollMoneyWonFrame.preyBackdrop:SetBackdropColor(bgr, bgg, bgb, bga)
         BonusRollMoneyWonFrame.preyBackdrop:SetBackdropBorderColor(sr, sg, sb, sa)
@@ -1166,18 +1129,15 @@ local function RefreshAlertColors()
     end
 end
 
--- Expose refresh function globally
+
 _G.PreyUI_RefreshAlertColors = RefreshAlertColors
 
----------------------------------------------------------------------------
--- MAIN INITIALIZATION
----------------------------------------------------------------------------
 
 function Alerts:HookAlertSystems()
     local db = GetAlertSettings()
     if not db.enabled then return end
 
-    -- Achievements
+
     if AchievementAlertSystem then
         hooksecurefunc(AchievementAlertSystem, "setUpFunction", SkinAchievementAlert)
     end
@@ -1188,7 +1148,7 @@ function Alerts:HookAlertSystems()
         hooksecurefunc(MonthlyActivityAlertSystem, "setUpFunction", SkinCriteriaAlert)
     end
 
-    -- Encounters
+
     if DungeonCompletionAlertSystem then
         hooksecurefunc(DungeonCompletionAlertSystem, "setUpFunction", SkinDungeonCompletionAlert)
     end
@@ -1205,12 +1165,12 @@ function Alerts:HookAlertSystems()
         hooksecurefunc(WorldQuestCompleteAlertSystem, "setUpFunction", SkinWorldQuestCompleteAlert)
     end
 
-    -- Honor
+
     if HonorAwardedAlertSystem then
         hooksecurefunc(HonorAwardedAlertSystem, "setUpFunction", SkinHonorAwardedAlert)
     end
 
-    -- Loot
+
     if LegendaryItemAlertSystem then
         hooksecurefunc(LegendaryItemAlertSystem, "setUpFunction", SkinLegendaryItemAlert)
     end
@@ -1230,7 +1190,7 @@ function Alerts:HookAlertSystems()
         hooksecurefunc(RafRewardDeliveredAlertSystem, "setUpFunction", SkinEntitlementAlert)
     end
 
-    -- Professions
+
     if DigsiteCompleteAlertSystem then
         hooksecurefunc(DigsiteCompleteAlertSystem, "setUpFunction", SkinDigsiteCompleteAlert)
     end
@@ -1238,7 +1198,7 @@ function Alerts:HookAlertSystems()
         hooksecurefunc(NewRecipeLearnedAlertSystem, "setUpFunction", SkinNewRecipeLearnedAlert)
     end
 
-    -- Collections (Pets/Mounts/Toys/Cosmetics/Warband)
+
     if NewPetAlertSystem then
         hooksecurefunc(NewPetAlertSystem, "setUpFunction", SkinMiscAlert)
     end
@@ -1255,7 +1215,7 @@ function Alerts:HookAlertSystems()
         hooksecurefunc(NewWarbandSceneAlertSystem, "setUpFunction", SkinMiscAlert)
     end
 
-    -- Skin bonus roll frames
+
     SkinBonusRollFrames()
 end
 
@@ -1263,10 +1223,10 @@ function Alerts:Initialize()
     local db = GetAlertSettings()
     if not db.enabled then return end
 
-    -- Hook all alert systems for skinning
+
     self:HookAlertSystems()
 
-    -- Create movers for custom alert positioning
+
     CreateAlertMover()
     CreateEventToastMover()
 end

@@ -1,9 +1,6 @@
---- PreyUI Perfect Pixel System
---- Provides pixel-perfect UI scaling and calculations
-
 local ADDON_NAME, ns = ...
 
--- Get PREYCore - must load after preycore_main.lua
+
 local PREYCore = ns.Addon or (PreyUI and PreyUI.PREYCore)
 
 if not PREYCore then
@@ -20,7 +17,7 @@ local GetScreenHeight = GetScreenHeight
 local InCombatLockdown = InCombatLockdown
 local GetPhysicalScreenSize = GetPhysicalScreenSize
 
--- Refresh global FX scenes (prevents taint from RefreshModelScene)
+
 function PREYCore:RefreshGlobalFX()
     if _G.GlobalFXDialogModelScene then
         _G.GlobalFXDialogModelScene:Hide()
@@ -38,37 +35,37 @@ function PREYCore:RefreshGlobalFX()
     end
 end
 
--- Check for Eyefinity (triple monitor) setup
+
 function PREYCore:IsEyefinity(width, height)
     if PREYCore.db and PREYCore.db.profile.general.eyefinity and width >= 3840 then
-        -- HQ resolution
-        if width >= 9840 then return 3280 end                   -- WQSXGA
-        if width >= 7680 and width < 9840 then return 2560 end  -- WQXGA
-        if width >= 5760 and width < 7680 then return 1920 end  -- WUXGA & HDTV
-        if width >= 5040 and width < 5760 then return 1680 end  -- WSXGA+
 
-        -- Adding height condition for bezel compensation
-        if width >= 4800 and width < 5760 and height == 900 then return 1600 end -- UXGA & HD+
+        if width >= 9840 then return 3280 end
+        if width >= 7680 and width < 9840 then return 2560 end
+        if width >= 5760 and width < 7680 then return 1920 end
+        if width >= 5040 and width < 5760 then return 1680 end
 
-        -- Low resolution screen
-        if width >= 4320 and width < 4800 then return 1440 end  -- WSXGA
-        if width >= 4080 and width < 4320 then return 1360 end  -- WXGA
-        if width >= 3840 and width < 4080 then return 1224 end  -- SXGA & SXGA (UVGA) & WXGA & HDTV
+
+        if width >= 4800 and width < 5760 and height == 900 then return 1600 end
+
+
+        if width >= 4320 and width < 4800 then return 1440 end
+        if width >= 4080 and width < 4320 then return 1360 end
+        if width >= 3840 and width < 4080 then return 1224 end
     end
 end
 
--- Check for Ultrawide setup
+
 function PREYCore:IsUltrawide(width, height)
     if PREYCore.db and PREYCore.db.profile.general.ultrawide and width >= 2560 then
-        -- HQ Resolution
-        if width >= 3440 and (height == 1440 or height == 1600) then return 2560 end -- DQHD, DQHD+, WQHD & WQHD+
 
-        -- Low resolution
-        if width >= 2560 and (height == 1080 or height == 1200) then return 1920 end -- WFHD, DFHD & WUXGA
+        if width >= 3440 and (height == 1440 or height == 1600) then return 2560 end
+
+
+        if width >= 2560 and (height == 1080 or height == 1200) then return 1920 end
     end
 end
 
--- Calculate the UI multiplier for pixel snapping
+
 function PREYCore:UIMult()
     local uiScale = 1.0
     if PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.general then
@@ -77,10 +74,10 @@ function PREYCore:UIMult()
     PREYCore.mult = PREYCore.perfect / uiScale
 end
 
--- Apply UI scale to UIParent
+
 function PREYCore:UIScale()
     if InCombatLockdown() then
-        -- Defer scale change until out of combat
+
         if not self._UIScalePending then
             self._UIScalePending = true
             self:RegisterEvent('PLAYER_REGEN_ENABLED', function()
@@ -95,10 +92,10 @@ function PREYCore:UIScale()
             uiScale = PREYCore.db.profile.general.uiScale or 1.0
         end
 
-        -- Use pcall to catch protected states not detected by InCombatLockdown
+
         local success = pcall(function() UIParent:SetScale(uiScale) end)
         if not success then
-            -- Protected state detected - defer to combat end
+
             if not self._UIScalePending then
                 self._UIScalePending = true
                 self:RegisterEvent('PLAYER_REGEN_ENABLED', function()
@@ -119,25 +116,25 @@ function PREYCore:UIScale()
 
         local newWidth = PREYCore.eyefinity or PREYCore.ultrawide
         if newWidth then
-            -- Center UIParent for multi-monitor setups
+
             width, height = newWidth / (height / PREYCore.screenHeight), PREYCore.screenHeight
         else
             width, height = PREYCore.screenWidth, PREYCore.screenHeight
         end
 
-        -- Refresh GlobalFX if in Retail
+
         if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE and _G.GlobalFXDialogModelScene then
             PREYCore:RefreshGlobalFX()
         end
     end
 end
 
--- Get the best pixel size for current setup
+
 function PREYCore:PixelBestSize()
     return max(0.4, min(1.15, PREYCore.perfect))
 end
 
--- Handle UI scale changes
+
 function PREYCore:PixelScaleChanged(event)
     if event == 'UI_SCALE_CHANGED' then
         PREYCore.physicalWidth, PREYCore.physicalHeight = GetPhysicalScreenSize()
@@ -149,8 +146,7 @@ function PREYCore:PixelScaleChanged(event)
     PREYCore:UIScale()
 end
 
--- Scale a value to align with physical pixels
--- This is the core pixel-perfect function
+
 function PREYCore:Scale(x)
     local m = PREYCore.mult
     if m == 1 or x == 0 then
@@ -161,39 +157,39 @@ function PREYCore:Scale(x)
     end
 end
 
--- Initialize the pixel perfect system
+
 function PREYCore:InitializePixelPerfect()
-    -- Initialize physical screen size and perfect scale
+
     self.physicalWidth, self.physicalHeight = GetPhysicalScreenSize()
     self.resolution = format('%dx%d', self.physicalWidth, self.physicalHeight)
     self.perfect = 768 / self.physicalHeight
-    
-    -- Initialize multiplier (will be 1.0 until db is ready)
+
+
     self.mult = 1.0
-    
-    -- Calculate initial multiplier if db is ready
+
+
     if self.db and self.db.profile then
         self:UIMult()
     end
-    
-    -- Register for UI scale changes
+
+
     self:RegisterEvent('UI_SCALE_CHANGED', 'PixelScaleChanged')
 end
 
--- Get smart default scale based on screen resolution (Option 3)
+
 function PREYCore:GetSmartDefaultScale()
     local _, screenHeight = GetPhysicalScreenSize()
-    
-    if screenHeight >= 2160 then      -- 4K
+
+    if screenHeight >= 2160 then
         return 0.53
-    elseif screenHeight >= 1440 then  -- 1440p
+    elseif screenHeight >= 1440 then
         return 0.64
-    else                              -- 1080p or lower
+    else
         return 1.0
     end
 end
 
--- Apply saved UI scale (call this after db is initialized)
+
 function PREYCore:ApplyUIScale()
     if self.db and self.db.profile and self.db.profile.general then
         local savedScale = self.db.profile.general.uiScale
@@ -201,14 +197,14 @@ function PREYCore:ApplyUIScale()
         if savedScale and savedScale > 0 then
             scaleToApply = savedScale
         else
-            -- No saved scale - use smart default based on resolution
+
             scaleToApply = self:GetSmartDefaultScale()
             self.db.profile.general.uiScale = scaleToApply
         end
 
-        -- Use pcall to catch protected states not detected by InCombatLockdown
+
         if InCombatLockdown() then
-            -- Defer to combat end
+
             if not self._UIScalePending then
                 self._UIScalePending = true
                 self:RegisterEvent('PLAYER_REGEN_ENABLED', function()
@@ -222,7 +218,7 @@ function PREYCore:ApplyUIScale()
 
         local success = pcall(function() UIParent:SetScale(scaleToApply) end)
         if not success then
-            -- Protected state detected - defer to combat end
+
             if not self._UIScalePending then
                 self._UIScalePending = true
                 self:RegisterEvent('PLAYER_REGEN_ENABLED', function()
@@ -235,7 +231,7 @@ function PREYCore:ApplyUIScale()
         end
     end
 
-    -- Update pixel perfect calculations
+
     if self.UIMult and self.UIScale then
         self:UIMult()
         self:UIScale()

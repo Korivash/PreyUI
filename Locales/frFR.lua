@@ -1,4 +1,3 @@
--- Localization file for French/France
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "frFR", false, true)
 
 if L then

@@ -1,4 +1,3 @@
--- Localization file for Portuguese/Brazil
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "ptBR", false, true)
 
 if L then
