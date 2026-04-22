@@ -36,13 +36,21 @@ local function OnMerchantShow()
 
     -- Auto repair (dropdown: "off", "personal", "guild")
     local repairMode = settings.autoRepair
-    if repairMode and repairMode ~= "off" and CanMerchantRepair() then
-        local repairCost = GetRepairAllCost()
+    local canRepair = C_MerchantFrame and C_MerchantFrame.CanMerchantRepair and C_MerchantFrame.CanMerchantRepair()
+                   or (CanMerchantRepair and CanMerchantRepair())
+    if repairMode and repairMode ~= "off" and canRepair then
+        local repairCost = (C_MerchantFrame and C_MerchantFrame.GetRepairAllCost and C_MerchantFrame.GetRepairAllCost())
+                        or (GetRepairAllCost and GetRepairAllCost())
         if repairCost and repairCost > 0 then
-            if repairMode == "guild" then
-                RepairAllItems(CanGuildBankRepair())
-            else
-                RepairAllItems(false)
+            local repairFn = (C_MerchantFrame and C_MerchantFrame.RepairAllItems) or RepairAllItems
+            if repairFn then
+                if repairMode == "guild" then
+                    local guildCanRepair = (C_MerchantFrame and C_MerchantFrame.CanGuildBankRepair and C_MerchantFrame.CanGuildBankRepair())
+                                        or (CanGuildBankRepair and CanGuildBankRepair())
+                    repairFn(guildCanRepair)
+                else
+                    repairFn(false)
+                end
             end
         end
     end
@@ -87,10 +95,13 @@ end
 
 local function IsGuildMemberByName(name)
     if not name or not IsInGuild() then return false end
-    local numMembers = GetNumGuildMembers()
+    local getNum = (C_GuildInfo and C_GuildInfo.GetNumGuildMembers) or GetNumGuildMembers
+    local getInfo = (C_GuildInfo and C_GuildInfo.GetGuildRosterInfo) or GetGuildRosterInfo
+    if not getNum or not getInfo then return false end
+    local numMembers = getNum()
     local searchName = name:match("^([^-]+)") or name
     for i = 1, numMembers do
-        local memberName = GetGuildRosterInfo(i)
+        local memberName = getInfo(i)
         if memberName then
             local memberShort = memberName:match("^([^-]+)") or memberName
             if memberShort == searchName then
@@ -244,9 +255,8 @@ local function OnLootReady()
     local settings = GetSettings()
     if not settings or not settings.fastAutoLoot then return end
 
-    -- Auto-enable WoW's auto-loot if our setting is on (lazy init on first loot)
-    if not GetCVarBool("autoLootDefault") then
-        SetCVar("autoLootDefault", "1")
+    if not C_CVar.GetCVarBool("autoLootDefault") then
+        C_CVar.SetCVar("autoLootDefault", "1")
     end
 
     TryLootAll()

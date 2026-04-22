@@ -1,7 +1,0 @@
-<Bindings>
-  <Binding name="PREYUI_TOGGLE_OPTIONS" category="PreyUI">
-    if PreyUI and PreyUI.GUI then
-      PreyUI.GUI:Toggle()
-    end
-  </Binding>
-</Bindings>

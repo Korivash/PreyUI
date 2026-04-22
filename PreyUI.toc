@@ -1,18 +1,17 @@
 ## Interface: 120005
 ## Title: |cFFB91C1CPreyUI|r
+## Notes: Modular WoW UI reskin and enhancement suite
 ## IconTexture: Interface\AddOns\PreyUI\assets\preyLogo
-## AddonCompartmentFunc: PreyUI_CompartmentClick
-## AddonCompartmentFuncOnEnter: PreyUI_CompartmentOnEnter
-## AddonCompartmentFuncOnLeave: PreyUI_CompartmentOnLeave
-## Notes: Fully rebuilt modular UI suite for PreyUI
-## Author: PreyUI Team
-## Version: 3.0.13
+## Author: Korivash
+## Version: 12.0.5.1
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
 ## SavedVariables: PreyUI_DB, PreyUIDB
 
-## X-Contributors: PreyUI Team
+## AddonCompartmentFunc: PreyUI_CompartmentClick
+## AddonCompartmentFuncOnEnter: PreyUI_CompartmentOnEnter
+## AddonCompartmentFuncOnLeave: PreyUI_CompartmentOnLeave
+
 ## X-License: GPLv3
-## X-Website: TBD
 
 load.xml

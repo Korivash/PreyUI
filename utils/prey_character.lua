@@ -164,7 +164,9 @@ end
 -- Utility: Format large numbers (17257920 -> "17.2M")
 ---------------------------------------------------------------------------
 local function FormatNumber(num)
-    if not num or num == 0 then return "0" end
+    if not num then return "0" end
+    if type(issecretvalue) == "function" and issecretvalue(num) then return "—" end
+    if num == 0 then return "0" end
     if num >= 1000000 then
         return string.format("%.1fM", num / 1000000)
     elseif num >= 1000 then
@@ -180,6 +182,19 @@ end
 local function FormatPercent(value, decimals)
     decimals = decimals or 2
     return string.format("%." .. decimals .. "f%%", value or 0)
+end
+
+---------------------------------------------------------------------------
+-- WoW 12.x "secret number" guard
+-- In instanced content (raid/dungeon) WoW returns opaque secret values for
+-- player stats. Comparing or doing arithmetic on them raises a Lua error.
+-- Always call IsSecret() before any > / < / == or math on a stat value.
+---------------------------------------------------------------------------
+local function IsSecret(v)
+    if type(issecretvalue) == "function" then
+        return issecretvalue(v)
+    end
+    return false
 end
 
 ---------------------------------------------------------------------------
@@ -387,11 +402,10 @@ local function GetGemInfo(unit, slotId)
         if gemLink then
             filledCount = filledCount + 1
             -- Get gem icon texture from item info (icon is the 10th return value)
-            local _, _, _, _, _, _, gemSubType, _, _, gemIcon = GetItemInfo(gemLink)
+            local _, _, _, _, _, _, gemSubType, _, _, gemIcon = C_Item.GetItemInfo(gemLink)
 
-            -- If GetItemInfo didn't return icon yet (item not cached), try C_Item API
-            if not gemIcon and C_Item and C_Item.GetItemIconByID then
-                local itemID = GetItemInfoInstant(gemLink)
+            if not gemIcon and C_Item.GetItemIconByID then
+                local itemID = C_Item.GetItemInfoInstant(gemLink)
                 if itemID then
                     gemIcon = C_Item.GetItemIconByID(itemID)
                 end
@@ -653,8 +667,7 @@ local function UpdateSlotOverlay(overlay, unit)
 
     overlay:Show()
 
-    -- Get item info for name and quality
-    local itemName = GetItemInfo(itemLink)
+    local itemName = C_Item.GetItemInfo(itemLink)
     local quality = GetSlotItemQuality(unit, slotId)
     local r, g, b = GetItemQualityColorRGB(quality)
 
@@ -1818,10 +1831,13 @@ local function UpdateStatsPanel(panel, unit)
         local SECTION_GAP = 8
         local BAR_HEIGHT = 16
 
-    -- Helper to safely get stats (pcall for Midnight protection)
+    -- Helper to safely get a stat value.
+    -- Returns 0 if the call errors OR returns a secret value (WoW 12.x instanced content).
     local function SafeGetStat(func, ...)
         local ok, result = pcall(func, ...)
-        return ok and result or 0
+        if not ok or not result then return 0 end
+        if type(issecretvalue) == "function" and issecretvalue(result) then return 0 end
+        return result
     end
 
     -- HEALTH & RESOURCE
@@ -1877,39 +1893,48 @@ local function UpdateStatsPanel(panel, unit)
 
     for _, stat in ipairs(stats) do
         local statValue, effectiveStat, posBuff, negBuff = UnitStat(unit, stat.statIndex)
-        if effectiveStat and effectiveStat > 0 then
+
+        -- WoW 12.x returns secret values for stats in instanced content.
+        -- Never compare or do arithmetic on them — display a dash instead.
+        local secretStat = IsSecret(effectiveStat)
+        local secretBuff = IsSecret(posBuff) or IsSecret(negBuff)
+
+        if effectiveStat and (secretStat or effectiveStat > 0) then
             row = CreateStatRow(scrollChild, y)
             row.label:SetText(stat.label)
-            row.value:SetText(FormatNumber(effectiveStat))
-            
-            -- Set tooltip (Blizzard format)
-            local statName = rawget(_G, "SPELL_STAT"..stat.statIndex.."_NAME")
-            local tooltipText = HIGHLIGHT_FONT_COLOR_CODE..format(PAPERDOLLFRAME_TOOLTIP_FORMAT, statName).." "
-            local effectiveStatDisplay = BreakUpLargeNumbers(effectiveStat)
-            
-            if (posBuff == 0) and (negBuff == 0) then
-                row.tooltip = tooltipText..effectiveStatDisplay..FONT_COLOR_CODE_CLOSE
-            else
-                tooltipText = tooltipText..effectiveStatDisplay
-                if (posBuff > 0 or negBuff < 0) then
-                    tooltipText = tooltipText.." ("..BreakUpLargeNumbers(statValue - posBuff - negBuff)..FONT_COLOR_CODE_CLOSE
+            row.value:SetText(FormatNumber(effectiveStat))  -- FormatNumber is secret-safe
+
+            if not secretStat then
+                -- Build tooltip — safe to do arithmetic only when not secret.
+                local statName = rawget(_G, "SPELL_STAT"..stat.statIndex.."_NAME")
+                local tooltipText = HIGHLIGHT_FONT_COLOR_CODE..format(PAPERDOLLFRAME_TOOLTIP_FORMAT, statName).." "
+                local effectiveStatDisplay = BreakUpLargeNumbers(effectiveStat)
+
+                if secretBuff or ((posBuff == 0) and (negBuff == 0)) then
+                    row.tooltip = tooltipText..effectiveStatDisplay..FONT_COLOR_CODE_CLOSE
+                else
+                    tooltipText = tooltipText..effectiveStatDisplay
+                    if (posBuff > 0 or negBuff < 0) then
+                        tooltipText = tooltipText.." ("..BreakUpLargeNumbers(statValue - posBuff - negBuff)..FONT_COLOR_CODE_CLOSE
+                    end
+                    if (posBuff > 0) then
+                        tooltipText = tooltipText..FONT_COLOR_CODE_CLOSE..GREEN_FONT_COLOR_CODE.."+"..BreakUpLargeNumbers(posBuff)..FONT_COLOR_CODE_CLOSE
+                    end
+                    if (negBuff < 0) then
+                        tooltipText = tooltipText..RED_FONT_COLOR_CODE.." "..BreakUpLargeNumbers(negBuff)..FONT_COLOR_CODE_CLOSE
+                    end
+                    if (posBuff > 0 or negBuff < 0) then
+                        tooltipText = tooltipText..HIGHLIGHT_FONT_COLOR_CODE..")"..FONT_COLOR_CODE_CLOSE
+                    end
+                    row.tooltip = tooltipText
                 end
-                if (posBuff > 0) then
-                    tooltipText = tooltipText..FONT_COLOR_CODE_CLOSE..GREEN_FONT_COLOR_CODE.."+"..BreakUpLargeNumbers(posBuff)..FONT_COLOR_CODE_CLOSE
-                end
-                if (negBuff < 0) then
-                    tooltipText = tooltipText..RED_FONT_COLOR_CODE.." "..BreakUpLargeNumbers(negBuff)..FONT_COLOR_CODE_CLOSE
-                end
-                if (posBuff > 0 or negBuff < 0) then
-                    tooltipText = tooltipText..HIGHLIGHT_FONT_COLOR_CODE..")"..FONT_COLOR_CODE_CLOSE
-                end
-                row.tooltip = tooltipText
             end
-            
+
             row.tooltip2 = rawget(_G, "DEFAULT_STAT"..stat.statIndex.."_TOOLTIP")
             
             -- Add class-specific tooltip info (similar to Blizzard's PaperDollFrame_SetStat)
-            if unit == "player" then
+            -- Skip when effectiveStat is a secret value — arithmetic on it will error.
+            if unit == "player" and not secretStat then
                 local success, result = pcall(function()
                     local _, unitClass = UnitClass("player")
                     unitClass = strupper(unitClass)
@@ -1955,7 +1980,7 @@ local function UpdateStatsPanel(panel, unit)
                             row.tooltip2 = STAT_NO_BENEFIT_TOOLTIP
                         end
                     elseif stat.statIndex == 3 then -- Stamina
-                        if UnitHPPerStamina and GetUnitMaxHealthModifier then
+                        if UnitHPPerStamina and GetUnitMaxHealthModifier and not IsSecret(effectiveStat) then
                             row.tooltip2 = format(row.tooltip2, BreakUpLargeNumbers(((effectiveStat*UnitHPPerStamina("player")))*GetUnitMaxHealthModifier("player")))
                         end
                     elseif stat.statIndex == 4 then -- Intellect
@@ -1964,7 +1989,8 @@ local function UpdateStatsPanel(panel, unit)
                         elseif HasSPEffectsAttackPower and HasSPEffectsAttackPower() then
                             row.tooltip2 = STAT_TOOLTIP_BONUS_AP_SP
                         elseif (not primaryStat or primaryStat == 4) then
-                            row.tooltip2 = format(row.tooltip2, max(0, effectiveStat))
+                            row.tooltip2 = IsSecret(effectiveStat) and row.tooltip2
+                                        or format(row.tooltip2, max(0, effectiveStat))
                         else
                             row.tooltip2 = STAT_NO_BENEFIT_TOOLTIP
                         end
@@ -2070,21 +2096,23 @@ local function UpdateStatsPanel(panel, unit)
     }
 
     for _, stat in ipairs(attackStats) do
-        local value = SafeGetStat(stat.func)
+        local value = SafeGetStat(stat.func)   -- SafeGetStat returns 0 for secret values
         if value and value > 0 then
             row = CreateStatRow(scrollChild, y)
             row.label:SetText(stat.label)
             row.value:SetText(stat.format(value))
-            
-            -- Set tooltips (Blizzard format)
+
             if stat.statKey == "ATTACK_POWER" then
                 if PaperDollFormatStat then
                     local base, posBuff, negBuff = UnitAttackPower(unit)
-                    local damageBonus = BreakUpLargeNumbers(max((base+posBuff+negBuff), 0)/ATTACK_POWER_MAGIC_NUMBER)
-                    local tag, tooltip = MELEE_ATTACK_POWER, MELEE_ATTACK_POWER_TOOLTIP
-                    local valueText, tooltipText = PaperDollFormatStat(tag, base, posBuff, negBuff)
-                    row.tooltip = tooltipText
-                    row.tooltip2 = format(tooltip, damageBonus)
+                    -- Guard arithmetic — all three can be secret values in instanced content.
+                    if not (IsSecret(base) or IsSecret(posBuff) or IsSecret(negBuff)) then
+                        local damageBonus = BreakUpLargeNumbers(max((base+posBuff+negBuff), 0)/ATTACK_POWER_MAGIC_NUMBER)
+                        local tag, tooltip = MELEE_ATTACK_POWER, MELEE_ATTACK_POWER_TOOLTIP
+                        local valueText, tooltipText = PaperDollFormatStat(tag, base, posBuff, negBuff)
+                        row.tooltip = tooltipText
+                        row.tooltip2 = format(tooltip, damageBonus)
+                    end
                 end
             elseif stat.statKey == "SPELLPOWER" then
                 row.tooltip = STAT_SPELLPOWER
@@ -2108,6 +2136,9 @@ local function UpdateStatsPanel(panel, unit)
     y = y - headerHeight
 
     local baselineArmor, effectiveArmor = UnitArmor(unit)
+    -- Treat secret armor values as 0 so FormatNumber doesn't crash.
+    if IsSecret(baselineArmor) then baselineArmor = 0 end
+    if IsSecret(effectiveArmor) then effectiveArmor = 0 end
     local dodge = SafeGetStat(GetDodgeChance)
     local parry = SafeGetStat(GetParryChance)
     local block = SafeGetStat(GetBlockChance)

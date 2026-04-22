@@ -4,7 +4,6 @@
 
 local ADDON_NAME, ns = ...
 local PREY = PreyUI
-local ADDON_NAME = "PreyUI"
 
 -- Create PREYCore as an Ace3 module within PreyUI
 local PREYCore = PREY:NewModule("PREYCore", "AceConsole-3.0", "AceEvent-3.0")

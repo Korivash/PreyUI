@@ -382,16 +382,16 @@ end
 
     -- Friendly Player Nameplates
     if settings.hideFriendlyPlayerNameplates then
-        SetCVar("nameplateShowFriendlyPlayers", "0")
+        C_CVar.SetCVar("nameplateShowFriendlyPlayers", "0")
     else
-        SetCVar("nameplateShowFriendlyPlayers", "1")
-end
+        C_CVar.SetCVar("nameplateShowFriendlyPlayers", "1")
+    end
 
     -- Friendly NPC Nameplates
     if settings.hideFriendlyNPCNameplates then
-        SetCVar("nameplateShowFriendlyNPCs", "0")
+        C_CVar.SetCVar("nameplateShowFriendlyNPCs", "0")
     else
-        SetCVar("nameplateShowFriendlyNPCs", "1")
+        C_CVar.SetCVar("nameplateShowFriendlyNPCs", "1")
     end
 
     -- Talking Head Frame

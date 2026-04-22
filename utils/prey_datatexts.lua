@@ -1838,12 +1838,14 @@ local function BuildGuildCache()
     end
 
     -- Get roster data
-    local total, online = GetNumGuildMembers()
+    local getNum  = (C_GuildInfo and C_GuildInfo.GetNumGuildMembers)  or GetNumGuildMembers
+    local getInfo = (C_GuildInfo and C_GuildInfo.GetGuildRosterInfo)  or GetGuildRosterInfo
+    local total, online = getNum()
     local showOffline = GetGuildRosterShowOffline()
     local scanTotal = showOffline and total or online
 
     for i = 1, scanTotal do
-        local name, rank, rankIndex, level, class, zone, note, offNote, connected, status, engClass, _, _, isMobile, _, _, guid = GetGuildRosterInfo(i)
+        local name, rank, rankIndex, level, class, zone, note, offNote, connected, status, engClass, _, _, isMobile, _, _, guid = getInfo(i)
         if name and (connected or isMobile) then
             local clubData = guildCache.clubMembers[guid]
 
@@ -1892,7 +1894,8 @@ Datatexts:Register("guild", {
                 return
             end
 
-            local total, online = GetNumGuildMembers()
+            local _getNum = (C_GuildInfo and C_GuildInfo.GetNumGuildMembers) or GetNumGuildMembers
+            local total, online = _getNum()
             local r, g, b = GetValueColor()
             local label = GetLabel("Guild: ", "Gu: ", slotFrame.shortLabel, slotFrame.noLabel)
 

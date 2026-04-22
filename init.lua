@@ -19,7 +19,7 @@ PreyUI.DEBUG_MODE = false
 -- Version & Defaults
 --============================================================--
 
-PreyUI.versionString = C_AddOns.GetAddOnMetadata("PreyUI", "Version") or "3.0.13"
+PreyUI.versionString = C_AddOns.GetAddOnMetadata("PreyUI", "Version") or "12.0.5.1"
 
 ---@type table
 PreyUI.defaults = {
@@ -125,16 +125,9 @@ end
 function PreyUI:OnEnable()
     self:RegisterEvent("PLAYER_ENTERING_WORLD")
 
-    -- Initialize PREYCore if present
-    if self.PREYCore then
-        if self.db.profile and self.db.profile.chat and self.db.profile.chat.showIntroMessage ~= false then
-            print("|cFFB91C1CPreyUI|r loaded. |cFFFFFF00/prey|r to configure.")
-            print("|cFFB91C1CPREY UI REMINDER:|r")
-            print("|cFFEF44441.|r ENABLE |cFFFFFF00Cooldown Manager|r in Options > Gameplay Enhancement")
-            print("|cFFEF44442.|r Action Bars & Menu Bar |cFFFFFF00HIDDEN|r on mouseover |cFFFFFF00by default|r. Use |cFFFFFF00'Actionbars'|r tab in |cFFFFFF00/prey|r to unhide.")
-            print("|cFFEF44443.|r Use |cFFFFFF00100% Icon Size|r on CDM Essential & Utility bars via |cFFFFFF00Edit Mode|r for best results.")
-            print("|cFFEF44444.|r Position your |cFFFFFF00CDM bars|r in |cFFFFFF00Edit Mode|r and click |cFFFFFF00Save|r before exiting.")
-        end
+    local db = self.db
+    if db and db.profile and db.profile.chat and db.profile.chat.showIntroMessage ~= false then
+        print("|cFFB91C1CPreyUI|r v" .. self.versionString .. " loaded. Type |cFFFFFF00/prey|r to configure.")
     end
 end
 
@@ -145,7 +138,6 @@ end
 function PreyUI:PLAYER_ENTERING_WORLD(_, isInitialLogin, isReloadingUi)
     self:BackwardsCompat()
 
-    -- Ensure debug table exists
     if not self.db.char.debug then
         self.db.char.debug = { reload = false }
     end
@@ -157,20 +149,7 @@ function PreyUI:PLAYER_ENTERING_WORLD(_, isInitialLogin, isReloadingUi)
             self:DebugPrint("Debug Mode Enabled")
         end
     else
-        self:DebugPrint("Debug Mode Enabled")
-    end
-
-    --============================================================--
-    -- Add to Options Menu (NEW)
-    --============================================================--
-    -- In your options registration function:
-    if select(2, UnitClass("player")) == "MONK" then
-        if self.GetStaggerOptions then
-            local options = self:GetOptionsTable()
-            if options and options.args then
-                options.args.stagger = self:GetStaggerOptions()
-            end
-        end
+        self:DebugPrint("Debug Mode Active")
     end
 end
 
@@ -193,8 +172,6 @@ function PreyUI_CompartmentClick()
         PreyUI.GUI:Toggle()
     end
 end
-
-local GameTooltip = GameTooltip
 
 function PreyUI_CompartmentOnEnter(self, button)
     GameTooltip:ClearLines()

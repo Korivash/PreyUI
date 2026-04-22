@@ -972,7 +972,7 @@ local function MigrateLockSetting()
 
     -- Only migrate once, and only if the user had lockButtons enabled
     if settings.lockButtons and not settings._lockMigrated then
-        SetCVar('lockActionBars', '1')
+        C_CVar.SetCVar("lockActionBars", "1")
         settings._lockMigrated = true
     end
 end

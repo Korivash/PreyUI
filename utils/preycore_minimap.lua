@@ -541,7 +541,7 @@ local function UpdateClockTime()
         hour, minute = GetGameTime()
     end
     
-    if GetCVarBool("timeMgrUseMilitaryTime") then
+    if C_CVar.GetCVarBool("timeMgrUseMilitaryTime") then
         clockText:SetFormattedText(TIMEMANAGER_TICKER_24HOUR, hour, minute)
     else
         if hour == 0 then

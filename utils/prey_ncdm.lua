@@ -11,7 +11,7 @@ local PREYCore = ns.Addon
 local LSM = LibStub("LibSharedMedia-3.0")
 
 -- Enable CDM immediately when file loads (before any events fire)
-pcall(function() SetCVar("cooldownViewerEnabled", 1) end)
+pcall(function() C_CVar.SetCVar("cooldownViewerEnabled", 1) end)
 
 ---------------------------------------------------------------------------
 -- HELPER: Get font from general settings
@@ -132,7 +132,7 @@ local function UpdateCooldownViewerCVar()
 
     -- If BOTH are disabled, turn off Blizzard CVar; otherwise keep it on
     if essentialEnabled or utilityEnabled then
-        pcall(function() SetCVar("cooldownViewerEnabled", 1) end)
+        pcall(function() C_CVar.SetCVar("cooldownViewerEnabled", 1) end)
     else
         pcall(function() SetCVar("cooldownViewerEnabled", 0) end)
     end

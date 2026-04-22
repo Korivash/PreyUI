@@ -1067,7 +1067,7 @@ local function CreateGeneralQoLPage(parent)
 
         local fastLootCheck = GUI:CreateFormCheckbox(tabContent, "Faster Auto Loot", "fastAutoLoot", db.general, function(enabled)
             if enabled then
-                SetCVar("autoLootDefault", "1")
+                C_CVar.SetCVar("autoLootDefault", "1")
             end
         end)
         fastLootCheck:SetPoint("TOPLEFT", PADDING, y)
@@ -12314,9 +12314,9 @@ local function CreateActionBarsPage(parent)
             __newindex = function(t, k, v)
                 if k == "buttonLock" and type(v) == "string" then
                     if v == "unlocked" then
-                        SetCVar("lockActionBars", "0")
+                        C_CVar.SetCVar("lockActionBars", "0")
                     else
-                        SetCVar("lockActionBars", "1")
+                        C_CVar.SetCVar("lockActionBars", "1")
                         local modifier = (v == "none") and "NONE" or v:upper()
                         SetModifiedClick("PICKUPACTION", modifier)
                         SaveBindings(GetCurrentBindingSet())
