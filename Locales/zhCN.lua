@@ -1,3 +1,4 @@
+-- Localization file for Chinese/Simplified
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "zhCN", false, true)
 
 if L then

@@ -1,9 +1,13 @@
 local addonName, ns = ...
 
-
+-- Fallback for NUM_BAG_FRAMES if not defined
 local NUM_BAG_FRAMES = NUM_BAG_FRAMES or 4
 
+---------------------------------------------------------------------------
+-- AUTO-INSERT KEYSTONE
+---------------------------------------------------------------------------
 
+-- Get settings from database
 local function GetSettings()
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     if PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.general then
@@ -12,7 +16,7 @@ local function GetSettings()
     return nil
 end
 
-
+-- Find keystone in player's bags
 local function FindKeystoneInBags()
     for bag = 0, NUM_BAG_FRAMES do
         local slots = C_Container.GetContainerNumSlots(bag)
@@ -29,7 +33,7 @@ local function FindKeystoneInBags()
     return nil, nil
 end
 
-
+-- Insert keystone into M+ UI
 local function InsertKeystone()
     local settings = GetSettings()
     if not settings or not settings.autoInsertKey then return end
@@ -43,7 +47,7 @@ local function InsertKeystone()
     end
 end
 
-
+-- Hook when Blizzard's M+ UI loads
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(self, event, addon)

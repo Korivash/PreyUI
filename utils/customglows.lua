@@ -1,16 +1,21 @@
+-- customglows.lua
+-- Custom glow effects for Essential and Utility cooldown viewers
+-- Uses Blizzard's SpellActivationAlert system for proper sizing
+-- Falls back to LibCustomGlow for additional glow styles
+
 local _, PREY = ...
 local IS_MODERN_CLIENT = (tonumber((select(4, GetBuildInfo()))) or 0) >= 120000
 
-
+-- Get LibCustomGlow for fallback styles
 local LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
 
-
+-- Get IsSpellOverlayed API for reliable glow state detection
 local IsSpellOverlayed = C_SpellActivationOverlay and C_SpellActivationOverlay.IsSpellOverlayed
 
+-- Track which icons currently have active glows
+local activeGlowIcons = {}  -- [icon] = true
 
-local activeGlowIcons = {}
-
-
+-- Glow templates for proc effects
 local GlowTemplates = {
     LoopGlow = {
         {
@@ -31,7 +36,9 @@ local GlowTemplates = {
     },
 }
 
-
+-- ======================================================
+-- Settings Access
+-- ======================================================
 local function GetSettings()
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     if not PREYCore or not PREYCore.db or not PREYCore.db.profile then
@@ -48,26 +55,30 @@ local function GetEffectsSettings()
     return PREYCore.db.profile.cooldownEffects or { hideEssential = true, hideUtility = true }
 end
 
-
+-- ======================================================
+-- Determine viewer type from icon
+-- ======================================================
 local function GetViewerType(icon)
     if not icon then return nil end
-
+    
     local parent = icon:GetParent()
     if not parent then return nil end
-
+    
     local parentName = parent:GetName()
     if not parentName then return nil end
-
+    
     if parentName:find("EssentialCooldown") then
         return "Essential"
     elseif parentName:find("UtilityCooldown") then
         return "Utility"
     end
-
+    
     return nil
 end
 
-
+-- ======================================================
+-- Get settings for viewer type
+-- ======================================================
 local function GetViewerSettings(viewerType)
     local settings = GetSettings()
     if not settings then return nil end
@@ -111,37 +122,41 @@ local function GetViewerSettings(viewerType)
     return nil
 end
 
-
+-- ======================================================
+-- Customize Blizzard's SpellActivationAlert
+-- ======================================================
 local function CustomizeBlizzardGlow(button, viewerSettings)
     if not button then return false end
-
+    
     local region = button.SpellActivationAlert
     if not region then return false end
-
-
+    
+    -- Get the loop flipbook texture
     local loopFlipbook = region.ProcLoopFlipbook
     if not loopFlipbook then return false end
-
-
+    
+    -- Apply custom color
     local color = viewerSettings.color or {0.95, 0.95, 0.32, 1}
-    loopFlipbook:SetDesaturated(true)
+    loopFlipbook:SetDesaturated(true)  -- Desaturate first so color applies properly
     loopFlipbook:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
-
-
+    
+    -- Also color the start flipbook if it exists
     local startFlipbook = region.ProcStartFlipbook
     if startFlipbook then
         startFlipbook:SetDesaturated(true)
         startFlipbook:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
     end
-
-
+    
+    -- Mark as customized
     button._PREYCustomGlowActive = true
     activeGlowIcons[button] = true
-
+    
     return true
 end
 
-
+-- ======================================================
+-- LibCustomGlow application (supports 3 glow types)
+-- ======================================================
 local function ApplyLibCustomGlow(icon, viewerSettings)
     if not LCG then return false end
     if not icon then return false end
@@ -155,24 +170,24 @@ local function ApplyLibCustomGlow(icon, viewerSettings)
     local xOffset = viewerSettings.xOffset or 0
     local yOffset = viewerSettings.yOffset or 0
 
-
+    -- Stop any existing glow first
     StopGlow(icon)
 
     if glowType == "Pixel Glow" then
-
-
+        -- Pixel Glow: animated lines around the border
+        -- Parameters: frame, color, numLines, frequency, length, thickness, xOffset, yOffset, border, key
         LCG.PixelGlow_Start(icon, color, lines, frequency, nil, thickness, 0, 0, true, "_PREYCustomGlow")
         local glowFrame = icon["_PixelGlow_PREYCustomGlow"]
         if glowFrame then
             glowFrame:ClearAllPoints()
-
+            -- Apply offset: negative expands outward, positive shrinks inward
             glowFrame:SetPoint("TOPLEFT", icon, "TOPLEFT", -xOffset, xOffset)
             glowFrame:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", xOffset, -xOffset)
         end
 
     elseif glowType == "Autocast Shine" then
-
-
+        -- Autocast Shine: orbiting sparkle spots
+        -- Parameters: frame, color, numSpots, frequency, scale, xOffset, yOffset, key
         LCG.AutoCastGlow_Start(icon, color, lines, frequency, scale, 0, 0, "_PREYCustomGlow")
         local glowFrame = icon["_AutoCastGlow_PREYCustomGlow"]
         if glowFrame then
@@ -182,38 +197,41 @@ local function ApplyLibCustomGlow(icon, viewerSettings)
         end
     end
 
-
+    -- Flag already set by StartGlow, just ensure it's there
     icon._PREYCustomGlowActive = true
     activeGlowIcons[icon] = true
 
     return true
 end
 
-
+-- ======================================================
+-- Main glow application function
+-- ======================================================
 local function StartGlow(icon)
     if not icon then return end
-
-
+    
+    -- Already has our glow? Skip
     if icon._PREYCustomGlowActive then return end
-
+    
     local viewerType = GetViewerType(icon)
     if not viewerType then return end
-
+    
     local viewerSettings = GetViewerSettings(viewerType)
     if not viewerSettings then return end
-
-
+    
+    -- Always use LibCustomGlow since we hide Blizzard's SpellActivationAlert
+    -- Set the flag FIRST so cooldowneffects.lua doesn't interfere
     icon._PREYCustomGlowActive = true
     activeGlowIcons[icon] = true
-
+    
     ApplyLibCustomGlow(icon, viewerSettings)
 end
 
-
+-- Stop all glow effects on an icon
 function StopGlow(icon)
     if not icon then return end
 
-
+    -- Stop LibCustomGlow effects
     if LCG then
         pcall(LCG.PixelGlow_Stop, icon, "_PREYCustomGlow")
         pcall(LCG.AutoCastGlow_Stop, icon, "_PREYCustomGlow")
@@ -223,7 +241,13 @@ function StopGlow(icon)
     activeGlowIcons[icon] = nil
 end
 
+-- ======================================================
+-- CDM Icon Method Hooking (reliable glow detection)
+-- Uses Blizzard's built-in CDM icon methods instead of
+-- manual spellID matching which fails during combat
+-- ======================================================
 
+-- Hook individual CDM icon's glow methods
 local function HookCDMIcon(icon)
     if not icon then return end
     if icon._PREYGlowHooked then return end
@@ -231,10 +255,10 @@ local function HookCDMIcon(icon)
     local viewerType = GetViewerType(icon)
     if not viewerType then return end
 
-
+    -- Hook the glow show event handler
     if icon.OnSpellActivationOverlayGlowShowEvent then
         hooksecurefunc(icon, "OnSpellActivationOverlayGlowShowEvent", function(self, spellID)
-
+            -- Check if this icon should respond to this spellID (wrapped in pcall for safety)
             local shouldProcess = true
             if self.NeedSpellActivationUpdate then
                 pcall(function()
@@ -254,10 +278,10 @@ local function HookCDMIcon(icon)
         end)
     end
 
-
+    -- Hook the glow hide event handler
     if icon.OnSpellActivationOverlayGlowHideEvent then
         hooksecurefunc(icon, "OnSpellActivationOverlayGlowHideEvent", function(self, spellID)
-
+            -- Check if this icon should respond to this spellID (wrapped in pcall for safety)
             local shouldProcess = true
             if self.NeedSpellActivationUpdate then
                 pcall(function()
@@ -272,7 +296,7 @@ local function HookCDMIcon(icon)
         end)
     end
 
-
+    -- Hook RefreshOverlayGlow for initial state and refreshes
     if icon.RefreshOverlayGlow then
         hooksecurefunc(icon, "RefreshOverlayGlow", function(self)
             local settings = GetViewerSettings(viewerType)
@@ -280,7 +304,7 @@ local function HookCDMIcon(icon)
 
             local shouldGlow = false
 
-
+            -- Method 1: Try IsSpellOverlayed API (wrapped in pcall for secret value protection)
             pcall(function()
                 local spellID = self.GetSpellID and self:GetSpellID()
                 if spellID and IsSpellOverlayed and IsSpellOverlayed(spellID) then
@@ -288,7 +312,7 @@ local function HookCDMIcon(icon)
                 end
             end)
 
-
+            -- Method 2: Fallback - check icon's overlay frames directly
             if not shouldGlow then
                 pcall(function()
                     if self.overlay and self.overlay:IsShown() then
@@ -312,7 +336,7 @@ local function HookCDMIcon(icon)
     icon._PREYGlowHooked = true
 end
 
-
+-- Hook all icons in a viewer
 local function HookViewerIcons(viewerName)
     local viewer = rawget(_G, viewerName)
     if not viewer then return end
@@ -325,21 +349,22 @@ local function HookViewerIcons(viewerName)
     end
 end
 
-
+-- Setup continuous hooking for new icons
+-- NOTE: In 12.0.1, we must avoid tainting Blizzard CooldownViewer frames
 local function SetupViewerHooking(viewerName, trackerKey)
-
+    -- Skip in 12.0.1+ to avoid taint
     local tocVersion = select(4, GetBuildInfo())
     if tocVersion and tocVersion >= 120000 then
         return
     end
-
+    
     local viewer = rawget(_G, viewerName)
     if not viewer then return end
 
-
+    -- Hook existing icons
     HookViewerIcons(viewerName)
 
-
+    -- Watch for new icons via layout changes (wrapped in pcall)
     if not viewer._PREYGlowLayoutHooked then
         pcall(function()
             viewer:HookScript("OnSizeChanged", function()
@@ -352,15 +377,18 @@ local function SetupViewerHooking(viewerName, trackerKey)
     end
 end
 
-
+-- ======================================================
+-- Hook into Blizzard's glow system
+-- ======================================================
 local function SetupGlowHooks()
-
-
+    -- 12.x: CDM icon internals carry secret values in instanced content.
+    -- Any insecure reads in glow hooks can taint Blizzard's follow-up logic.
     if IS_MODERN_CLIENT then
         return
     end
 
-
+    -- Keep ActionButton hooks as backup for edge cases
+    -- These still work for some scenarios where CDM icon methods aren't available
     if type(ActionButton_ShowOverlayGlow) == "function" then
         hooksecurefunc("ActionButton_ShowOverlayGlow", function(button)
             if not button then return end
@@ -384,18 +412,19 @@ local function SetupGlowHooks()
         end)
     end
 
-
+    -- NEW: Setup CDM icon method hooks (more reliable than event-based spellID matching)
+    -- These hook directly into Blizzard's CDM icon methods for glow show/hide
     C_Timer.After(0.5, function()
         SetupViewerHooking("EssentialCooldownViewer", "Essential")
         SetupViewerHooking("UtilityCooldownViewer", "Utility")
     end)
 
-
+    -- Event frame for ensuring hooks are set up when icons change
     local eventFrame = CreateFrame("Frame")
     eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
     eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
     eventFrame:SetScript("OnEvent", function(self, event)
-
+        -- Ensure all icons are hooked (new icons may have been created)
         C_Timer.After(0.2, function()
             SetupViewerHooking("EssentialCooldownViewer", "Essential")
             SetupViewerHooking("UtilityCooldownViewer", "Utility")
@@ -403,25 +432,27 @@ local function SetupGlowHooks()
     end)
 end
 
-
+-- ======================================================
+-- Refresh all glows (called when settings change)
+-- ======================================================
 local function RefreshAllGlows()
-
+    -- Store which icons had glows before refresh
     local iconsWithGlows = {}
     for icon, _ in pairs(activeGlowIcons) do
         if icon then
             iconsWithGlows[icon] = true
         end
     end
-
-
+    
+    -- Stop all existing custom glows
     for icon, _ in pairs(activeGlowIcons) do
         if icon then
             StopGlow(icon)
         end
     end
     wipe(activeGlowIcons)
-
-
+    
+    -- Re-apply glows to icons that had them before
     for icon, _ in pairs(iconsWithGlows) do
         if icon and icon:IsShown() then
             StartGlow(icon)
@@ -429,7 +460,9 @@ local function RefreshAllGlows()
     end
 end
 
-
+-- ======================================================
+-- Initialize
+-- ======================================================
 local glowHooksSetup = false
 
 local function EnsureGlowHooks()
@@ -443,30 +476,32 @@ initFrame:RegisterEvent("ADDON_LOADED")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function(self, event, arg)
     if event == "ADDON_LOADED" and arg == "Blizzard_CooldownManager" then
-
+        -- Set up hooks immediately - no delay!
         EnsureGlowHooks()
     elseif event == "PLAYER_LOGIN" then
-
+        -- Backup: ensure hooks are set up by login
         EnsureGlowHooks()
     end
 end)
 
-
+-- ======================================================
+-- Export to PREY namespace
+-- ======================================================
 PREY.CustomGlows = {
     StartGlow = StartGlow,
     StopGlow = StopGlow,
     RefreshAllGlows = RefreshAllGlows,
     GetViewerType = GetViewerType,
     activeGlowIcons = activeGlowIcons,
-
+    -- CDM icon hooking (for external trigger if needed)
     HookCDMIcon = HookCDMIcon,
     HookViewerIcons = HookViewerIcons,
 }
 
-
+-- Global function for config panel to call
 _G.PreyUI_RefreshCustomGlows = RefreshAllGlows
 
-
+-- Debug functions
 _G.PreyUI_TestCustomGlow = function(viewerType)
     viewerType = viewerType or "Essential"
     local viewer = rawget(_G, viewerType .. "CooldownViewer")

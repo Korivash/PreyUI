@@ -1,3 +1,4 @@
+-- Localization file for German/Germany
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "deDE", false, true)
 
 if L then

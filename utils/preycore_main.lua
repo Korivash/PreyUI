@@ -1,14 +1,19 @@
+--- PreyUI Core - Main Integration Module
+--- Integrated from PREYCore v1.18 with proper AceDB support
+--- All branding changed to PreyUI
+
 local ADDON_NAME, ns = ...
 local PREY = PreyUI
+local ADDON_NAME = "PreyUI"
 
-
+-- Create PREYCore as an Ace3 module within PreyUI
 local PREYCore = PREY:NewModule("PREYCore", "AceConsole-3.0", "AceEvent-3.0")
 PREY.PREYCore = PREYCore
 
-
+-- Expose PREYCore to namespace for other files
 ns.Addon = PREYCore
 
-
+-- Shared utility functions
 ns.Utils = {}
 local ViewerFrameOrder = setmetatable({}, { __mode = "k" })
 local nextViewerFrameOrder = 0
@@ -24,13 +29,14 @@ local function GetViewerStableFrameOrder(frame)
     return order
 end
 
-
+-- Check if player is in instanced content (dungeon or raid)
 function ns.Utils.IsInInstancedContent()
     local inInstance, instanceType = IsInInstance()
     return inInstance and (instanceType == "party" or instanceType == "raid")
 end
 
-
+-- Check if a value is a "secret value" (12.x returns these from some unit APIs in instanced content)
+-- issecretvalue() only exists in 12.x, so we check for its existence first for 11.x compatibility
 function ns.Utils.IsSecretValue(value)
     if type(issecretvalue) == "function" then
         return issecretvalue(value)
@@ -38,25 +44,25 @@ function ns.Utils.IsSecretValue(value)
     return false
 end
 
-
+-- Global pending reload system
 PREYCore.__pendingReload = false
 PREYCore.__reloadEventFrame = nil
 
-
+-- Safe reload function - queues if in combat, reloads immediately if not
 function PREYCore:SafeReload()
     if InCombatLockdown() then
         if not self.__pendingReload then
             self.__pendingReload = true
             print("|cFFB91C1CPreyUI:|r Reload queued - will execute when combat ends.")
 
-
+            -- Create event frame if needed
             if not self.__reloadEventFrame then
                 self.__reloadEventFrame = CreateFrame("Frame")
                 self.__reloadEventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
                 self.__reloadEventFrame:SetScript("OnEvent", function(frame, event)
                     if event == "PLAYER_REGEN_ENABLED" and PREYCore.__pendingReload then
                         PREYCore.__pendingReload = false
-
+                        -- Show popup with reload button (user click = allowed)
                         PREYCore:ShowReloadPopup()
                     end
                 end)
@@ -67,9 +73,9 @@ function PREYCore:SafeReload()
     end
 end
 
-
+-- Show reload popup after combat ends (user must click to reload)
 function PREYCore:ShowReloadPopup()
-
+    -- Use PreyUI's existing confirmation dialog
     if PreyUI and PreyUI.GUI and PreyUI.GUI.ShowConfirmation then
         PreyUI.GUI:ShowConfirmation({
             title = "Reload Ready",
@@ -79,17 +85,17 @@ function PREYCore:ShowReloadPopup()
             onAccept = function() ReloadUI() end,
         })
     else
-
+        -- Fallback: print message if GUI not available
         print("|cFFB91C1CPreyUI:|r Combat ended. Type /reload to reload.")
     end
 end
 
-
+-- Global safe reload function on PreyUI object
 function PREY:SafeReload()
     if self.PREYCore then
         self.PREYCore:SafeReload()
     else
-
+        -- Fallback if PREYCore not loaded
         if InCombatLockdown() then
             print("|cFFB91C1CPreyUI:|r Cannot reload during combat.")
         else
@@ -105,6 +111,11 @@ local AceSerializer = LibStub("AceSerializer-3.0", true)
 local LibDeflate    = LibStub("LibDeflate", true)
 local LibDualSpec   = LibStub("LibDualSpec-1.0", true)
 
+-- Texture registration handled in media.lua
+
+---=================================================================================
+--- PROFILE IMPORT/EXPORT
+---=================================================================================
 
 function PREYCore:ExportProfileToString()
     if not self.db or not self.db.profile then
@@ -144,9 +155,9 @@ function PREYCore:ImportProfileFromString(str)
     end
 
     str = str:gsub("%s+", "")
-    str = str:gsub("^PREY1:", "")
-    str = str:gsub("^KORI1:", "")
-    str = str:gsub("^CDM1:", "")
+    str = str:gsub("^PREY1:", "")  -- PreyUI prefix
+    str = str:gsub("^KORI1:", "")  -- Legacy KoriUI prefix
+    str = str:gsub("^CDM1:", "")  -- Backwards compatibility
 
     local compressed = LibDeflate:DecodeForPrint(str)
     if not compressed then
@@ -178,23 +189,42 @@ function PREYCore:ImportProfileFromString(str)
     return true
 end
 
+---=================================================================================
+--- HUD LAYERING UTILITY
+---=================================================================================
 
+-- Convert layer priority (0-10) to frame level
+-- Base 100, step 20 = range 100-300
+-- Higher priority = rendered on top of lower priority elements
 function PREYCore:GetHUDFrameLevel(priority)
     return 100 + (priority or 5) * 20
 end
 
+---=================================================================================
+--- SAFE BACKDROP UTILITY (Combat/Secret Value Protection)
+---=================================================================================
 
+-- Global SafeSetBackdrop function that defers SetBackdrop calls when frame dimensions
+-- are secret values (Midnight 12.0 protection) or when in combat lockdown.
+-- This prevents the "attempt to perform arithmetic on a secret value" error that occurs
+-- when Blizzard's Backdrop.lua tries to use GetWidth()/GetHeight() during protected contexts.
+--
+-- @param frame The frame to set backdrop on (must have BackdropTemplate mixed in)
+-- @param backdropInfo The backdrop info table, or nil to remove backdrop
+-- @param borderColor Optional {r,g,b,a} table for border color after backdrop is set
+-- @return boolean True if backdrop was set immediately, false if deferred
 function PREYCore.SafeSetBackdrop(frame, backdropInfo, borderColor)
     if not frame or not frame.SetBackdrop then return false end
 
-
+    -- Check if frame has valid (non-secret) dimensions
+    -- SetBackdrop internally calls GetWidth/GetHeight which can error on secret values
     local hasValidSize = false
     local ok, result = pcall(function()
         local w = frame:GetWidth()
         local h = frame:GetHeight()
-
+        -- Try to do arithmetic - this will fail if they're secret values
         if w and h then
-            local test = w + h
+            local test = w + h  -- This will error if secret
             if test > 0 then
                 return true
             end
@@ -205,26 +235,26 @@ function PREYCore.SafeSetBackdrop(frame, backdropInfo, borderColor)
         hasValidSize = true
     end
 
-
+    -- If dimensions are secret/invalid, defer the backdrop setup
     if not hasValidSize then
         frame.__preyBackdropPending = backdropInfo
         frame.__preyBackdropBorderColor = borderColor
         PREYCore.__pendingBackdrops = PREYCore.__pendingBackdrops or {}
         PREYCore.__pendingBackdrops[frame] = true
 
-
+        -- Set up deferred processing via OnUpdate (for when dimensions become valid)
         if not PREYCore.__backdropUpdateFrame then
             local updateFrame = CreateFrame("Frame")
             local elapsed = 0
             updateFrame:SetScript("OnUpdate", function(self, delta)
                 elapsed = elapsed + delta
-                if elapsed < 0.1 then return end
+                if elapsed < 0.1 then return end  -- Check every 0.1s
                 elapsed = 0
 
                 local processed = {}
                 for pendingFrame in pairs(PREYCore.__pendingBackdrops or {}) do
                     if pendingFrame and pendingFrame.__preyBackdropPending ~= nil then
-
+                        -- Re-check if dimensions are now valid
                         local checkOk, checkResult = pcall(function()
                             local w = pendingFrame:GetWidth()
                             local h = pendingFrame:GetHeight()
@@ -254,7 +284,7 @@ function PREYCore.SafeSetBackdrop(frame, backdropInfo, borderColor)
                     PREYCore.__pendingBackdrops[pf] = nil
                 end
 
-
+                -- Stop OnUpdate if no more pending
                 local hasAny = false
                 for _ in pairs(PREYCore.__pendingBackdrops or {}) do
                     hasAny = true
@@ -270,7 +300,7 @@ function PREYCore.SafeSetBackdrop(frame, backdropInfo, borderColor)
         return false
     end
 
-
+    -- If in combat, defer backdrop setup to avoid secret value errors
     if InCombatLockdown() then
         local alreadyPending = PREYCore.__pendingBackdrops and PREYCore.__pendingBackdrops[frame]
         if not alreadyPending then
@@ -307,7 +337,7 @@ function PREYCore.SafeSetBackdrop(frame, backdropInfo, borderColor)
         return false
     end
 
-
+    -- Safe to set backdrop now
     local setOk = pcall(frame.SetBackdrop, frame, backdropInfo)
     if setOk and backdropInfo and borderColor then
         frame:SetBackdropBorderColor(borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
@@ -315,25 +345,32 @@ function PREYCore.SafeSetBackdrop(frame, backdropInfo, borderColor)
     return setOk
 end
 
+---=================================================================================
+--- VIEWER LIST
+---=================================================================================
 
+-- NOTE: All cooldown viewers are now handled by dedicated modules:
+-- EssentialCooldownViewer/UtilityCooldownViewer → prey_ncdm.lua
+-- BuffIconCooldownViewer/BuffBarCooldownViewer → prey_buffbar.lua
 PREYCore.viewers = {
-
-
+    -- "EssentialCooldownViewer",  -- Handled by NCDM
+    -- "UtilityCooldownViewer",    -- Handled by NCDM
+    -- "BuffIconCooldownViewer",   -- Handled by prey_buffbar.lua
 }
 
 local defaults = {
     profile = {
-
+        -- Nudge amount for moving frames
         nudgeAmount = 1,
 
-
+        -- General Settings
         general = {
-            uiScale = 0.64,
-            eyefinity = false,
-            ultrawide = false,
-            font = "Prey",
-            fontOutline = "OUTLINE",
-            texture = "Prey v5",
+            uiScale = 0.64,  -- Default UI scale for 1440p+ monitors
+            eyefinity = false,  -- Triple monitor support
+            ultrawide = false,  -- Ultrawide monitor support
+            font = "Prey",  -- Default font face
+            fontOutline = "OUTLINE",  -- Default font outline: "", "OUTLINE", "THICKOUTLINE"
+            texture = "Prey v5",  -- Default bar texture
             darkMode = false,
             darkModeHealthColor = { 0, 0, 0, 1 },
             darkModeBgColor = { 0.592, 0.592, 0.592, 1 },
@@ -354,78 +391,78 @@ local defaults = {
             defaultOpacity = 1.0,
             defaultHealthOpacity = 1.0,
             defaultBgOpacity = 1.0,
-            applyGlobalFontToBlizzard = true,
-            autoInsertKey = true,
-            skinKeystoneFrame = true,
-            skinGameMenu = false,
-            addPreyUIButton = false,
-            gameMenuFontSize = 12,
-            skinPowerBarAlt = true,
-            skinOverrideActionBar = false,
-            skinObjectiveTracker = false,
-            objectiveTrackerHeight = 600,
-            objectiveTrackerModuleFontSize = 12,
-            objectiveTrackerTitleFontSize = 10,
-            objectiveTrackerTextFontSize = 10,
-            hideObjectiveTrackerBorder = false,
-            objectiveTrackerModuleColor = { 1.0, 0.82, 0.0, 1.0 },
-            objectiveTrackerTitleColor = { 1.0, 1.0, 1.0, 1.0 },
-            objectiveTrackerTextColor = { 0.8, 0.8, 0.8, 1.0 },
-            skinInstanceFrames = false,
-            skinBgColor = { 0.008, 0.008, 0.008, 1 },
-            skinAlerts = true,
-            skinCharacterFrame = true,
-            skinInspectFrame = true,
-            skinLootWindow = true,
-            skinLootUnderMouse = true,
-            skinLootHistory = true,
-            skinRollFrames = true,
-            skinRollSpacing = 6,
-            skinUseClassColor = true,
-            skinCustomColor = { 0.820, 0.180, 0.220, 1 },
-
+            applyGlobalFontToBlizzard = true,  -- Apply font to Blizzard UI elements
+            autoInsertKey = true,  -- Auto-insert keystone in M+ UI
+            skinKeystoneFrame = true,  -- Skin keystone insertion window
+            skinGameMenu = false,  -- Skin ESC menu (opt-in)
+            addPreyUIButton = false,  -- Add PreyUI button to ESC menu (opt-in)
+            gameMenuFontSize = 12,  -- Game menu button font size
+            skinPowerBarAlt = true,  -- Skin encounter/quest power bar (PlayerPowerBarAlt)
+            skinOverrideActionBar = false,  -- Skin override/vehicle action bar (opt-in)
+            skinObjectiveTracker = false,  -- Skin objective tracker (opt-in)
+            objectiveTrackerHeight = 600,  -- Objective tracker max height
+            objectiveTrackerModuleFontSize = 12,  -- Module headers (QUESTS, ACHIEVEMENTS, etc.)
+            objectiveTrackerTitleFontSize = 10,  -- Quest/achievement titles
+            objectiveTrackerTextFontSize = 10,  -- Objective text lines
+            hideObjectiveTrackerBorder = false,  -- Hide the class-colored border
+            objectiveTrackerModuleColor = { 1.0, 0.82, 0.0, 1.0 },  -- Module header color (Blizzard gold)
+            objectiveTrackerTitleColor = { 1.0, 1.0, 1.0, 1.0 },  -- Quest title color (white)
+            objectiveTrackerTextColor = { 0.8, 0.8, 0.8, 1.0 },  -- Objective text color (light gray)
+            skinInstanceFrames = false,  -- Skin PVE/Dungeon/PVP frames (opt-in)
+            skinBgColor = { 0.008, 0.008, 0.008, 1 },  -- Skinning background color (with alpha)
+            skinAlerts = true,  -- Skin alert/toast frames
+            skinCharacterFrame = true,  -- Skin Character Frame (Character, Reputation, Currency tabs)
+            skinInspectFrame = true,  -- Skin Inspect Frame to match Character Frame
+            skinLootWindow = true,  -- Skin custom loot window
+            skinLootUnderMouse = true,  -- Position loot window at cursor
+            skinLootHistory = true,  -- Skin loot history frame
+            skinRollFrames = true,  -- Skin loot roll frames
+            skinRollSpacing = 6,  -- Spacing between roll frames
+            skinUseClassColor = true,  -- Use class color for skin accents
+            skinCustomColor = { 0.820, 0.180, 0.220, 1 },  -- Custom skin accent color (blue)
+            -- QoL Automation
             sellJunk = true,
-            autoRepair = "personal",
+            autoRepair = "personal",      -- "off", "personal", "guild"
             autoRoleAccept = true,
-            autoAcceptInvites = "all",
+            autoAcceptInvites = "all",    -- "off", "all", "friends", "guild", "both"
             autoAcceptQuest = false,
             autoTurnInQuest = false,
             questHoldShift = true,
             fastAutoLoot = true,
-            autoSelectGossip = false,
-            autoCombatLog = false,
-            autoDeleteConfirm = true,
-
+            autoSelectGossip = false,  -- Auto-select single gossip options
+            autoCombatLog = false,  -- Auto start/stop combat logging in M+ (opt-in)
+            autoDeleteConfirm = true,  -- Auto-fill DELETE confirmation text
+            -- Quick Salvage settings
             quickSalvage = {
-                enabled = false,
-                modifier = "ALT",
+                enabled = false,  -- Opt-in, OFF by default
+                modifier = "ALT",  -- "ALT", "ALTCTRL", "ALTSHIFT"
             },
-
-            mplusTeleportEnabled = true,
-            keyTrackerEnabled = true,
-            keyTrackerFontSize = 9,
+            -- M+ Dungeon Teleport
+            mplusTeleportEnabled = true,  -- Click-to-teleport on M+ tab icons
+            keyTrackerEnabled = true,     -- Show party keys on M+ tab
+            keyTrackerFontSize = 9,       -- Font size for key tracker (7-12)
         },
 
-
+        -- Alert & Toast Skinning Settings (enabled via general.skinAlerts)
         alerts = {
             enabled = true,
             alertPosition = { point = "TOP", relPoint = "TOP", x = 1.667, y = -293.333 },
             toastPosition = { point = "CENTER", relPoint = "CENTER", x = -5.833, y = 268.333 },
         },
 
-
+        -- Missing Raid Buffs Display Settings
         raidBuffs = {
             enabled = true,
             showOnlyInGroup = true,
             providerMode = false,
-            hideLabelBar = false,
+            hideLabelBar = false,  -- Hide the "Missing Buffs" label bar
             iconSize = 32,
             labelFontSize = 12,
-            labelTextColor = nil,
+            labelTextColor = nil,  -- nil = white, otherwise {r, g, b, a}
             position = nil,
         },
 
-
+        -- Custom M+ Timer Settings
         mplusTimer = {
             enabled = false,
             layoutMode = "sleek",
@@ -437,90 +474,92 @@ local defaults = {
             position = { x = -11.667, y = -204.998 },
         },
 
-
+        -- Character Pane Settings
         character = {
             enabled = true,
-            showItemName = true,
-            showItemLevel = true,
-            showEnchants = true,
-            showGems = true,
-            showDurability = false,
+            showItemName = true,            -- Show equipment name (line 1)
+            showItemLevel = true,           -- Show item level & track (line 2)
+            showEnchants = true,            -- Show enchant status (line 3)
+            showGems = true,                -- Show gem indicators
+            showDurability = false,         -- Show durability bars
             inspectEnabled = true,
-            showModelBackground = true,
-
+            showModelBackground = true,     -- Show background behind model
+            -- Inspect-specific overlay settings (separate from character)
             showInspectItemName = true,
             showInspectItemLevel = true,
             showInspectEnchants = true,
             showInspectGems = true,
 
-
-            panelScale = 1.0,
-            overlayScale = 0.75,
-            backgroundColor = {0, 0, 0, 0.762},
-            statsTextSize = 13,
-            statsTextColor = {1, 1, 1, 1},
-            ilvlTextSize = 8,
-            headerTextSize = 16,
-            secondaryStatFormat = "both",
-            compactStats = true,
-            headerClassColor = true,
-            headerColor = {0.820, 0.180, 0.220},
-            enchantTextSize = 10,
-            enchantClassColor = true,
-            enchantTextColor = {0.820, 0.180, 0.220},
-            enchantFont = nil,
-            noEnchantTextColor = {1, 0.341, 0.314, 1},
-            slotTextSize = 12,
-            slotPadding = 0,
-            upgradeTrackColor = {1, 0.816, 0.145, 1},
+            -- In-pane customization
+            panelScale = 1.0,               -- Panel scale (0.75 - 1.5 multiplier, base 1.30)
+            overlayScale = 0.75,            -- Overlay scale for slot info
+            backgroundColor = {0, 0, 0, 0.762},  -- Black with transparency
+            statsTextSize = 13,             -- Stats text size in pixels (6 - 40)
+            statsTextColor = {1, 1, 1, 1},  -- Stats text color (white)
+            ilvlTextSize = 8,               -- Item level text size in pixels (8 - 16)
+            headerTextSize = 16,            -- Header text size in pixels (10 - 18)
+            secondaryStatFormat = "both",   -- Secondary stat format: "percent", "rating", "both"
+            compactStats = true,            -- Compact stats mode (reduced spacing)
+            headerClassColor = true,        -- Use class color for headers (default on)
+            headerColor = {0.820, 0.180, 0.220},  -- Header color (default blue accent, used when headerClassColor is off)
+            enchantTextSize = 10,           -- Enchant text size in pixels (8 - 14) [DEPRECATED - use slotTextSize]
+            enchantClassColor = true,       -- Use class color for enchants (default on)
+            enchantTextColor = {0.820, 0.180, 0.220},  -- Enchant text color (blue, used when enchantClassColor is off)
+            enchantFont = nil,              -- Enchant font (nil = use global font)
+            noEnchantTextColor = {1, 0.341, 0.314, 1},  -- "No Enchant" text color (red tint)
+            slotTextSize = 12,              -- Unified text size for all 3 slot lines (6 - 40)
+            slotPadding = 0,                -- Padding between slot elements
+            upgradeTrackColor = {1, 0.816, 0.145, 1},  -- Upgrade track text color (gold)
         },
 
-
+        -- Loot Window Settings
         loot = {
-            enabled = true,
-            lootUnderMouse = false,
-            showTransmogMarker = true,
+            enabled = true,           -- Enable custom loot window
+            lootUnderMouse = false,   -- Position loot window at cursor
+            showTransmogMarker = true, -- Show marker on uncollected appearances
             position = { point = "TOP", relPoint = "TOP", x = 289.166, y = -165.667 },
         },
 
-
+        -- Loot Roll Frame Settings
         lootRoll = {
-            enabled = true,
-            growDirection = "DOWN",
-            spacing = 4,
+            enabled = true,           -- Enable custom roll frames
+            growDirection = "DOWN",   -- Roll frame stacking direction (UP/DOWN)
+            spacing = 4,              -- Spacing between roll frames
             position = { point = "TOP", relPoint = "TOP", x = -11.667, y = -166 },
         },
 
-
+        -- Loot History (Results) Settings
         lootResults = {
-            enabled = true,
+            enabled = true,           -- Skin GroupLootHistoryFrame
         },
 
 
+        -- PREY New Cooldown Display Manager (NCDM)
+        -- Per-row configuration for Essential and Utility viewers
         ncdm = {
             essential = {
                 enabled = true,
                 layoutDirection = "HORIZONTAL",
                 row1 = {
-                    iconCount = 8,
-                    iconSize = 39,
-                    borderSize = 1,
-                    borderColorTable = {0, 0, 0, 1},
-                    aspectRatioCrop = 1.0,
-                    zoom = 0,
-                    padding = 2,
-                    xOffset = 0,
-                    yOffset = 0,
-                    durationSize = 16,
-                    durationOffsetX = 0,
-                    durationOffsetY = 0,
-                    stackSize = 12,
-                    stackOffsetX = 0,
-                    stackOffsetY = 2,
-                    durationTextColor = {1, 1, 1, 1},
-                    durationAnchor = "CENTER",
-                    stackTextColor = {1, 1, 1, 1},
-                    stackAnchor = "BOTTOMRIGHT",
+                    iconCount = 8,      -- How many icons in row 1 (0 = disabled)
+                    iconSize = 39,      -- Icon size in pixels (width)
+                    borderSize = 1,     -- Border thickness around icon (0 to 5)
+                    borderColorTable = {0, 0, 0, 1}, -- Border color (RGBA)
+                    aspectRatioCrop = 1.0,  -- 1.0 = square, higher = flatter
+                    zoom = 0,           -- Icon texture zoom (0 to 0.2)
+                    padding = 2,        -- Spacing between icons (-20 to 20)
+                    xOffset = 0,        -- Horizontal offset for this row
+                    yOffset = 0,        -- Vertical offset for this row (-50 to 50)
+                    durationSize = 16,  -- Duration text font size (8 to 24)
+                    durationOffsetX = 0, -- Duration text X offset
+                    durationOffsetY = 0, -- Duration text Y offset
+                    stackSize = 12,     -- Stack count text font size (8 to 24)
+                    stackOffsetX = 0,   -- Stack text X offset
+                    stackOffsetY = 2,   -- Stack text Y offset
+                    durationTextColor = {1, 1, 1, 1}, -- Duration text color (white default)
+                    durationAnchor = "CENTER",        -- Duration text anchor point
+                    stackTextColor = {1, 1, 1, 1},    -- Stack text color (white default)
+                    stackAnchor = "BOTTOMRIGHT",      -- Stack text anchor point
                 },
                 row2 = {
                     iconCount = 8,
@@ -544,7 +583,7 @@ local defaults = {
                     stackAnchor = "BOTTOMRIGHT",
                 },
                 row3 = {
-                    iconCount = 8,
+                    iconCount = 8,      -- 0 = row disabled by default
                     iconSize = 39,
                     borderSize = 1,
                     borderColorTable = {0, 0, 0, 1},
@@ -645,18 +684,18 @@ local defaults = {
             },
             buff = {
                 enabled = true,
-                iconSize = 32,
-                borderSize = 1,
-                shape = "square",
-                aspectRatioCrop = 1.0,
-                growthDirection = "CENTERED_HORIZONTAL",
-                zoom = 0,
-                padding = 4,
-                durationSize = 14,
+                iconSize = 32,      -- Icon size in pixels
+                borderSize = 1,     -- Border thickness (0 to 8)
+                shape = "square",   -- DEPRECATED: use aspectRatioCrop instead
+                aspectRatioCrop = 1.0,  -- Aspect ratio (0.5-2.0): <1=taller, 1=square, >1=wider
+                growthDirection = "CENTERED_HORIZONTAL",  -- CENTERED_HORIZONTAL, LEFT, or RIGHT
+                zoom = 0,           -- Icon texture zoom (0 to 0.2)
+                padding = 4,        -- Spacing between icons (-20 to 20)
+                durationSize = 14,  -- Duration text font size (8 to 24)
                 durationOffsetX = 0,
                 durationOffsetY = 8,
                 durationAnchor = "TOP",
-                stackSize = 14,
+                stackSize = 14,     -- Stack count text font size (8 to 24)
                 stackOffsetX = 0,
                 stackOffsetY = -8,
                 stackAnchor = "BOTTOM",
@@ -668,12 +707,12 @@ local defaults = {
                 barWidth = 215,
                 texture = "Prey v5",
                 useClassColor = true,
-                barColor = {0.820, 0.180, 0.220, 1},
+                barColor = {0.820, 0.180, 0.220, 1},  -- blue accent fallback
                 borderSize = 2,
                 bgOpacity = 0.5,
                 textSize = 14,
                 spacing = 2,
-                growUp = true,
+                growUp = true,  -- true = grow upward, false = grow downward
                 orientation = "horizontal",
                 fillDirection = "UP",
                 iconPosition = "top",
@@ -685,7 +724,7 @@ local defaults = {
             },
         },
 
-
+        -- CDM Visibility (essentials, utility, buffs, power bars)
         cdmVisibility = {
             showAlways = true,
             showWhenTargetExists = true,
@@ -698,7 +737,7 @@ local defaults = {
             hideWhenMounted = false,
         },
 
-
+        -- Unitframes Visibility (player, target, focus, pet, tot, boss)
         unitframesVisibility = {
             showAlways = true,
             showWhenTargetExists = false,
@@ -708,11 +747,11 @@ local defaults = {
             showOnMouseover = false,
             fadeDuration = 0.2,
             fadeOutAlpha = 0,
-            alwaysShowCastbars = false,
+            alwaysShowCastbars = false,  -- When true, castbars ignore UF visibility
             hideWhenMounted = false,
         },
 
-
+        -- Custom Trackers Visibility (all custom item/spell bars)
         customTrackersVisibility = {
             showAlways = true,
             showWhenTargetExists = false,
@@ -740,23 +779,23 @@ local defaults = {
                 countTextOffsetY = 0,
                 durationTextSize = 14,
                 rowLimit         = 8,
-
+                -- Row pattern: icons per row (0 = row disabled)
                 row1Icons        = 6,
                 row2Icons        = 6,
                 row3Icons        = 6,
-                useRowPattern    = false,
-                rowAlignment     = "CENTER",
-
+                useRowPattern    = false,  -- false = use rowLimit, true = use row pattern
+                rowAlignment     = "CENTER", -- LEFT, CENTER, RIGHT
+                -- Keybind display
                 showKeybinds      = false,
                 keybindTextSize   = 12,
-                keybindTextColor  = { 1, 0.82, 0, 1 },
+                keybindTextColor  = { 1, 0.82, 0, 1 },  -- Gold/Yellow
                 keybindAnchor     = "TOPLEFT",
                 keybindOffsetX    = 2,
                 keybindOffsetY    = 2,
-
+                -- Rotation Helper overlay (uses C_AssistedCombat)
                 showRotationHelper = false,
-                rotationHelperColor = { 0.820, 0.180, 0.220, 1 },
-                rotationHelperThickness = 2,
+                rotationHelperColor = { 0.820, 0.180, 0.220, 1 },  -- #00FFD6 cyan/blue border
+                rotationHelperThickness = 2,  -- Border thickness in pixels
             },
             UtilityCooldownViewer = {
                 enabled          = true,
@@ -772,53 +811,53 @@ local defaults = {
                 countTextOffsetY = 0,
                 durationTextSize = 14,
                 rowLimit         = 0,
-
+                -- Row pattern: icons per row (0 = row disabled)
                 row1Icons        = 8,
                 row2Icons        = 8,
-                useRowPattern    = false,
-                rowAlignment     = "CENTER",
-
-                anchorToEssential = false,
-                anchorGap         = 10,
-
+                useRowPattern    = false,  -- false = use rowLimit, true = use row pattern
+                rowAlignment     = "CENTER", -- LEFT, CENTER, RIGHT
+                -- Auto-anchor to Essential
+                anchorToEssential = false,  -- When true, Utility anchors below Essential's last row
+                anchorGap         = 10,     -- Gap between Essential and Utility when anchored
+                -- Keybind display
                 showKeybinds      = false,
                 keybindTextSize   = 12,
-                keybindTextColor  = { 1, 0.82, 0, 1 },
+                keybindTextColor  = { 1, 0.82, 0, 1 },  -- Gold/Yellow
                 keybindAnchor     = "TOPLEFT",
                 keybindOffsetX    = 2,
                 keybindOffsetY    = 2,
-
+                -- Rotation Helper overlay (uses C_AssistedCombat)
                 showRotationHelper = false,
-                rotationHelperColor = { 0.820, 0.180, 0.220, 1 },
-                rotationHelperThickness = 2,
+                rotationHelperColor = { 0.820, 0.180, 0.220, 1 },  -- #00FFD6 cyan/blue border
+                rotationHelperThickness = 2,  -- Border thickness in pixels
             },
-
-
+            -- BuffIconCooldownViewer removed - now handled by prey_buffbar.lua
+            -- Settings are at db.profile.ncdm.buff instead
         },
 
-
+        -- Rotation Assist Icon (standalone icon showing next recommended ability)
         rotationAssistIcon = {
             enabled = false,
             isLocked = true,
             iconSize = 56,
-            visibility = "always",
+            visibility = "always",  -- "always", "combat", "hostile"
             frameStrata = "MEDIUM",
-
+            -- Border
             showBorder = true,
             borderThickness = 2,
             borderColor = { 0, 0, 0, 1 },
-
+            -- Cooldown
             cooldownSwipeEnabled = true,
-
+            -- Keybind
             showKeybind = true,
-            keybindFont = nil,
+            keybindFont = nil,  -- nil = use general.font
             keybindSize = 13,
             keybindColor = { 1, 1, 1, 1 },
             keybindOutline = true,
             keybindAnchor = "BOTTOMRIGHT",
             keybindOffsetX = -2,
             keybindOffsetY = 2,
-
+            -- Position (anchored to CENTER of screen)
             positionX = 0,
             positionY = -180,
         },
@@ -830,30 +869,30 @@ local defaults = {
             attachTo          = "EssentialCooldownViewer",
             height            = 8,
             borderSize        = 1,
-            offsetY           = -204,
+            offsetY           = -204,      -- Snapped to top of Essential CDM (default position)
             offsetX           = 0,
-            width             = 326,
+            width             = 326,       -- Matches Essential CDM width
             useRawPixels      = true,
             texture           = "Prey v5",
-            colorMode         = "power",
-            usePowerColor     = true,
-            useClassColor     = false,
-            customColor       = { 0.82, 0.18, 0.22, 1 },
+            colorMode         = "power",  -- "power" = power type color, "class" = class color
+            usePowerColor     = true,     -- Use power type color (customizable in Power Colors section)
+            useClassColor     = false,    -- Use class color
+            customColor       = { 0.82, 0.18, 0.22, 1 },  -- Custom power bar color
             showPercent       = true,
             showText          = true,
             textSize          = 16,
             textX             = 1,
             textY             = 3,
-            textUseClassColor = false,
-            textCustomColor   = { 1, 1, 1, 1 },
+            textUseClassColor = false,    -- Use class color for text
+            textCustomColor   = { 1, 1, 1, 1 },  -- Custom text color (white default)
             bgColor           = { 0.078, 0.078, 0.078, 1 },
-            showTicks         = false,
-            tickThickness     = 2,
-            tickColor         = { 0, 0, 0, 1 },
-            lockedToEssential = false,
-            lockedToUtility   = false,
-            snapGap           = 5,
-            orientation       = "HORIZONTAL",
+            showTicks         = false,    -- Show tick marks for segmented resources (Holy Power, Chi, etc.)
+            tickThickness     = 2,        -- Thickness of tick marks in pixels
+            tickColor         = { 0, 0, 0, 1 },  -- Color of tick marks (default black)
+            lockedToEssential = false,  -- Auto-resize width when Essential CDM changes
+            lockedToUtility   = false,  -- Auto-resize width when Utility CDM changes
+            snapGap           = 5,      -- Gap when snapped to CDM
+            orientation       = "HORIZONTAL",  -- Bar orientation
         },
         castBar = {
             enabled       = true,
@@ -903,38 +942,39 @@ local defaults = {
             autoAttach    = false,
             standaloneMode = false,
             attachTo      = "EssentialCooldownViewer",
-            height        = 8,
+            height        = 14,       -- Pip height (taller gives pips better visual clarity)
             borderSize    = 1,
-            offsetY       = 0,
+            offsetY       = 0,        -- User adjustment when locked to primary (0 = no offset)
             offsetX       = 0,
-            width         = 326,
+            width         = 326,      -- Matches Primary bar width
             useRawPixels  = true,
             texture       = "Prey v5",
-            colorMode     = "power",
-            usePowerColor = true,
-            useClassColor = false,
-            customColor   = { 1, 0.8, 0.2, 1 },
+            colorMode     = "power",  -- "power" = power type color, "class" = class color
+            usePowerColor = true,     -- Use power type color (customizable in Power Colors section)
+            useClassColor = false,    -- Use class color
+            customColor   = { 1, 0.8, 0.2, 1 },  -- Custom power bar color
             showPercent   = false,
             showText      = false,
             textSize      = 14,
             textX         = 0,
             textY         = 2,
-            textUseClassColor = false,
-            textCustomColor   = { 1, 1, 1, 1 },
-            bgColor       = { 0.078, 0.078, 0.078, 0.83 },
-            showTicks     = true,
-            tickThickness = 2,
-            tickColor     = { 0, 0, 0, 1 },
-            lockedToEssential = false,
-            lockedToUtility   = false,
-            lockedToPrimary   = true,
-            snapGap       = 5,
-            orientation   = "AUTO",
-            showFragmentedPowerBarText = false,
+            textUseClassColor = false,    -- Use class color for text
+            textCustomColor   = { 1, 1, 1, 1 },  -- Custom text color (white default)
+            bgColor       = { 0.12, 0.12, 0.12, 0.90 },
+            showTicks     = true,     -- Show tick marks for segmented resources (Holy Power, Chi, etc.)
+            tickThickness = 2,        -- Thickness of tick marks in pixels
+            tickColor     = { 0, 0, 0, 1 },  -- Color of tick marks (separator lines between slots)
+            emptySlotColor = { 0.25, 0.25, 0.25, 0.55 }, -- Overlay color for unfilled slots (nil = off)
+            lockedToEssential = false,  -- Auto-resize width when Essential CDM changes
+            lockedToUtility   = false,  -- Auto-resize width when Utility CDM changes
+            lockedToPrimary   = true,   -- Position above + match Primary bar width
+            snapGap       = 5,        -- Gap when snapped
+            orientation   = "AUTO",   -- Bar orientation
+            showFragmentedPowerBarText = false,  -- Show text on fragmented power bars
         },
-
+        -- Power Colors (global, used by both Primary and Secondary power bars)
         powerColors = {
-
+            -- Core Resources
             rage = { 1.00, 0.00, 0.00, 1 },
             energy = { 1.00, 1.00, 0.00, 1 },
             mana = { 0.00, 0.00, 1.00, 1 },
@@ -945,7 +985,7 @@ local defaults = {
             maelstrom = { 0.00, 0.50, 1.00, 1 },
             lunarPower = { 0.30, 0.52, 0.90, 1 },
 
-
+            -- Builder Resources
             holyPower = { 0.95, 0.90, 0.60, 1 },
             chi = { 0.00, 1.00, 0.59, 1 },
             comboPoints = { 1.00, 0.96, 0.41, 1 },
@@ -953,72 +993,72 @@ local defaults = {
             arcaneCharges = { 0.10, 0.10, 0.98, 1 },
             essence = { 0.20, 0.58, 0.50, 1 },
 
-
+            -- Specialized Resources
             stagger = { 0.00, 1.00, 0.59, 1 },
-            staggerLight = { 0.52, 1.00, 0.52, 1 },
-            staggerModerate = { 1.00, 0.98, 0.72, 1 },
-            staggerHeavy = { 1.00, 0.42, 0.42, 1 },
-            useStaggerLevelColors = true,
+            staggerLight = { 0.52, 1.00, 0.52, 1 },     -- Green (0-30% of max health)
+            staggerModerate = { 1.00, 0.98, 0.72, 1 },  -- Yellow (30-60% of max health)
+            staggerHeavy = { 1.00, 0.42, 0.42, 1 },     -- Red (60%+ of max health)
+            useStaggerLevelColors = true,               -- Enable dynamic stagger colors
             soulFragments = { 0.64, 0.19, 0.79, 1 },
             runes = { 0.77, 0.12, 0.23, 1 },
             bloodRunes = { 0.77, 0.12, 0.23, 1 },
             frostRunes = { 0.00, 0.82, 1.00, 1 },
             unholyRunes = { 0.00, 0.80, 0.00, 1 },
         },
-
+        -- Reticle (GCD tracker around cursor)
         reticle = {
             enabled = false,
-
-            reticleStyle = "dot",
-            reticleSize = 10,
-
-            ringStyle = "standard",
-            ringSize = 40,
-
-            useClassColor = false,
-            customColor = {1, 1, 1, 1},
-
+            -- Reticle
+            reticleStyle = "dot",         -- "dot", "cross", "chevron", "diamond"
+            reticleSize = 10,             -- Size in pixels (4-20)
+            -- Ring
+            ringStyle = "standard",       -- "thin", "standard", "thick", "solid"
+            ringSize = 40,                -- Ring diameter (20-80)
+            -- Colors
+            useClassColor = false,        -- Use class color vs custom
+            customColor = {1, 1, 1, 1},   -- White default (#ffffff)
+            -- Visibility
             inCombatAlpha = 1.0,
             outCombatAlpha = 1.0,
             hideOutOfCombat = false,
-
+            -- Positioning
             offsetX = 0,
             offsetY = 0,
-
+            -- GCD
             gcdEnabled = true,
-            gcdFadeRing = 0.35,
-            gcdReverse = false,
-
+            gcdFadeRing = 0.35,           -- Fade ring during GCD (0-1)
+            gcdReverse = false,           -- Reverse swipe direction
+            -- Behavior
             hideOnRightClick = false,
         },
-
+        -- Screen Center Crosshair
         crosshair = {
-            enabled = false,
-            onlyInCombat = false,
-            size = 9,
-            thickness = 3,
-            borderSize = 3,
-            offsetX = 0,
-            offsetY = 0,
-            r = 0.796,
-            g = 1,
-            b = 0.780,
-            a = 1,
-            borderR = 0,
-            borderG = 0,
-            borderB = 0,
-            borderA = 1,
-            strata = "LOW",
+            enabled = false,         -- Disabled by default
+            onlyInCombat = false,    -- Show all the time when enabled
+            size = 9,                -- Line length (half-length from center)
+            thickness = 3,           -- Line thickness in pixels
+            borderSize = 3,          -- Border thickness around lines
+            offsetX = 0,             -- X offset from screen center
+            offsetY = 0,             -- Y offset from screen center
+            r = 0.796,               -- Crosshair color red
+            g = 1,                   -- Crosshair color green
+            b = 0.780,               -- Crosshair color blue
+            a = 1,                   -- Crosshair alpha
+            borderR = 0,             -- Border color red
+            borderG = 0,             -- Border color green
+            borderB = 0,             -- Border color blue
+            borderA = 1,             -- Border alpha
+            strata = "LOW",          -- Frame strata
             lineColor = { 0.796, 1, 0.780, 1 },
             borderColorTable = { 0, 0, 0, 1 },
-
+            -- Out of melee range color change
             changeColorOnRange = false,
-            outOfRangeColor = { 1, 0.2, 0.2, 1 },
-            rangeColorInCombatOnly = false,
-            hideUntilOutOfRange = false,
+            outOfRangeColor = { 1, 0.2, 0.2, 1 },  -- Red color when out of range
+            rangeColorInCombatOnly = false,       -- Only change color in combat
+            hideUntilOutOfRange = false,          -- Only show crosshair when in combat AND out of range
         },
 
-
+        -- Skyriding Vigor Bar
         skyriding = {
             enabled = true,
             width = 250,
@@ -1028,10 +1068,10 @@ local defaults = {
             offsetY = 135,
             locked = false,
             useClassColorVigor = false,
-            barColor = { 0.860, 0.220, 0.260, 1 },
-            backgroundColor = { 0.102, 0.102, 0.102, 0.353 },
-            segmentColor = { 0, 0, 0, 1 },
-            rechargeColor = { 0.4, 0.9, 1.0, 1 },
+            barColor = { 0.860, 0.220, 0.260, 1 },              -- 33CCFF
+            backgroundColor = { 0.102, 0.102, 0.102, 0.353 }, -- 1A1A1A with lower alpha
+            segmentColor = { 0, 0, 0, 1 },                -- 000000
+            rechargeColor = { 0.4, 0.9, 1.0, 1 },         -- 66E6FF
             borderSize = 1,
             borderColor = { 0, 0, 0, 1 },
             barTexture = "Prey v4",
@@ -1046,141 +1086,141 @@ local defaults = {
             secondWindMode = "MINIBAR",
             secondWindScale = 2.1,
             useClassColorSecondWind = false,
-            secondWindColor = { 1.0, 0.8, 0.2, 1 },
-            secondWindBackgroundColor = { 0.102, 0.102, 0.102, 0.301 },
+            secondWindColor = { 1.0, 0.8, 0.2, 1 },       -- FFCC33
+            secondWindBackgroundColor = { 0.102, 0.102, 0.102, 0.301 }, -- 1A1A1A with lower alpha
             visibility = "FLYING_ONLY",
             fadeDelay = 1,
             fadeDuration = 0.3,
         },
 
-
+        -- Chat Frame Customization
         chat = {
             enabled = true,
-
+            -- Glass visual effect
             glass = {
                 enabled = true,
-                bgAlpha = 0.25,
-                bgColor = {0, 0, 0},
+                bgAlpha = 0.25,          -- Background transparency (0-1.0)
+                bgColor = {0, 0, 0},     -- Background color (RGB)
             },
-
+            -- Message fade after inactivity (uses native API)
             fade = {
-                enabled = false,
-                delay = 15,
-                duration = 0.6,
+                enabled = false,         -- Off by default
+                delay = 15,              -- Seconds before fade starts
+                duration = 0.6,          -- Fade animation duration
             },
-
+            -- Font settings
             font = {
-                forceOutline = false,
+                forceOutline = false,    -- Force font outline
             },
-
+            -- URL detection and copying
             urls = {
                 enabled = true,
-                color = {0.078, 0.608, 0.992, 1},
+                color = {0.078, 0.608, 0.992, 1},  -- Clickable URL color (blue)
             },
-
-            hideButtons = true,
-
+            -- UI cleanup
+            hideButtons = true,          -- Hide social/channel/scroll buttons
+            -- Input box styling
             editBox = {
-                enabled = true,
-                bgAlpha = 0.25,
-                bgColor = {0, 0, 0},
-                height = 20,
-                positionTop = false,
+                enabled = true,          -- Apply glass styling to input box
+                bgAlpha = 0.25,          -- Background transparency (0-1.0)
+                bgColor = {0, 0, 0},     -- Background color (RGB)
+                height = 20,             -- Input box height
+                positionTop = false,     -- Position input box above chat tabs
             },
-
+            -- Timestamps
             timestamps = {
-                enabled = false,
-                format = "24h",
-                color = {0.6, 0.6, 0.6},
+                enabled = false,         -- Off by default
+                format = "24h",          -- "24h" or "12h"
+                color = {0.6, 0.6, 0.6}, -- Gray color
             },
-
+            -- Copy button mode: "always", "hover", "hidden", "disabled"
             copyButtonMode = "always",
-
+            -- Intro message on login
             showIntroMessage = true,
         },
 
-
+        -- Tooltip Management
         tooltip = {
-            enabled = true,
-            anchorToCursor = true,
-            hideInCombat = true,
-            classColorName = false,
-
+            enabled = true,                    -- Master toggle for tooltip module
+            anchorToCursor = true,             -- Follow cursor vs default anchor
+            hideInCombat = true,               -- Suppress tooltips during combat
+            classColorName = false,            -- Color player names by class
+            -- Per-Context Visibility (SHOW/HIDE/SHIFT/CTRL/ALT)
             visibility = {
-                npcs = "SHOW",
-                abilities = "SHOW",
-                items = "SHOW",
-                frames = "SHOW",
-                cdm = "SHOW",
-                customTrackers = "SHOW",
+                npcs = "SHOW",                 -- NPCs/players in world
+                abilities = "SHOW",            -- Action bar buttons
+                items = "SHOW",                -- Bag/bank items
+                frames = "SHOW",               -- Unit frame mouseover
+                cdm = "SHOW",                  -- CDM views (Essential, Utility, Buff)
+                customTrackers = "SHOW",       -- Custom Items/Spells bars
             },
-            combatKey = "SHIFT",
-            hideHealthBar = true,
+            combatKey = "SHIFT",               -- NONE/SHIFT/CTRL/ALT
+            hideHealthBar = true,              -- Hide the health bar on unit tooltips
         },
 
-
+        -- PREY Action Bars - Button Skinning and Fade System
         actionBars = {
             enabled = true,
-
+            -- Global settings (apply to all bars)
             global = {
-                skinEnabled = true,
-                iconSize = 36,
-                iconZoom = 0.05,
-                showBackdrop = true,
-                backdropAlpha = 0.8,
-                showGloss = true,
-                glossAlpha = 0.6,
-                showBorders = true,
-                showKeybinds = true,
-                showMacroNames = false,
-                showCounts = true,
-                hideEmptyKeybinds = false,
-                keybindFontSize = 16,
-                keybindColor = {1, 1, 1, 1},
-                keybindAnchor = "TOPRIGHT",
-                keybindOffsetX = 0,
-                keybindOffsetY = -5,
-                macroNameFontSize = 10,
-                macroNameColor = {1, 1, 1, 1},
-                macroNameAnchor = "BOTTOM",
-                macroNameOffsetX = 0,
-                macroNameOffsetY = 0,
-                countFontSize = 14,
-                countColor = {1, 1, 1, 1},
-                countAnchor = "BOTTOMRIGHT",
-                countOffsetX = 0,
-                countOffsetY = 0,
-
-                barScale = 1.0,
-                hideEmptySlots = false,
-                lockButtons = false,
-
-                rangeIndicator = false,
-                rangeColor = {0.8, 0.1, 0.1, 1},
-
-                usabilityIndicator = false,
-                usabilityDesaturate = false,
-                usabilityColor = {0.4, 0.4, 0.4, 1},
-                manaColor = {0.5, 0.5, 1.0, 1},
-                fastUsabilityUpdates = false,
+                skinEnabled = true,         -- Apply button skinning
+                iconSize = 36,              -- Base icon size (36x36)
+                iconZoom = 0.05,            -- Icon texture crop (0.05-0.15)
+                showBackdrop = true,        -- Show backdrop behind icons
+                backdropAlpha = 0.8,        -- Backdrop opacity (0-1)
+                showGloss = true,           -- Show gloss/shine overlay
+                glossAlpha = 0.6,           -- Gloss opacity (0-1)
+                showBorders = true,         -- Show button borders
+                showKeybinds = true,        -- Show hotkey text
+                showMacroNames = false,     -- Show macro name text
+                showCounts = true,          -- Show stack/charge count
+                hideEmptyKeybinds = false,  -- Hide placeholder keybinds
+                keybindFontSize = 16,       -- Keybind text size
+                keybindColor = {1, 1, 1, 1},-- Keybind text color
+                keybindAnchor = "TOPRIGHT", -- Keybind text anchor point
+                keybindOffsetX = 0,         -- Keybind text X offset
+                keybindOffsetY = -5,        -- Keybind text Y offset
+                macroNameFontSize = 10,     -- Macro name text size
+                macroNameColor = {1, 1, 1, 1}, -- Macro name text color
+                macroNameAnchor = "BOTTOM", -- Macro name text anchor point
+                macroNameOffsetX = 0,       -- Macro name text X offset
+                macroNameOffsetY = 0,       -- Macro name text Y offset
+                countFontSize = 14,         -- Count text size
+                countColor = {1, 1, 1, 1},  -- Count text color
+                countAnchor = "BOTTOMRIGHT", -- Stack count text anchor point
+                countOffsetX = 0,           -- Stack count text X offset
+                countOffsetY = 0,           -- Stack count text Y offset
+                -- Bar Layout settings
+                barScale = 1.0,             -- Global scale multiplier (0.5 - 2.0)
+                hideEmptySlots = false,     -- Hide buttons with no ability assigned
+                lockButtons = false,        -- Prevent dragging abilities off buttons
+                -- Range indicator settings
+                rangeIndicator = false,     -- Tint out-of-range buttons
+                rangeColor = {0.8, 0.1, 0.1, 1}, -- Red tint color
+                -- Usability indicator settings
+                usabilityIndicator = false,     -- Dim unusable buttons
+                usabilityDesaturate = false,    -- Use desaturation (grey) for unusable
+                usabilityColor = {0.4, 0.4, 0.4, 1},  -- Fallback color if not desaturating
+                manaColor = {0.5, 0.5, 1.0, 1}, -- Out of mana color (blue tint)
+                fastUsabilityUpdates = false, -- 5x faster range/usability checks (50ms vs 250ms)
             },
-
+            -- Mouseover fade settings
             fade = {
-                enabled = true,
-                fadeInDuration = 0.2,
-                fadeOutDuration = 0.3,
-                fadeOutAlpha = 0.0,
-                fadeOutDelay = 0.5,
-                alwaysShowInCombat = false,
-                linkBars1to8 = false,
+                enabled = true,             -- Master toggle for mouseover fade
+                fadeInDuration = 0.2,       -- Fade in speed (seconds)
+                fadeOutDuration = 0.3,      -- Fade out speed (seconds)
+                fadeOutAlpha = 0.0,         -- Alpha when faded out (0-1)
+                fadeOutDelay = 0.5,         -- Delay before fading out (seconds)
+                alwaysShowInCombat = false, -- Force full opacity during combat
+                linkBars1to8 = false,       -- Link all action bars 1-8 for mouseover
             },
-
-
+            -- Per-bar settings (nil = use global, value = override)
+            -- alwaysShow = true means bar stays visible even when mouseover hide is enabled
             bars = {
                 bar1 = {
                     enabled = true, fadeEnabled = nil, fadeOutAlpha = nil, alwaysShow = false,
                     hidePageArrow = true,
-
+                    -- Style overrides (nil = use global)
                     overrideEnabled = false,
                     iconZoom = 0.05, showBackdrop = nil, backdropAlpha = 0,
                     showGloss = nil, glossAlpha = 0,
@@ -1275,12 +1315,12 @@ local defaults = {
                     showCounts = nil, countFontSize = 8, countColor = nil,
                     countAnchor = nil, countOffsetX = -20, countOffsetY = -20,
                 },
-
+                -- Pet/Stance/Microbar/Bags/Extra do NOT have style overrides
                 pet = { enabled = true, fadeEnabled = nil, fadeOutAlpha = nil, alwaysShow = false },
                 stance = { enabled = true, fadeEnabled = nil, fadeOutAlpha = nil, alwaysShow = false },
                 microbar = { enabled = true, fadeEnabled = nil, fadeOutAlpha = nil, alwaysShow = false },
                 bags = { enabled = true, fadeEnabled = nil, fadeOutAlpha = nil, alwaysShow = false },
-
+                -- Extra Action Button (boss encounters, quests)
                 extraActionButton = {
                     enabled = true,
                     fadeEnabled = nil,
@@ -1292,7 +1332,7 @@ local defaults = {
                     position = { point = "CENTER", relPoint = "CENTER", x = -120.833, y = -25.833 },
                     hideArtwork = false,
                 },
-
+                -- Zone Ability Button (garrison, covenant, zone powers)
                 zoneAbility = {
                     enabled = true,
                     fadeEnabled = nil,
@@ -1307,57 +1347,57 @@ local defaults = {
             },
         },
 
-
+        -- PREY Unit Frames (New Implementation)
         quiUnitFrames = {
             enabled = true,
-
+            -- General settings (applies to all frames)
             general = {
-                darkMode = false,
-                darkModeHealthColor = { 0.15, 0.15, 0.15, 1 },
-                darkModeBgColor = { 0.25, 0.25, 0.25, 1 },
-                darkModeOpacity = 1.0,
-                darkModeHealthOpacity = 1.0,
-                darkModeBgOpacity = 1.0,
-
-                defaultUseClassColor = true,
-                defaultHealthColor = { 0.2, 0.2, 0.2, 1 },
-                defaultBgColor = { 0, 0, 0, 1 },
-                defaultOpacity = 1.0,
-                defaultHealthOpacity = 1.0,
-                defaultBgOpacity = 1.0,
-                classColorText = false,
-
-                masterColorNameText = false,
-                masterColorHealthText = false,
-                masterColorPowerText = false,
-                masterColorCastbarText = false,
-                masterColorToTText = false,
+                darkMode = false,                         -- Instant dark mode toggle (disabled by default)
+                darkModeHealthColor = { 0.15, 0.15, 0.15, 1 },  -- #262626
+                darkModeBgColor = { 0.25, 0.25, 0.25, 1 },      -- #404040
+                darkModeOpacity = 1.0,                          -- Frame opacity when dark mode enabled (0.1 to 1.0)
+                darkModeHealthOpacity = 1.0,                    -- Health bar opacity when dark mode enabled
+                darkModeBgOpacity = 1.0,                        -- Background opacity when dark mode enabled
+                -- Default unitframe colors (when dark mode is OFF)
+                defaultUseClassColor = true,                    -- Use class color for health bar (default ON)
+                defaultHealthColor = { 0.2, 0.2, 0.2, 1 },      -- Default health bar color (when class color OFF)
+                defaultBgColor = { 0, 0, 0, 1 },                -- Default background color (pure black)
+                defaultOpacity = 1.0,                           -- Default bar opacity
+                defaultHealthOpacity = 1.0,                     -- Health bar opacity when dark mode disabled
+                defaultBgOpacity = 1.0,                         -- Background opacity when dark mode disabled
+                classColorText = false,                   -- LEGACY: Use class color for all unit frame text (kept for migration)
+                -- Master text color overrides (new system - takes precedence over per-unit settings)
+                masterColorNameText = false,              -- Apply class/reaction color to ALL name text
+                masterColorHealthText = false,            -- Apply class/reaction color to ALL health text
+                masterColorPowerText = false,             -- Apply class/reaction color to ALL power text
+                masterColorCastbarText = false,           -- Apply class/reaction color to ALL castbar text (spell + timer)
+                masterColorToTText = false,               -- Apply class/reaction color to ALL inline ToT text
                 font = "Prey",
                 fontSize = 12,
-                fontOutline = "OUTLINE",
-                showTooltips = true,
-                smootherAnimation = false,
-
-                hostilityColorHostile = { 0.8, 0.2, 0.2, 1 },
-                hostilityColorNeutral = { 1, 1, 0.2, 1 },
-                hostilityColorFriendly = { 0.2, 0.8, 0.2, 1 },
+                fontOutline = "OUTLINE",                  -- NONE, OUTLINE, THICKOUTLINE
+                showTooltips = true,                      -- Show tooltips on unit frame mouseover
+                smootherAnimation = false,                -- Uncap 60 FPS throttle for smoother castbar animation
+                -- Hostility colors (for NPC unit frames)
+                hostilityColorHostile = { 0.8, 0.2, 0.2, 1 },   -- Red (enemies)
+                hostilityColorNeutral = { 1, 1, 0.2, 1 },       -- Yellow (neutral NPCs)
+                hostilityColorFriendly = { 0.2, 0.8, 0.2, 1 },  -- Green (friendly NPCs)
             },
-
+            -- Player frame settings
             player = {
                 enabled = true,
-                borderSize = 1,
+                borderSize = 1,                     -- Frame border thickness (0-5)
                 width = 240,
                 height = 40,
                 offsetX = -290,
                 offsetY = -219,
-
+                -- Anchor to frame (disabled, essential, utility, primary, secondary)
                 anchorTo = "disabled",
                 anchorGap = 10,
                 anchorYOffset = 0,
                 texture = "Prey v5",
                 useClassColor = true,
                 customHealthColor = { 0.2, 0.6, 0.2, 1 },
-
+                -- Portrait
                 showPortrait = false,
                 portraitSide = "LEFT",
                 portraitSize = 40,
@@ -1365,7 +1405,7 @@ local defaults = {
                 portraitBorderUseClassColor = false,
                 portraitBorderColor = { 0, 0, 0, 1 },
                 portraitGap = 0,
-
+                -- Name text
                 showName = true,
                 nameTextUseClassColor = false,
                 nameTextColor = { 1, 1, 1, 1 },
@@ -1373,43 +1413,43 @@ local defaults = {
                 nameAnchor = "LEFT",
                 nameOffsetX = 12,
                 nameOffsetY = 0,
-                maxNameLength = 0,
-
+                maxNameLength = 0,              -- 0 = no limit, otherwise truncate to N characters
+                -- Health text
                 showHealth = true,
                 showHealthPercent = true,
                 showHealthAbsolute = true,
-                healthDisplayStyle = "both",
-                healthDivider = " | ",
+                healthDisplayStyle = "both",    -- "percent", "absolute", "both", "both_reverse"
+                healthDivider = " | ",          -- " | ", " - ", " / "
                 healthFontSize = 16,
                 healthAnchor = "RIGHT",
                 healthOffsetX = -12,
                 healthOffsetY = 0,
-                healthTextUseClassColor = false,
-                healthTextColor = { 1, 1, 1, 1 },
-
+                healthTextUseClassColor = false, -- Independent from name class color
+                healthTextColor = { 1, 1, 1, 1 }, -- Custom health text color
+                -- Power text
                 showPowerText = false,
-                powerTextFormat = "percent",
-                powerTextUsePowerColor = true,
+                powerTextFormat = "percent",    -- "percent", "current", "both"
+                powerTextUsePowerColor = true,  -- Use power type color (mana blue, rage red, etc.)
                 powerTextUseClassColor = false,
                 powerTextColor = { 1, 1, 1, 1 },
                 powerTextFontSize = 12,
                 powerTextAnchor = "BOTTOMRIGHT",
                 powerTextOffsetX = -9,
                 powerTextOffsetY = 4,
-
+                -- Power bar
                 showPowerBar = false,
                 powerBarHeight = 4,
                 powerBarBorder = true,
                 powerBarUsePowerColor = true,
-                powerBarColor = { 0, 0.5, 1, 1 },
-
+                powerBarColor = { 0, 0.5, 1, 1 },  -- Custom power bar color
+                -- Absorbs
                 absorbs = {
                     enabled = false,
                     color = { 1, 1, 1, 1 },
                     opacity = 0.3,
                     texture = "PREY Stripes",
                 },
-
+                -- Castbar
                 castbar = {
                     enabled = true,
                     showIcon = true,
@@ -1429,25 +1469,25 @@ local defaults = {
                     interruptibleColor = {0.2, 0.8, 0.2, 1},
                     maxLength = 0,
                 },
-
+                -- Auras (buffs/debuffs)
                 auras = {
                     showBuffs = false,
                     showDebuffs = false,
-
+                    -- Debuff settings
                     iconSize = 22,
                     debuffAnchor = "TOPLEFT",
                     debuffGrow = "RIGHT",
                     debuffMaxIcons = 4,
                     debuffOffsetX = 0,
                     debuffOffsetY = 0,
-
+                    -- Buff settings
                     buffIconSize = 22,
                     buffAnchor = "BOTTOMLEFT",
                     buffGrow = "RIGHT",
                     buffMaxIcons = 4,
                     buffOffsetX = 0,
                     buffOffsetY = 0,
-
+                    -- Duration text
                     iconSpacing = 2,
                     buffSpacing = 2,
                     debuffSpacing = 2,
@@ -1457,14 +1497,14 @@ local defaults = {
                     durationAnchor = "CENTER",
                     durationOffsetX = 0,
                     durationOffsetY = 0,
-
+                    -- Stack text
                     stackColor = {1, 1, 1, 1},
                     showStack = true,
                     stackSize = 10,
                     stackAnchor = "BOTTOMRIGHT",
                     stackOffsetX = -1,
                     stackOffsetY = 1,
-
+                    -- Buff duration/stack
                     buffDuration = { show = true, fontSize = 12, anchor = "CENTER", offsetX = 0, offsetY = 0, color = {1, 1, 1, 1} },
                     buffStack = { show = true, fontSize = 10, anchor = "BOTTOMRIGHT", offsetX = -1, offsetY = 1, color = {1, 1, 1, 1} },
                     buffShowStack = true,
@@ -1473,7 +1513,7 @@ local defaults = {
                     buffStackOffsetX = -1,
                     buffStackOffsetY = 1,
                     buffStackColor = {1, 1, 1, 1},
-
+                    -- Debuff duration/stack
                     debuffDuration = { show = false, fontSize = 10, anchor = "CENTER", offsetX = 0, offsetY = 0, color = {1, 1, 1, 1} },
                     debuffStack = { show = true, fontSize = 10, anchor = "BOTTOMRIGHT", offsetX = -1, offsetY = 1, color = {1, 1, 1, 1} },
                     debuffShowStack = true,
@@ -1483,24 +1523,24 @@ local defaults = {
                     debuffStackOffsetY = 1,
                     debuffStackColor = {1, 1, 1, 1},
                 },
-
+                -- Status indicators (player only)
                 indicators = {
                     rested = {
-                        enabled = false,
+                        enabled = false,      -- Disabled by default
                         size = 16,
                         anchor = "TOPLEFT",
                         offsetX = -2,
                         offsetY = 2,
                     },
                     combat = {
-                        enabled = false,
+                        enabled = false,      -- Disabled by default
                         size = 16,
                         anchor = "TOPRIGHT",
                         offsetX = -2,
                         offsetY = 2,
                     },
                     stance = {
-                        enabled = false,
+                        enabled = false,      -- Disabled by default (opt-in)
                         fontSize = 12,
                         anchor = "BOTTOM",
                         offsetX = 0,
@@ -1512,15 +1552,15 @@ local defaults = {
                         iconOffsetX = -2,
                     },
                 },
-
+                -- Target marker (raid icons like skull, cross, etc.)
                 targetMarker = {
-                    enabled = false,
+                    enabled = false,    -- Disabled by default for player (rarely marked)
                     size = 20,
                     anchor = "TOP",
                     xOffset = 0,
                     yOffset = 8,
                 },
-
+                -- Leader/Assistant icon (crown for leader, flag for assistant)
                 leaderIcon = {
                     enabled = false,
                     size = 16,
@@ -1529,23 +1569,23 @@ local defaults = {
                     yOffset = 8,
                 },
             },
-
+            -- Target frame settings
             target = {
                 enabled = true,
-                borderSize = 1,
+                borderSize = 1,                     -- Frame border thickness (0-5)
                 width = 240,
                 height = 40,
                 offsetX = 290,
                 offsetY = -219,
-
+                -- Anchor to frame (disabled, essential, utility, primary, secondary)
                 anchorTo = "disabled",
                 anchorGap = 10,
                 anchorYOffset = 0,
                 texture = "Prey v5 Inverse",
                 useClassColor = true,
-                useHostilityColor = true,
+                useHostilityColor = true,  -- Use red/yellow/green based on unit hostility
                 customHealthColor = { 0.2, 0.6, 0.2, 1 },
-
+                -- Portrait
                 showPortrait = false,
                 portraitSide = "RIGHT",
                 portraitSize = 40,
@@ -1553,7 +1593,7 @@ local defaults = {
                 portraitBorderUseClassColor = false,
                 portraitBorderColor = { 0, 0, 0, 1 },
                 portraitGap = 0,
-
+                -- Name text
                 showName = true,
                 nameTextUseClassColor = false,
                 nameTextColor = { 1, 1, 1, 1 },
@@ -1561,50 +1601,50 @@ local defaults = {
                 nameAnchor = "RIGHT",
                 nameOffsetX = -9,
                 nameOffsetY = 0,
-                maxNameLength = 10,
-
+                maxNameLength = 10,              -- 0 = no limit, otherwise truncate to N characters
+                -- Inline Target of Target (shows ">> ToT Name" after target name)
                 showInlineToT = false,
                 totSeparator = " >> ",
                 totUseClassColor = true,
-                totDividerUseClassColor = false,
-                totDividerColor = {1, 1, 1, 1},
-                totNameCharLimit = 0,
-
+                totDividerUseClassColor = false,    -- Color divider by class/reaction
+                totDividerColor = {1, 1, 1, 1},     -- Custom divider color (white default)
+                totNameCharLimit = 0,               -- 0 = no limit, otherwise limit ToT name length
+                -- Health text
                 showHealth = true,
                 showHealthPercent = true,
                 showHealthAbsolute = true,
-                healthDisplayStyle = "both",
-                healthDivider = " | ",
+                healthDisplayStyle = "both",    -- "percent", "absolute", "both", "both_reverse"
+                healthDivider = " | ",          -- " | ", " - ", " / "
                 healthFontSize = 16,
                 healthAnchor = "LEFT",
                 healthOffsetX = 9,
                 healthOffsetY = 0,
-                healthTextUseClassColor = false,
-                healthTextColor = { 1, 1, 1, 1 },
-
+                healthTextUseClassColor = false, -- Independent from name class color
+                healthTextColor = { 1, 1, 1, 1 }, -- Custom health text color
+                -- Power text
                 showPowerText = false,
-                powerTextFormat = "percent",
-                powerTextUsePowerColor = false,
+                powerTextFormat = "percent",    -- "percent", "current", "both"
+                powerTextUsePowerColor = false,  -- Use power type color (mana blue, rage red, etc.)
                 powerTextUseClassColor = false,
                 powerTextColor = { 1, 1, 1, 1 },
                 powerTextFontSize = 14,
                 powerTextAnchor = "BOTTOMRIGHT",
                 powerTextOffsetX = -2,
                 powerTextOffsetY = 2,
-
+                -- Power bar
                 showPowerBar = false,
                 powerBarHeight = 4,
                 powerBarBorder = true,
                 powerBarUsePowerColor = true,
-                powerBarColor = { 0, 0.5, 1, 1 },
-
+                powerBarColor = { 0, 0.5, 1, 1 },  -- Custom power bar color
+                -- Absorbs
                 absorbs = {
                     enabled = true,
                     color = { 1, 1, 1, 1 },
                     opacity = 0.3,
                     texture = "PREY Stripes",
                 },
-
+                -- Castbar
                 castbar = {
                     enabled = true,
                     showIcon = true,
@@ -1623,25 +1663,25 @@ local defaults = {
                     interruptibleColor = {0.2, 0.8, 0.2, 1},
                     maxLength = 12,
                 },
-
+                -- Auras (buffs/debuffs)
                 auras = {
                     showBuffs = false,
                     showDebuffs = false,
-
+                    -- Debuff settings
                     iconSize = 26,
                     debuffAnchor = "TOPLEFT",
                     debuffGrow = "RIGHT",
                     debuffMaxIcons = 4,
                     debuffOffsetX = 0,
                     debuffOffsetY = 0,
-
+                    -- Buff settings
                     buffIconSize = 18,
                     buffAnchor = "BOTTOMLEFT",
                     buffGrow = "RIGHT",
                     buffMaxIcons = 4,
                     buffOffsetX = 0,
                     buffOffsetY = 0,
-
+                    -- Duration text
                     iconSpacing = 2,
                     buffSpacing = 2,
                     debuffSpacing = 2,
@@ -1651,14 +1691,14 @@ local defaults = {
                     durationAnchor = "CENTER",
                     durationOffsetX = 0,
                     durationOffsetY = 0,
-
+                    -- Stack text
                     stackColor = {1, 1, 1, 1},
                     showStack = true,
                     stackSize = 10,
                     stackAnchor = "BOTTOMRIGHT",
                     stackOffsetX = -1,
                     stackOffsetY = 1,
-
+                    -- Buff duration/stack
                     buffDuration = { show = true, fontSize = 12, anchor = "CENTER", offsetX = 0, offsetY = 0, color = {1, 1, 1, 1} },
                     buffStack = { show = true, fontSize = 10, anchor = "BOTTOMRIGHT", offsetX = -1, offsetY = 1, color = {1, 1, 1, 1} },
                     buffShowStack = true,
@@ -1667,7 +1707,7 @@ local defaults = {
                     buffStackOffsetX = -1,
                     buffStackOffsetY = 1,
                     buffStackColor = {1, 1, 1, 1},
-
+                    -- Debuff duration/stack
                     debuffDuration = { show = false, fontSize = 10, anchor = "CENTER", offsetX = 0, offsetY = 0, color = {1, 1, 1, 1} },
                     debuffStack = { show = true, fontSize = 10, anchor = "BOTTOMRIGHT", offsetX = -1, offsetY = 1, color = {1, 1, 1, 1} },
                     debuffShowStack = true,
@@ -1677,7 +1717,7 @@ local defaults = {
                     debuffStackOffsetY = 1,
                     debuffStackColor = {1, 1, 1, 1},
                 },
-
+                -- Target marker (raid icons like skull, cross, etc.)
                 targetMarker = {
                     enabled = false,
                     size = 20,
@@ -1685,7 +1725,7 @@ local defaults = {
                     xOffset = 0,
                     yOffset = 8,
                 },
-
+                -- Leader/Assistant icon (crown for leader, flag for assistant)
                 leaderIcon = {
                     enabled = false,
                     size = 16,
@@ -1694,19 +1734,19 @@ local defaults = {
                     yOffset = 8,
                 },
             },
-
+            -- Target of Target
             targettarget = {
                 enabled = false,
-                borderSize = 1,
+                borderSize = 1,                     -- Frame border thickness (0-5)
                 width = 160,
                 height = 30,
                 offsetX = 496,
                 offsetY = -214,
                 texture = "Prey",
                 useClassColor = true,
-                useHostilityColor = true,
+                useHostilityColor = true,  -- Use red/yellow/green based on unit hostility
                 customHealthColor = { 0.2, 0.6, 0.2, 1 },
-
+                -- Name text
                 showName = true,
                 nameTextUseClassColor = false,
                 nameTextColor = { 1, 1, 1, 1 },
@@ -1715,7 +1755,7 @@ local defaults = {
                 nameOffsetX = 4,
                 nameOffsetY = 0,
                 maxNameLength = 0,
-
+                -- Health text
                 showHealth = true,
                 showHealthPercent = true,
                 showHealthAbsolute = false,
@@ -1727,7 +1767,7 @@ local defaults = {
                 healthOffsetY = 0,
                 healthTextUseClassColor = false,
                 healthTextColor = { 1, 1, 1, 1 },
-
+                -- Power text
                 showPowerText = false,
                 powerTextFormat = "percent",
                 powerTextUsePowerColor = true,
@@ -1737,20 +1777,20 @@ local defaults = {
                 powerTextAnchor = "BOTTOMRIGHT",
                 powerTextOffsetX = -4,
                 powerTextOffsetY = 2,
-
+                -- Power bar
                 showPowerBar = false,
                 powerBarHeight = 3,
                 powerBarBorder = true,
                 powerBarUsePowerColor = true,
-                powerBarColor = { 0, 0.5, 1, 1 },
-
+                powerBarColor = { 0, 0.5, 1, 1 },  -- Custom power bar color
+                -- Absorbs
                 absorbs = {
                     enabled = true,
                     color = { 1, 1, 1, 1 },
                     opacity = 0.7,
                     texture = "PREY Stripes",
                 },
-
+                -- Castbar
                 castbar = {
                     enabled = false,
                     showIcon = true,
@@ -1762,18 +1802,18 @@ local defaults = {
                     fontSize = 10,
                     color = {1, 0.7, 0, 1},
                 },
-
+                -- Auras (buffs/debuffs)
                 auras = {
                     showBuffs = false,
                     showDebuffs = false,
-
+                    -- Debuff settings
                     iconSize = 22,
                     debuffAnchor = "TOPLEFT",
                     debuffGrow = "RIGHT",
                     debuffMaxIcons = 4,
                     debuffOffsetX = 0,
                     debuffOffsetY = 0,
-
+                    -- Buff settings
                     buffIconSize = 22,
                     buffAnchor = "BOTTOMLEFT",
                     buffGrow = "RIGHT",
@@ -1781,19 +1821,19 @@ local defaults = {
                     buffOffsetX = 0,
                     buffOffsetY = 0,
                 },
-
+                -- Target marker (raid icons like skull, cross, etc.)
                 targetMarker = {
-                    enabled = false,
+                    enabled = false,    -- Disabled by default for ToT (small frame)
                     size = 16,
                     anchor = "TOP",
                     xOffset = 0,
                     yOffset = 6,
                 },
             },
-
+            -- Pet frame
             pet = {
                 enabled = true,
-                borderSize = 1,
+                borderSize = 1,                     -- Frame border thickness (0-5)
                 width = 140,
                 height = 25,
                 offsetX = -340,
@@ -1802,7 +1842,7 @@ local defaults = {
                 useClassColor = true,
                 useHostilityColor = true,
                 customHealthColor = { 0.2, 0.6, 0.2, 1 },
-
+                -- Name text
                 showName = true,
                 nameTextUseClassColor = false,
                 nameTextColor = { 1, 1, 1, 1 },
@@ -1811,7 +1851,7 @@ local defaults = {
                 nameOffsetX = 4,
                 nameOffsetY = 0,
                 maxNameLength = 0,
-
+                -- Health text
                 showHealth = true,
                 showHealthPercent = true,
                 showHealthAbsolute = false,
@@ -1823,7 +1863,7 @@ local defaults = {
                 healthOffsetY = 0,
                 healthTextUseClassColor = false,
                 healthTextColor = { 1, 1, 1, 1 },
-
+                -- Power text
                 showPowerText = false,
                 powerTextFormat = "percent",
                 powerTextUsePowerColor = true,
@@ -1833,31 +1873,31 @@ local defaults = {
                 powerTextAnchor = "BOTTOMRIGHT",
                 powerTextOffsetX = -4,
                 powerTextOffsetY = 2,
-
+                -- Power bar
                 showPowerBar = true,
                 powerBarHeight = 3,
                 powerBarBorder = true,
                 powerBarUsePowerColor = true,
-                powerBarColor = { 0, 0.5, 1, 1 },
-
+                powerBarColor = { 0, 0.5, 1, 1 },  -- Custom power bar color
+                -- Absorbs
                 absorbs = {
                     enabled = true,
                     color = { 1, 1, 1 },
                     opacity = 0.7,
                     texture = "PREY Stripes",
                 },
-
+                -- Auras (buffs/debuffs)
                 auras = {
                     showBuffs = false,
                     showDebuffs = false,
-
+                    -- Debuff settings
                     iconSize = 22,
                     debuffAnchor = "TOPLEFT",
                     debuffGrow = "RIGHT",
                     debuffMaxIcons = 4,
                     debuffOffsetX = 0,
                     debuffOffsetY = 0,
-
+                    -- Buff settings
                     buffIconSize = 22,
                     buffAnchor = "BOTTOMLEFT",
                     buffGrow = "RIGHT",
@@ -1865,17 +1905,17 @@ local defaults = {
                     buffOffsetX = 0,
                     buffOffsetY = 0,
                 },
-
+                -- Target marker (raid icons like skull, cross, etc.)
                 targetMarker = {
-                    enabled = false,
+                    enabled = false,    -- Disabled by default for pet (rarely marked)
                     size = 16,
                     anchor = "TOP",
                     xOffset = 0,
                     yOffset = 6,
                 },
-
+                -- Castbar (opt-in for vehicle/RP casts)
                 castbar = {
-                    enabled = false,
+                    enabled = false,  -- Disabled by default (opt-in feature)
                     showIcon = true,
                     width = 140,
                     height = 15,
@@ -1886,19 +1926,19 @@ local defaults = {
                     color = {0.860, 0.220, 0.260, 1},
                 },
             },
-
+            -- Focus frame
             focus = {
                 enabled = false,
-                borderSize = 1,
+                borderSize = 1,                     -- Frame border thickness (0-5)
                 width = 160,
                 height = 30,
                 offsetX = -496,
                 offsetY = -214,
                 texture = "Prey v5",
                 useClassColor = true,
-                useHostilityColor = true,
+                useHostilityColor = true,  -- Use red/yellow/green based on unit hostility
                 customHealthColor = { 0.2, 0.6, 0.2, 1 },
-
+                -- Portrait
                 showPortrait = false,
                 portraitSide = "RIGHT",
                 portraitSize = 30,
@@ -1906,7 +1946,7 @@ local defaults = {
                 portraitBorderUseClassColor = false,
                 portraitBorderColor = { 0, 0, 0, 1 },
                 portraitGap = 0,
-
+                -- Name text
                 showName = true,
                 nameTextUseClassColor = false,
                 nameTextColor = { 1, 1, 1, 1 },
@@ -1915,7 +1955,7 @@ local defaults = {
                 nameOffsetX = 4,
                 nameOffsetY = 0,
                 maxNameLength = 0,
-
+                -- Health text
                 showHealth = true,
                 showHealthPercent = true,
                 showHealthAbsolute = true,
@@ -1927,7 +1967,7 @@ local defaults = {
                 healthOffsetY = 0,
                 healthTextUseClassColor = false,
                 healthTextColor = { 1, 1, 1, 1 },
-
+                -- Power text
                 showPowerText = false,
                 powerTextFormat = "percent",
                 powerTextUsePowerColor = true,
@@ -1937,20 +1977,20 @@ local defaults = {
                 powerTextAnchor = "BOTTOMRIGHT",
                 powerTextOffsetX = -4,
                 powerTextOffsetY = 2,
-
+                -- Power bar
                 showPowerBar = true,
                 powerBarHeight = 3,
                 powerBarBorder = true,
                 powerBarUsePowerColor = true,
-                powerBarColor = { 0, 0.5, 1, 1 },
-
+                powerBarColor = { 0, 0.5, 1, 1 },  -- Custom power bar color
+                -- Absorbs
                 absorbs = {
                     enabled = true,
                     color = { 1, 1, 1, 1 },
                     opacity = 0.7,
                     texture = "PREY Stripes",
                 },
-
+                -- Castbar
                 castbar = {
                     enabled = true,
                     showIcon = false,
@@ -1963,18 +2003,18 @@ local defaults = {
                     color = {0.82, 0.18, 0.22, 1},
                     anchor = "unitframe",
                 },
-
+                -- Auras (buffs/debuffs)
                 auras = {
                     showBuffs = false,
                     showDebuffs = false,
-
+                    -- Debuff settings
                     iconSize = 20,
                     debuffAnchor = "TOPLEFT",
                     debuffGrow = "RIGHT",
                     debuffMaxIcons = 16,
                     debuffOffsetX = 0,
                     debuffOffsetY = 2,
-
+                    -- Buff settings
                     buffIconSize = 20,
                     buffAnchor = "BOTTOMLEFT",
                     buffGrow = "RIGHT",
@@ -1982,7 +2022,7 @@ local defaults = {
                     buffOffsetX = 0,
                     buffOffsetY = -2,
                 },
-
+                -- Target marker (raid icons like skull, cross, etc.)
                 targetMarker = {
                     enabled = false,
                     size = 18,
@@ -1990,7 +2030,7 @@ local defaults = {
                     xOffset = 0,
                     yOffset = 6,
                 },
-
+                -- Leader/Assistant icon (crown for leader, flag for assistant)
                 leaderIcon = {
                     enabled = false,
                     size = 16,
@@ -1999,20 +2039,20 @@ local defaults = {
                     yOffset = 8,
                 },
             },
-
+            -- Boss frames
             boss = {
                 enabled = true,
-                borderSize = 1,
+                borderSize = 1,                     -- Frame border thickness (0-5)
                 width = 162,
                 height = 36,
                 offsetX = 974,
                 offsetY = 106,
-                spacing = 35,
+                spacing = 35,           -- Vertical spacing between boss frames
                 texture = "Prey v5",
                 useClassColor = true,
                 useHostilityColor = true,
                 customHealthColor = { 0.6, 0.2, 0.2, 1 },
-
+                -- Name text
                 showName = true,
                 nameTextUseClassColor = false,
                 nameTextColor = { 1, 1, 1, 1 },
@@ -2021,7 +2061,7 @@ local defaults = {
                 nameOffsetX = 4,
                 nameOffsetY = 0,
                 maxNameLength = 0,
-
+                -- Health text
                 showHealth = true,
                 healthDisplayStyle = "both",
                 healthDivider = " | ",
@@ -2031,7 +2071,7 @@ local defaults = {
                 healthOffsetY = 0,
                 healthTextUseClassColor = false,
                 healthTextColor = { 1, 1, 1, 1 },
-
+                -- Power text
                 showPowerText = false,
                 powerTextFormat = "percent",
                 powerTextUsePowerColor = true,
@@ -2041,20 +2081,20 @@ local defaults = {
                 powerTextAnchor = "BOTTOMRIGHT",
                 powerTextOffsetX = -4,
                 powerTextOffsetY = 2,
-
+                -- Power bar
                 showPowerBar = true,
                 powerBarHeight = 3,
                 powerBarBorder = true,
                 powerBarUsePowerColor = true,
-                powerBarColor = { 0, 0.5, 1, 1 },
-
+                powerBarColor = { 0, 0.5, 1, 1 },  -- Custom power bar color
+                -- Absorbs
                 absorbs = {
                     enabled = true,
                     color = { 1, 1, 1 },
                     opacity = 0.7,
                     texture = "PREY Stripes",
                 },
-
+                -- Castbar
                 castbar = {
                     enabled = true,
                     showIcon = true,
@@ -2067,18 +2107,18 @@ local defaults = {
                     color = {1, 0.7, 0, 1},
                     anchor = "unitframe",
                 },
-
+                -- Auras (buffs/debuffs)
                 auras = {
                     showBuffs = false,
                     showDebuffs = false,
-
+                    -- Debuff settings
                     iconSize = 22,
                     debuffAnchor = "TOPLEFT",
                     debuffGrow = "RIGHT",
                     debuffMaxIcons = 4,
                     debuffOffsetX = 0,
                     debuffOffsetY = 0,
-
+                    -- Buff settings
                     buffIconSize = 22,
                     buffAnchor = "BOTTOMLEFT",
                     buffGrow = "RIGHT",
@@ -2086,7 +2126,7 @@ local defaults = {
                     buffOffsetX = 0,
                     buffOffsetY = 0,
                 },
-
+                -- Target marker (raid icons like skull, cross, etc.)
                 targetMarker = {
                     enabled = false,
                     size = 20,
@@ -2108,35 +2148,35 @@ local defaults = {
                 },
                 ForegroundTexture = "Prey_v5",
                 BackgroundTexture = "Solid",
-
+                -- Dark Mode: overrides class colors on unit frame health bars (not resource bars)
                 DarkMode = {
                     Enabled = false,
-                    ForegroundColor = {0.15, 0.15, 0.15, 1},
-                    BackgroundColor = {0.25, 0.25, 0.25, 1},
-                    UseSolidTexture = true,
+                    ForegroundColor = {0.15, 0.15, 0.15, 1},  -- Very dark for health bar
+                    BackgroundColor = {0.25, 0.25, 0.25, 1},  -- Slightly lighter for background
+                    UseSolidTexture = true,  -- Force solid texture when dark mode is enabled
                 },
                 CustomColors = {
                     Reaction = {
-                        [1] = {204/255, 64/255, 64/255},
-                        [2] = {204/255, 64/255, 64/255},
-                        [3] = {204/255, 128/255, 64/255},
-                        [4] = {255/255, 234/255, 126/255},
-                        [5] = {64/255, 204/255, 64/255},
-                        [6] = {64/255, 204/255, 64/255},
-                        [7] = {64/255, 204/255, 64/255},
-                        [8] = {64/255, 204/255, 64/255},
+                        [1] = {204/255, 64/255, 64/255},    -- Hated
+                        [2] = {204/255, 64/255, 64/255},    -- Hostile
+                        [3] = {204/255, 128/255, 64/255},   -- Unfriendly
+                        [4] = {255/255, 234/255, 126/255},   -- Neutral
+                        [5] = {64/255, 204/255, 64/255},    -- Friendly
+                        [6] = {64/255, 204/255, 64/255},    -- Honored
+                        [7] = {64/255, 204/255, 64/255},    -- Revered
+                        [8] = {64/255, 204/255, 64/255},    -- Exalted
                     },
                     Power = {
-                        [0] = {0, 0.50, 1},
-                        [1] = {1, 0, 0},
-                        [2] = {1, 0.5, 0.25},
-                        [3] = {1, 1, 0},
-                        [6] = {0, 0.82, 1},
-                        [8] = {0.3, 0.52, 0.9},
-                        [11] = {0, 0.5, 1},
-                        [13] = {0.4, 0, 0.8},
-                        [17] = {0.79, 0.26, 0.99},
-                        [18] = {1, 0.61, 0}
+                        [0] = {0, 0.50, 1},            -- Mana
+                        [1] = {1, 0, 0},            -- Rage
+                        [2] = {1, 0.5, 0.25},       -- Focus
+                        [3] = {1, 1, 0},            -- Energy
+                        [6] = {0, 0.82, 1},         -- Runic Power
+                        [8] = {0.3, 0.52, 0.9},     -- Lunar Power
+                        [11] = {0, 0.5, 1},         -- Maelstrom
+                        [13] = {0.4, 0, 0.8},       -- Insanity
+                        [17] = {0.79, 0.26, 0.99},  -- Fury
+                        [18] = {1, 0.61, 0}         -- Pain
                     },
                 },
             },
@@ -2194,7 +2234,7 @@ local defaults = {
                 },
                 Absorb = {
                     Enabled = true,
-                    Color = {0, 1, 0.96, 0.2},
+                    Color = {0, 1, 0.96, 0.2},  -- #00FFF5 (cyan) with 20% opacity
                 },
             },
             target = {
@@ -2250,26 +2290,26 @@ local defaults = {
                     },
                 },
                 Auras = {
-                    Width = 0,
+                    Width = 0,  -- 0 = use frame width
                     Height = 18,
                     Scale = 2.5,
                     Alpha = 1,
-                    RowLimit = 0,
-
+                    RowLimit = 0,  -- 0 = unlimited
+                    -- Border settings (applies to both buffs and debuffs)
                     BorderSize = 1,
-                    BorderColor = {0, 0, 0, 1},
-
+                    BorderColor = {0, 0, 0, 1},  -- Black border
+                    -- Debuff settings
                     ShowDebuffs = true,
                     DebuffOffsetX = 0,
                     DebuffOffsetY = 2,
-
+                    -- Buff settings
                     ShowBuffs = true,
                     BuffOffsetX = 0,
                     BuffOffsetY = 40,
                 },
                 Absorb = {
                     Enabled = true,
-                    Color = {0, 1, 0.96, 0.2},
+                    Color = {0, 1, 0.96, 0.2},  -- #00FFF5 (cyan) with 20% opacity
                 },
             },
             targettarget = {
@@ -2501,82 +2541,82 @@ local defaults = {
                 },
             },
         },
-
+        -- Config Panel Scale, Width, and Alpha (for the settings UI, not the in-game HUD)
         configPanelScale = 1.0,
         configPanelWidth = 750,
         configPanelAlpha = 0.97,
 
-
+        -- Combat Text Indicator
         combatText = {
             enabled = true,
-            displayTime = 0.8,
-            fadeTime = 0.3,
-            fontSize = 14,
-            xOffset = 0,
-            yOffset = 0,
-            enterCombatColor = {1, 0.98, 0.2, 1},
-            leaveCombatColor = {1, 0.98, 0.2, 1},
+            displayTime = 0.8,    -- Time text is visible before fade starts (seconds)
+            fadeTime = 0.3,       -- Fade animation duration (seconds)
+            fontSize = 14,        -- Text size
+            xOffset = 0,          -- Horizontal offset from screen center
+            yOffset = 0,          -- Vertical offset from screen center (positive = above)
+            enterCombatColor = {1, 0.98, 0.2, 1},      -- +Combat text color (#FFFA33 yellow)
+            leaveCombatColor = {1, 0.98, 0.2, 1},      -- -Combat text color (#FFFA33 yellow)
         },
 
-
+        -- Combat Timer (displays elapsed combat time)
         combatTimer = {
-            enabled = false,
-            xOffset = 0,
-            yOffset = -150,
-            width = 80,
-            height = 30,
-            fontSize = 16,
-            useCustomFont = false,
-            font = "Prey",
-            useClassColorText = false,
-            textColor = {1, 1, 1, 1},
-
+            enabled = false,       -- Opt-in feature (disabled by default)
+            xOffset = 0,           -- Horizontal offset from screen center
+            yOffset = -150,        -- Vertical offset (below center by default)
+            width = 80,            -- Frame width
+            height = 30,           -- Frame height
+            fontSize = 16,         -- Font size for timer text
+            useCustomFont = false, -- If false, use global addon font
+            font = "Prey",       -- Font name (from LibSharedMedia)
+            useClassColorText = false,  -- If true, use player class color for text
+            textColor = {1, 1, 1, 1},  -- White text
+            -- Backdrop settings
             showBackdrop = true,
-            backdropColor = {0, 0, 0, 0.6},
-
+            backdropColor = {0, 0, 0, 0.6},  -- Semi-transparent black
+            -- Border settings
             borderSize = 1,
-            borderTexture = "None",
-            useClassColorBorder = false,
-            borderColor = {0, 0, 0, 1},
-            hideBorder = false,
-            onlyShowInEncounters = false,
+            borderTexture = "None", -- Border texture from LibSharedMedia (or "None" for solid)
+            useClassColorBorder = false,  -- If true, use player class color
+            borderColor = {0, 0, 0, 1},  -- Black border
+            hideBorder = false,  -- If true, hide border completely (overrides other border settings)
+            onlyShowInEncounters = false,  -- If true, only show during boss encounters (not general combat)
         },
 
-
+        -- Cooldown Manager Effects
         cooldownSwipe = {
-            showBuffSwipe = false,
-            showBuffIconSwipe = false,
-            showGCDSwipe = false,
-            showCooldownSwipe = false,
-            showRechargeEdge = false,
-            showActionSwipe = true,
-            showNcdmSwipe = true,
-            showCustomTrackerSwipe = true,
-            migratedToV2 = true,
+            showBuffSwipe = false,      -- Buff/aura duration swipe (Essential/Utility)
+            showBuffIconSwipe = false,  -- BuffIcon viewer swipe (opt-in)
+            showGCDSwipe = false,       -- GCD swipe (~1.5s)
+            showCooldownSwipe = false,  -- Actual spell cooldown swipe
+            showRechargeEdge = false,   -- Yellow edge on multi-charge abilities
+            showActionSwipe = true,     -- Action bar cooldown swipe
+            showNcdmSwipe = true,       -- NCDM cooldown swipe
+            showCustomTrackerSwipe = true, -- Custom tracker cooldown swipe
+            migratedToV2 = true,        -- Migration marker from old hideEssential/hideUtility
         },
         cooldownEffects = {
             hideEssential = true,
             hideUtility = true,
         },
         cooldownManager = {
-
+            -- hideSwipe removed - now handled by cooldownSwipe
         },
-
-
+        
+        -- Custom Glow Settings (for Essential/Utility cooldown viewers)
         customGlow = {
-
+            -- Essential Cooldowns
             essentialEnabled = true,
-            essentialGlowType = "Pixel Glow",
-            essentialColor = {0.95, 0.95, 0.32, 1},
-            essentialLines = 14,
-            essentialFrequency = 0.25,
-            essentialLength = nil,
-            essentialThickness = 2,
-            essentialScale = 1,
+            essentialGlowType = "Pixel Glow",  -- "Pixel Glow", "Autocast Shine", "Button Glow"
+            essentialColor = {0.95, 0.95, 0.32, 1},  -- Default yellow/gold
+            essentialLines = 14,       -- Number of lines for Pixel Glow / spots for Autocast Shine
+            essentialFrequency = 0.25, -- Animation speed
+            essentialLength = nil,     -- nil = auto-calculate based on icon size
+            essentialThickness = 2,    -- Line thickness for Pixel Glow
+            essentialScale = 1,        -- Scale for Autocast Shine
             essentialXOffset = 0,
             essentialYOffset = 0,
 
-
+            -- Utility Cooldowns
             utilityEnabled = true,
             utilityGlowType = "Pixel Glow",
             utilityColor = {0.95, 0.95, 0.32, 1},
@@ -2588,8 +2628,8 @@ local defaults = {
             utilityXOffset = 0,
             utilityYOffset = 0,
         },
-
-
+        
+        -- Buff/Debuff Visuals
         buffBorders = {
             enableBuffs = true,
             enableDebuffs = true,
@@ -2597,10 +2637,10 @@ local defaults = {
             fontSize = 12,
             fontOutline = true,
         },
-
-
+        
+        -- PREY Autohides
         uiHider = {
-            hideObjectiveTrackerAlways = false,
+            hideObjectiveTrackerAlways = false,  -- Hide Objective Tracker always
             hideObjectiveTrackerInstanceTypes = {
                 mythicPlus = false,
                 mythicDungeon = false,
@@ -2631,29 +2671,29 @@ local defaults = {
             hideReputationBar = false,
             hideMainActionBarArt = false,
         },
-
-
+        
+        -- Minimap Settings
         minimap = {
-            enabled = true,
-
-
-            shape = "SQUARE",
+            enabled = true,  -- Enabled by default for clean minimap experience
+            
+            -- Shape and Size
+            shape = "SQUARE",  -- SQUARE or ROUND
             size = 160,
-            scale = 1.0,
+            scale = 1.0,  -- Scale multiplier for minimap frame
             borderSize = 2,
-            borderColor = {0, 0, 0, 1},
+            borderColor = {0, 0, 0, 1},  -- Black border
             useClassColorBorder = false,
-            buttonRadius = 2,
-
-
-            lock = false,
+            buttonRadius = 2,  -- LibDBIcon button radius for square minimap
+            
+            -- Position
+            lock = false,  -- Unlocked by default so users can position it
             position = { point = "TOPLEFT", relPoint = "BOTTOMLEFT", x = 790, y = 285 },
-
-
-            autoZoom = false,
-            hideAddonButtons = true,
-
-
+            
+            -- Features
+            autoZoom = false,  -- Auto zoom out after 10 seconds
+            hideAddonButtons = true,  -- Show addon buttons on hover only
+            
+            -- Button Visibility
             showZoomButtons = false,
             showMail = false,
             showCraftingOrder = false,
@@ -2663,7 +2703,7 @@ local defaults = {
             showCalendar = true,
             showTracking = false,
 
-
+            -- Dungeon Eye (LFG Queue Status Button) - repositions to minimap when in queue
             dungeonEye = {
                 enabled = true,
                 corner = "BOTTOMLEFT",
@@ -2672,7 +2712,7 @@ local defaults = {
                 offsetY = 0,
             },
 
-
+            -- Clock (anchored top-left) - disabled by default, user can enable
             showClock = false,
             clockConfig = {
                 offsetX = 0,
@@ -2684,13 +2724,13 @@ local defaults = {
                 outline = "OUTLINE",
                 color = {1, 1, 1, 1},
                 useClassColor = false,
-                timeFormat = "local",
+                timeFormat = "local",  -- "local" or "server"
             },
-
-
+            
+            -- Coordinates (anchored top-right)
             showCoords = false,
-            coordPrecision = "%d,%d",
-            coordUpdateInterval = 1,
+            coordPrecision = "%d,%d",  -- %d,%d = normal, %.1f,%.1f = high, %.2f,%.2f = very high
+            coordUpdateInterval = 1,  -- Update every 1 second
             coordsConfig = {
                 offsetX = 0,
                 offsetY = 0,
@@ -2702,8 +2742,8 @@ local defaults = {
                 color = {1, 1, 1, 1},
                 useClassColor = false,
             },
-
-
+            
+            -- Zone Text (anchored top-center)
             showZoneText = true,
             zoneTextConfig = {
                 offsetX = 0,
@@ -2715,53 +2755,53 @@ local defaults = {
                 monochrome = false,
                 outline = "OUTLINE",
                 useClassColor = false,
-                colorNormal = {1, 0.82, 0, 1},
-                colorSanctuary = {0.41, 0.8, 0.94, 1},
-                colorArena = {1.0, 0.1, 0.1, 1},
-                colorFriendly = {0.1, 1.0, 0.1, 1},
-                colorHostile = {1.0, 0.1, 0.1, 1},
-                colorContested = {1.0, 0.7, 0.0, 1},
+                colorNormal = {1, 0.82, 0, 1},      -- Gold
+                colorSanctuary = {0.41, 0.8, 0.94, 1},  -- Light blue
+                colorArena = {1.0, 0.1, 0.1, 1},    -- Red
+                colorFriendly = {0.1, 1.0, 0.1, 1}, -- Green
+                colorHostile = {1.0, 0.1, 0.1, 1},  -- Red
+                colorContested = {1.0, 0.7, 0.0, 1}, -- Orange
             },
         },
-
-
+        
+        -- Minimap Button (LibDBIcon) - separate from minimap module
         minimapButton = {
             hide = false,
-            minimapPos = 180,
+            minimapPos = 180,  -- 9 o'clock position (left side)
         },
-
-
+        
+        -- Datatext Panel (fixed below minimap - slot-based architecture)
         datatext = {
             enabled = true,
-            slots = {"fps", "durability", "time"},
+            slots = {"fps", "durability", "time"},  -- 3 configurable datatext slots
 
-
+            -- Per-slot configuration (shortLabel, noLabel, xOffset, yOffset)
             slot1 = { shortLabel = false, noLabel = false, xOffset = -1, yOffset = 0 },
             slot2 = { shortLabel = false, noLabel = false, xOffset = 6, yOffset = 0 },
             slot3 = { shortLabel = true, noLabel = false, xOffset = 3, yOffset = 0 },
 
-            forceSingleLine = true,
-
-
+            forceSingleLine = true,  -- If true, ignores wrapping and forces single line
+            
+            -- Panel Settings (width auto-matches minimap)
             height = 22,
-            offsetY = 0,
-            bgOpacity = 60,
-            borderSize = 2,
-            borderColor = {0, 0, 0, 1},
+            offsetY = 0,  -- Y offset from minimap bottom
+            bgOpacity = 60,  -- 0-100
+            borderSize = 2,  -- Border thickness (0-8, 0=hidden)
+            borderColor = {0, 0, 0, 1},  -- Black border (#90)
 
-
+            -- Font Settings
             font = "Prey",
             fontSize = 13,
-            fontOutline = "OUTLINE",
+            fontOutline = "OUTLINE",  -- "OUTLINE" = Thin
 
-
+            -- Color Settings
             useClassColor = false,
-            valueColor = {0.1, 1.0, 0.1, 1},
-
-
+            valueColor = {0.1, 1.0, 0.1, 1},  -- #1AFF1A green
+            
+            -- Separator
             separator = "  ",
-
-
+            
+            -- Legacy Composite Mode Toggles
             showFPS = true,
             showLatency = false,
             showDurability = true,
@@ -2771,45 +2811,45 @@ local defaults = {
             showFriends = false,
             showGuild = false,
             showLootSpec = false,
-
-
-            timeFormat = "local",
+            
+            -- Time Settings (for Time datatext or legacy mode)
+            timeFormat = "local",  -- "local" or "server"
             use24Hour = true,
-            useLocalTime = true,
-            lockoutCacheMinutes = 5,
+            useLocalTime = true,  -- For datatext registry
+            lockoutCacheMinutes = 5,  -- minutes between lockout data refresh (min 1)
 
+            -- Social datatext settings
+            showTotal = true,  -- Show total count (friends/guild)
+            showGuildName = false,  -- Show guild name in text
 
-            showTotal = true,
-            showGuildName = false,
+            -- Player Spec datatext settings
+            specDisplayMode = "full",  -- "icon" = icon only, "loadout" = icon + loadout, "full" = icon + spec/loadout
 
-
-            specDisplayMode = "full",
-
-
+            -- System datatext settings (combined FPS + Latency)
             system = {
-                latencyType = "home",
-                showLatency = true,
-                showProtocols = true,
-                showBandwidth = true,
-                showAddonMemory = true,
-                addonCount = 10,
-                showFpsStats = true,
+                latencyType = "home",      -- "home" or "world" latency on main display
+                showLatency = true,        -- Show Home/World latency in tooltip
+                showProtocols = true,      -- Show IPv4/IPv6 protocols in tooltip
+                showBandwidth = true,      -- Show bandwidth/download % when downloading
+                showAddonMemory = true,    -- Show addon memory usage in tooltip
+                addonCount = 10,           -- Number of addons to show (sorted by memory)
+                showFpsStats = true,       -- Show FPS avg/low/high when Shift held
             },
 
-
+            -- Volume datatext settings
             volume = {
-                volumeStep = 5,
-                controlType = "master",
-                showIcon = false,
+                volumeStep = 5,            -- Volume change per scroll (1-20)
+                controlType = "master",    -- Which volume to control: "master", "music", "sfx", "ambience", "dialog"
+                showIcon = false,          -- Show speaker icon instead of "Vol:" label
             },
         },
-
-
+        
+        -- Additional Datapanels (user-created, independent of minimap)
         quiDatatexts = {
-            panels = {},
+            panels = {},  -- Array of panel configurations
         },
 
-
+        -- Custom Tracker Bars (consumables, trinkets, custom spells)
         customTrackers = {
             bars = {
                 {
@@ -2817,32 +2857,32 @@ local defaults = {
                     name = "Trinket & Pot",
                     enabled = false,
                     locked = false,
-
+                    -- Position (offset from screen center, use snap buttons to align to player)
                     offsetX = -406,
                     offsetY = -152,
-
+                    -- Layout
                     growDirection = "RIGHT",
                     iconSize = 28,
                     spacing = 4,
                     borderSize = 2,
                     aspectRatioCrop = 1.0,
                     zoom = 0,
-
+                    -- Duration text
                     durationSize = 13,
                     durationColor = {1, 1, 1, 1},
                     durationAnchor = "CENTER",
                     durationOffsetX = 0,
                     durationOffsetY = 0,
                     hideDurationText = false,
-
+                    -- Stack text
                     stackSize = 9,
                     stackColor = {1, 1, 1, 1},
                     stackAnchor = "BOTTOMRIGHT",
                     stackOffsetX = 3,
                     stackOffsetY = -1,
                     hideStackText = false,
-                    showItemCharges = true,
-
+                    showItemCharges = true,  -- Show item charges (e.g., Healthstone 3 charges) instead of item count
+                    -- Background
                     bgOpacity = 0,
                     bgColor = {0, 0, 0, 1},
                     hideGCD = true,
@@ -2851,66 +2891,67 @@ local defaults = {
                     showOnlyWhenActive = false,
                     showOnlyWhenOffCooldown = false,
                     showOnlyInCombat = false,
-
+                    -- Active state (buff/cast/channel display)
                     showActiveState = true,
                     activeGlowEnabled = true,
                     activeGlowType = "Pixel Glow",
                     activeGlowColor = {1, 0.85, 0.3, 1},
-
+                    -- Pre-populated with Algari Healing Potion
                     entries = {
                         { type = "item", id = 224022 },
                     },
                 },
             },
-
+            -- Global keybind settings for custom trackers
             keybinds = {
                 showKeybinds = false,
                 keybindTextSize = 12,
-                keybindTextColor = { 1, 0.82, 0, 1 },
+                keybindTextColor = { 1, 0.82, 0, 1 },  -- Gold
                 keybindOffsetX = 2,
                 keybindOffsetY = -2,
             },
-
+            -- CDM buff tracking (trinket proc detection)
             cdmBuffTracking = {
                 trinketData = {},
                 learnedBuffs = {},
             },
         },
 
-
+        -- HUD Layering: Control frame level ordering for HUD elements
+        -- Higher values appear above lower values (range 0-10)
         hudLayering = {
-
+            -- CDM viewers (default 5 - middle)
             essential = 5,
             utility = 5,
             buffIcon = 5,
             buffBar = 5,
-
+            -- Power bars (higher defaults so text visible above CDM)
             primaryPowerBar = 7,
             secondaryPowerBar = 6,
-
+            -- Unit frames (lower defaults, background elements)
             playerFrame = 4,
-            playerIndicators = 6,
+            playerIndicators = 6,  -- Above player frame for visibility
             targetFrame = 4,
             totFrame = 3,
             petFrame = 3,
             focusFrame = 4,
             bossFrames = 4,
-
+            -- Castbars (middle)
             playerCastbar = 5,
             targetCastbar = 5,
-
+            -- Custom trackers
             customBars = 5,
         },
     },
-
+    -- Account-wide storage (shared across all characters)
     global = {
-
+        -- Gold tracking per character (realm-name = copper)
         goldData = {},
-
+        -- Spell Scanner: cross-character spell/item duration mappings
         spellScanner = {
-            spells = {},
-            items = {},
-            autoScan = false,
+            spells = {},   -- [castSpellID] = { buffSpellID, duration, icon, name, scannedAt }
+            items = {},    -- [itemID] = { useSpellID, buffSpellID, duration, icon, name, scannedAt }
+            autoScan = false,  -- Auto-scan setting (off by default)
         },
     },
 }
@@ -2921,33 +2962,38 @@ function PREYCore:OnInitialize()
     end
 
     self.db = LibStub("AceDB-3.0"):New("PreyUIDB", defaults, true)
-    PREY.db = self.db
+    PREY.db = self.db  -- Make database accessible to other PREY modules
 
-
+    -- Migrate visibility settings to SHOW logic
+    -- Old hideWhenX → new showX (semantic conversion)
+    -- hideOutOfCombat=true → showInCombat=true (user wants combat-only)
+    -- hideWhenNotInGroup=true → showInGroup=true (user wants group-only)
+    -- hideWhenNotInInstance=true → showInInstance=true (user wants instance-only)
+    -- hideWhenMounted has no equivalent (can't express "hide when mounted" in SHOW logic)
     local profile = self.db.profile
 
-
+    -- Helper to migrate a visibility table from HIDE to SHOW logic
     local function migrateToShowLogic(visTable)
         if not visTable then return end
-
+        -- Convert hideOutOfCombat → showInCombat
         if visTable.hideOutOfCombat then
             visTable.showInCombat = true
         end
-
+        -- Convert hideWhenNotInGroup → showInGroup
         if visTable.hideWhenNotInGroup then
             visTable.showInGroup = true
         end
-
+        -- Convert hideWhenNotInInstance → showInInstance
         if visTable.hideWhenNotInInstance then
             visTable.showInInstance = true
         end
-
+        -- Clean up old keys (hideWhenMounted is a new feature, not migrated)
         visTable.hideOutOfCombat = nil
         visTable.hideWhenNotInGroup = nil
         visTable.hideWhenNotInInstance = nil
     end
 
-
+    -- Migrate from old classHud table (pre-split)
     if profile.classHud then
         if not profile.cdmVisibility then
             profile.cdmVisibility = {}
@@ -2955,44 +3001,45 @@ function PREYCore:OnInitialize()
         if not profile.unitframesVisibility then
             profile.unitframesVisibility = {}
         end
-
+        -- Copy hideOutOfCombat → showInCombat for both
         if profile.classHud.hideOutOfCombat then
             profile.cdmVisibility.showInCombat = true
             profile.unitframesVisibility.showInCombat = true
         end
-
+        -- Preserve fade duration
         profile.cdmVisibility.fadeDuration = profile.cdmVisibility.fadeDuration or profile.classHud.fadeDuration or 0.2
         profile.unitframesVisibility.fadeDuration = profile.unitframesVisibility.fadeDuration or profile.classHud.fadeDuration or 0.2
         profile.classHud = nil
     end
 
-
+    -- Migrate recently-added hideWhenX keys to showX (if user reloaded after first implementation)
     migrateToShowLogic(profile.cdmVisibility)
     migrateToShowLogic(profile.unitframesVisibility)
 
-
+    -- Initialize preserved scale - will be properly set in OnEnable after UI scale is applied
     self._preservedUIScale = nil
 
-
+    -- Track spec for detecting false PLAYER_SPECIALIZATION_CHANGED events during M+ entry
     self._lastKnownSpec = GetSpecialization() or 0
 
-
+    -- Track current profile to detect same-profile "switches" during M+ entry
     self._lastKnownProfile = self.db:GetCurrentProfile()
 
     self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     self.db.RegisterCallback(self, "OnProfileCopied",  "OnProfileChanged")
     self.db.RegisterCallback(self, "OnProfileReset",   "OnProfileChanged")
 
-
+    -- Enhance database with LibDualSpec if available
     if LibDualSpec then
         LibDualSpec:EnhanceDatabase(self.db, ADDON_NAME)
     end
 
 
+    -- Note: Main /prey command is handled by init.lua
     self:RegisterChatCommand("preycorerefresh", "ForceRefreshBuffIcons")
     self:RegisterChatCommand("quicorerefresh", "ForceRefreshBuffIcons")
 
-
+    -- Defer minimap button creation to reduce load-time CPU
     C_Timer.After(0.1, function()
         self:CreateMinimapButton()
     end)
@@ -3000,31 +3047,36 @@ end
 
 function PREYCore:OnProfileChanged(event, db, profileKey)
 
-
+    -- AGGRESSIVE M+ PROTECTION: If we're in a challenge mode dungeon, defer EVERYTHING
+    -- WoW's protected state during M+ transitions can't be reliably detected by InCombatLockdown()
+    -- and pcall doesn't suppress ADDON_ACTION_BLOCKED (fires before Lua error propagates)
+    -- Check multiple conditions: active M+ OR in an M+ dungeon (covers keystone activation phase)
     local inChallengeMode = false
     if C_ChallengeMode then
-
-
+        -- IsChallengeModeActive = timer is running
+        -- GetActiveChallengeMapID returns non-nil if in an M+ dungeon (even before timer starts)
         inChallengeMode = (C_ChallengeMode.IsChallengeModeActive and C_ChallengeMode.IsChallengeModeActive())
             or (C_ChallengeMode.GetActiveChallengeMapID and C_ChallengeMode.GetActiveChallengeMapID() ~= nil)
     end
     if inChallengeMode then
-
-
+        -- We're in a challenge mode dungeon - skip profile changes entirely during M+
+        -- The protected state during keystone activation doesn't play nice with SetScale
+        -- Profile will be applied correctly on next /reload or when leaving the dungeon
         return
     end
 
-
+    -- Skip if "switching" to the same profile (happens during M+ entry false events)
+    -- LibDualSpec triggers profile switch even when already on correct profile
     local currentProfile = self.db:GetCurrentProfile()
     if profileKey == self._lastKnownProfile and profileKey == currentProfile then
-        return
+        return  -- No actual change happening - skip all UI modifications
     end
     self._lastKnownProfile = profileKey
 
-
+    -- Update spec tracking (kept for reference)
     self._lastKnownSpec = GetSpecialization() or 0
 
-
+    -- Helper to apply UIParent scale safely (defers if in combat or protected state)
     local function ApplyUIScale(scale)
         if InCombatLockdown() then
             PREYCore._pendingUIScale = scale
@@ -3043,11 +3095,11 @@ function PREYCore:OnProfileChanged(event, db, profileKey)
             end
             PREYCore._scaleRegenFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
         else
-
-
+            -- Use pcall to catch protected states not detected by InCombatLockdown
+            -- (e.g., instance transitions during M+ keystone activation)
             local success = pcall(function() UIParent:SetScale(scale) end)
             if not success then
-
+                -- Protected state detected - defer to combat end
                 PREYCore._pendingUIScale = scale
                 if not PREYCore._scaleRegenFrame then
                     PREYCore._scaleRegenFrame = CreateFrame("Frame")
@@ -3067,20 +3119,20 @@ function PREYCore:OnProfileChanged(event, db, profileKey)
         end
     end
 
-
+    -- Handle UI scale on profile change
     if self.db.profile.general then
         local newProfileScale = self.db.profile.general.uiScale
 
         if not newProfileScale or newProfileScale == 0 then
-
+            -- New/reset profile has no scale - use the preserved one
             local scaleToUse = self._preservedUIScale
 
-
+            -- If no preserved scale, use smart default based on resolution
             if not scaleToUse then
                 if self.GetSmartDefaultScale then
                     scaleToUse = self:GetSmartDefaultScale()
                 else
-
+                    -- Inline fallback
                     local _, screenHeight = GetPhysicalScreenSize()
                     if screenHeight >= 2160 then
                         scaleToUse = 0.53
@@ -3095,88 +3147,91 @@ function PREYCore:OnProfileChanged(event, db, profileKey)
             self.db.profile.general.uiScale = scaleToUse
             ApplyUIScale(scaleToUse)
         else
-
+            -- Existing profile has a saved scale - apply it
             ApplyUIScale(newProfileScale)
-
+            -- Only update preserved scale when switching to a profile with a valid saved scale
             self._preservedUIScale = newProfileScale
         end
 
-
+        -- Update pixel perfect calculations (skip if deferred to combat end)
         if not InCombatLockdown() and self.UIMult then
             self:UIMult()
         end
     end
-
-
+    
+    -- Handle Panel Scale and Alpha preservation
+    -- Always restore the preserved panel settings on profile change (new, reset, or switch)
+    -- This keeps the panel consistent across all profile operations
     if self._preservedPanelScale then
         self.db.profile.configPanelScale = self._preservedPanelScale
     end
     if self._preservedPanelAlpha then
         self.db.profile.configPanelAlpha = self._preservedPanelAlpha
     end
-
+    
     if self.RefreshAll then
         self:RefreshAll()
     end
-
-
+    
+    -- Refresh Minimap module on profile change
     if PREYCore.Minimap then
-
+        -- Small delay to ensure profile data is fully loaded
         C_Timer.After(0.1, function()
             if PREYCore.Minimap.Refresh then
                 PREYCore.Minimap:Refresh()
             end
         end)
     end
-
-
+    
+    -- Refresh Unit Frames (including castbars) on profile change
     C_Timer.After(0.2, function()
         if _G.PreyUI_RefreshUnitFrames then
             _G.PreyUI_RefreshUnitFrames()
         end
     end)
-
-
+    
+    -- Refresh NCDM (Cooldown Display Manager) on profile change
     C_Timer.After(0.3, function()
         if _G.PreyUI_RefreshNCDM then
             _G.PreyUI_RefreshNCDM()
         end
     end)
 
-
+    -- Refresh CDM Visibility on profile change
     C_Timer.After(0.4, function()
         if _G.PreyUI_RefreshCDMVisibility then
             _G.PreyUI_RefreshCDMVisibility()
         end
     end)
 
-
+    -- Refresh Reticle on profile change
     C_Timer.After(0.45, function()
         if _G.PreyUI_RefreshReticle then
             _G.PreyUI_RefreshReticle()
         end
     end)
 
-
+    -- Refresh Custom Trackers on profile change
     C_Timer.After(0.47, function()
         if _G.PreyUI_RefreshCustomTrackers then
             _G.PreyUI_RefreshCustomTrackers()
         end
     end)
 
-
+    -- Refresh Spec Profiles tab if options panel is open
     if _G.PreyUI_RefreshSpecProfilesTab then
         _G.PreyUI_RefreshSpecProfilesTab()
     end
 
-
+    -- Show popup notification about profile change
+    -- Delay slightly to ensure UI is ready
     C_Timer.After(0.5, function()
         self:ShowProfileChangeNotification()
     end)
 end
 
 function PREYCore:ShowProfileChangeNotification()
-
+    -- Create a simple popup frame if it doesn't exist
     if not self.profileChangePopup then
         local popup = CreateFrame("Frame", "PREYCore_ProfileChangePopup", UIParent, "BackdropTemplate")
         popup:SetSize(400, 120)
@@ -3193,41 +3248,41 @@ function PREYCore:ShowProfileChangeNotification()
         })
         popup:SetBackdropColor(0, 0, 0, 0.9)
         popup:Hide()
-
-
+        
+        -- Title
         local title = popup:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         title:SetPoint("TOP", popup, "TOP", 0, -20)
         title:SetText("Profile Changed")
         popup.title = title
-
-
+        
+        -- Message
         local message = popup:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         message:SetPoint("CENTER", popup, "CENTER", 0, -10)
         message:SetWidth(360)
         message:SetJustifyH("CENTER")
         message:SetText("Profile changed please open edit mode for unit frame position updates")
         popup.message = message
-
-
+        
+        -- Close button (opens edit mode)
         local closeButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
         closeButton:SetSize(100, 30)
         closeButton:SetPoint("BOTTOM", popup, "BOTTOM", 0, 15)
         closeButton:SetText("OK")
         closeButton:SetScript("OnClick", function(self)
             self:GetParent():Hide()
-
+            -- Open edit mode the same way as the config button
             DEFAULT_CHAT_FRAME.editBox:SetText("/editmode")
             ChatEdit_SendText(DEFAULT_CHAT_FRAME.editBox, 0)
         end)
         popup.closeButton = closeButton
-
+        
         self.profileChangePopup = popup
     end
-
-
+    
+    -- Show the popup
     if self.profileChangePopup then
         self.profileChangePopup:Show()
-
+        -- Auto-hide after 10 seconds if not manually closed
         C_Timer.After(10, function()
             if self.profileChangePopup and self.profileChangePopup:IsShown() then
                 self.profileChangePopup:Hide()
@@ -3236,44 +3291,48 @@ function PREYCore:ShowProfileChangeNotification()
     end
 end
 
+-- ============================================================================
+-- EDIT MODE SELECTION MANAGER
+-- Tracks which element is currently selected for nudge arrows
+-- ============================================================================
 
 PREYCore.EditModeSelection = {
-    selectedType = nil,
-    selectedKey = nil,
+    selectedType = nil,  -- "unitframe", "powerbar", "cdm"
+    selectedKey = nil,   -- "player", "primary", "EssentialCooldownViewer", etc.
 }
 
-
+-- Select an element and show its nudge arrows (hides arrows on previous selection)
 function PREYCore:SelectEditModeElement(elementType, elementKey)
-
+    -- Skip if already selected
     if self.EditModeSelection.selectedType == elementType and self.EditModeSelection.selectedKey == elementKey then
         return
     end
 
-
+    -- Hide arrows on previously selected element
     self:HideCurrentSelectionArrows()
 
-
+    -- Update selection
     self.EditModeSelection.selectedType = elementType
     self.EditModeSelection.selectedKey = elementKey
 
-
+    -- Show arrows on newly selected element
     self:ShowSelectionArrows(elementType, elementKey)
 end
 
-
+-- Clear selection (called when exiting Edit Mode)
 function PREYCore:ClearEditModeSelection()
     self:HideCurrentSelectionArrows()
     self.EditModeSelection.selectedType = nil
     self.EditModeSelection.selectedKey = nil
 end
 
-
+-- Hide nudge arrows on the currently selected element
 function PREYCore:HideCurrentSelectionArrows()
     local sel = self.EditModeSelection
     if not sel.selectedType then return end
 
     if sel.selectedType == "unitframe" then
-
+        -- Unit frames store their overlay on the frame itself
         if ns.PREY_UnitFrames and ns.PREY_UnitFrames.frames then
             local frame = ns.PREY_UnitFrames.frames[sel.selectedKey]
             if frame and frame.editOverlay then
@@ -3300,7 +3359,7 @@ function PREYCore:HideCurrentSelectionArrows()
     end
 end
 
-
+-- Show nudge arrows on the specified element
 function PREYCore:ShowSelectionArrows(elementType, elementKey)
     if elementType == "unitframe" then
         if ns.PREY_UnitFrames and ns.PREY_UnitFrames.frames then
@@ -3325,7 +3384,7 @@ function PREYCore:ShowSelectionArrows(elementType, elementKey)
     elseif elementType == "minimap" then
         if self.minimapOverlay then
             self:ShowNudgeButtons(self.minimapOverlay)
-
+            -- Update info text with current position
             local settings = self.db and self.db.profile and self.db.profile.minimap
             if settings and settings.position and self.minimapOverlay.infoText then
                 self.minimapOverlay.infoText:SetText(string.format("Minimap  X:%d Y:%d",
@@ -3336,7 +3395,7 @@ function PREYCore:ShowSelectionArrows(elementType, elementKey)
     end
 end
 
-
+-- Helper to show nudge buttons on an overlay
 function PREYCore:ShowNudgeButtons(overlay)
     if not overlay then return end
     if overlay.nudgeUp then overlay.nudgeUp:Show() end
@@ -3346,7 +3405,7 @@ function PREYCore:ShowNudgeButtons(overlay)
     if overlay.infoText then overlay.infoText:Show() end
 end
 
-
+-- Helper to hide nudge buttons on an overlay
 function PREYCore:HideNudgeButtons(overlay)
     if not overlay then return end
     if overlay.nudgeUp then overlay.nudgeUp:Hide() end
@@ -3356,50 +3415,51 @@ function PREYCore:HideNudgeButtons(overlay)
     if overlay.infoText then overlay.infoText:Hide() end
 end
 
+-- ============================================================================
 
 function PREYCore:OnEnable()
-
-
+    -- Override Blizzard's /reload command to use SafeReload
+    -- (Must happen in OnEnable, after Blizzard's slash commands are registered)
     SlashCmdList["RELOAD"] = function()
         PREY:SafeReload()
     end
 
-
+    -- IMMEDIATE (<1ms): Critical sync-only work
     if self.InitializePixelPerfect then
         self:InitializePixelPerfect()
     end
 
-
+    -- Apply UI scale (uses pixel perfect system if available)
     if self.ApplyUIScale then
         self:ApplyUIScale()
     elseif self.db.profile.general then
-
+        -- Fallback if pixel perfect not loaded
         local savedScale = self.db.profile.general.uiScale
         local scaleToApply
         if savedScale and savedScale > 0 then
             scaleToApply = savedScale
         else
-
+            -- Smart default based on resolution
             local _, screenHeight = GetPhysicalScreenSize()
-            if screenHeight >= 2160 then
+            if screenHeight >= 2160 then      -- 4K
                 scaleToApply = 0.53
-            elseif screenHeight >= 1440 then
+            elseif screenHeight >= 1440 then  -- 1440p
                 scaleToApply = 0.64
-            else
+            else                              -- 1080p or lower
                 scaleToApply = 1.0
             end
             self.db.profile.general.uiScale = scaleToApply
         end
-
+        -- Use pcall to catch protected states
         pcall(function() UIParent:SetScale(scaleToApply) end)
     end
 
-
+    -- Capture preserved UI scale (after it's been properly applied)
     self._preservedUIScale = UIParent:GetScale()
     self._preservedPanelScale = self.db.profile.configPanelScale
     self._preservedPanelAlpha = self.db.profile.configPanelAlpha
 
-
+    -- DEFERRED 0.1s: Hook setup (spreads work across frames)
     C_Timer.After(0.1, function()
         if not InCombatLockdown() then
             self:HookViewers()
@@ -3407,27 +3467,27 @@ function PREYCore:OnEnable()
         end
     end)
 
-
+    -- DEFERRED 0.5s: Unit frames (secure APIs now safe) + global font override + alerts
     C_Timer.After(0.5, function()
         if self.UnitFrames and self.db.profile.unitFrames and self.db.profile.unitFrames.enabled then
             self.UnitFrames:Initialize()
         end
-
+        -- Initialize alert/toast skinning
         if self.Alerts and self.db.profile.general and self.db.profile.general.skinAlerts then
             self.Alerts:Initialize()
         end
-
+        -- Apply global font to Blizzard UI elements
         if self.ApplyGlobalFont then
             self:ApplyGlobalFont()
         end
-
+        -- Initialize Stagger Bar for Monks
         local _, class = UnitClass("player")
         if class == "MONK" and PREY.InitStaggerBar then
             PREY:InitStaggerBar()
         end
     end)
 
-
+    -- DEFERRED 1.0s: First viewer reskin + UI hider + buff borders
     C_Timer.After(1.0, function()
         if not InCombatLockdown() then
             self:ForceReskinAllViewers()
@@ -3440,7 +3500,7 @@ function PREYCore:OnEnable()
         end
     end)
 
-
+    -- DEFERRED 2.0s: Safety retry for late-loading frames
     C_Timer.After(2.0, function()
         if not InCombatLockdown() then
             self:ForceReskinAllViewers()
@@ -3449,7 +3509,7 @@ function PREYCore:OnEnable()
 end
 
 function PREYCore:OpenConfig()
-
+    -- Open the new custom GUI instead of AceConfig
     if PreyUI and PreyUI.GUI then
         PreyUI.GUI:Toggle()
     end
@@ -3458,19 +3518,19 @@ end
 function PREYCore:CreateMinimapButton()
     local LDB = LibStub("LibDataBroker-1.1", true)
     local LibDBIcon = LibStub("LibDBIcon-1.0", true)
-
+    
     if not LDB or not LibDBIcon then
         return
     end
-
-
+    
+    -- Initialize minimap button database (separate from minimap module settings)
     if not self.db.profile.minimapButton then
         self.db.profile.minimapButton = {
             hide = false,
         }
     end
-
-
+    
+    -- Create DataBroker object
     local dataObj = LDB:NewDataObject(ADDON_NAME, {
         type = "launcher",
         icon = "Interface\\AddOns\\PreyUI\\assets\\preyLogo.tga",
@@ -3479,8 +3539,8 @@ function PREYCore:CreateMinimapButton()
             if button == "LeftButton" then
                 self:OpenConfig()
             elseif button == "RightButton" then
-
-
+                -- Right click could toggle something or show a menu
+                -- For now, just open config
                 self:OpenConfig()
             end
         end,
@@ -3490,11 +3550,12 @@ function PREYCore:CreateMinimapButton()
             tooltip:AddLine("Right-click to open configuration", 1, 1, 1)
         end,
     })
-
-
+    
+    -- Register with LibDBIcon using separate minimapButton settings
     LibDBIcon:Register(ADDON_NAME, dataObj, self.db.profile.minimapButton)
 end
 
+-- Helper Functions
 
 local function CreateBorder(frame)
     if frame.border then return frame.border end
@@ -3529,7 +3590,7 @@ end
 local function GetIconCountFont(icon)
     if not icon then return nil end
 
-
+    -- 1. ChargeCount (charges)
     local charge = icon.ChargeCount
     if charge then
         local fs = charge.Current or charge.Text or charge.Count or nil
@@ -3548,7 +3609,7 @@ local function GetIconCountFont(icon)
         end
     end
 
-
+    -- 2. Applications (Buff stacks)
     local apps = icon.Applications
     if apps and apps.GetRegions then
         for _, region in ipairs({ apps:GetRegions() }) do
@@ -3558,7 +3619,7 @@ local function GetIconCountFont(icon)
         end
     end
 
-
+    -- 3. Fallback: look for named stack text
     for _, region in ipairs({ icon:GetRegions() }) do
         if region:GetObjectType() == "FontString" then
             local name = region:GetName()
@@ -3571,125 +3632,130 @@ local function GetIconCountFont(icon)
     return nil
 end
 
+-- Icon Skinning
 
 function PREYCore:SkinIcon(icon, settings)
-
+    -- Get the icon texture frame (handle both .icon and .Icon for compatibility)
     local iconTexture = icon.icon or icon.Icon
     if not icon or not iconTexture then return end
 
-
+    -- Calculate icon dimensions from iconSize and aspectRatio (crop slider)
     local iconSize = settings.iconSize or 40
-    local aspectRatioValue = 1.0
-
-
+    local aspectRatioValue = 1.0 -- Default to square
+    
+    -- Get aspect ratio from crop slider or convert from string format
     if settings.aspectRatioCrop then
         aspectRatioValue = settings.aspectRatioCrop
     elseif settings.aspectRatio then
-
+        -- Convert "16:9" format to numeric ratio
         local aspectW, aspectH = settings.aspectRatio:match("^(%d+%.?%d*):(%d+%.?%d*)$")
         if aspectW and aspectH then
             aspectRatioValue = tonumber(aspectW) / tonumber(aspectH)
         end
     end
-
+    
     local iconWidth = iconSize
     local iconHeight = iconSize
-
-
+    
+    -- Calculate width/height based on aspect ratio value
+    -- aspectRatioValue is width:height ratio (e.g., 1.78 for 16:9, 0.56 for 9:16)
     if aspectRatioValue and aspectRatioValue ~= 1.0 then
         if aspectRatioValue > 1.0 then
-
+            -- Wider - width is longest, so width = iconSize
             iconWidth = iconSize
             iconHeight = iconSize / aspectRatioValue
         elseif aspectRatioValue < 1.0 then
-
+            -- Taller - height is longest, so height = iconSize
             iconWidth = iconSize * aspectRatioValue
             iconHeight = iconSize
         end
     end
-
+    
     local padding   = settings.padding or 5
     local zoom      = settings.zoom or 0
     local border    = icon.__CDM_Border
     local cdPadding = math.floor(padding * 0.7 + 0.5)
 
-
+    -- This prevents stretching by cropping the texture to match the container aspect ratio
     iconTexture:ClearAllPoints()
-
-
+    
+    -- Fill the container
     iconTexture:SetPoint("TOPLEFT", icon, "TOPLEFT", padding, -padding)
     iconTexture:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -padding, padding)
-
-
+    
+    -- Calculate texture coordinates based on aspect ratio to prevent stretching
+    -- Use the same aspectRatioValue calculated above
     local left, right, top, bottom = 0, 1, 0, 1
-
+    
     if aspectRatioValue and aspectRatioValue ~= 1.0 then
         if aspectRatioValue > 1.0 then
-
+            -- Wider than tall (e.g., 1.78 for 16:9) - crop top/bottom
             local cropAmount = 1.0 - (1.0 / aspectRatioValue)
             local offset = cropAmount / 2.0
             top = offset
             bottom = 1.0 - offset
         elseif aspectRatioValue < 1.0 then
-
+            -- Taller than wide (e.g., 0.56 for 9:16) - crop left/right
             local cropAmount = 1.0 - aspectRatioValue
             local offset = cropAmount / 2.0
             left = offset
             right = 1.0 - offset
         end
     end
-
-
+    
+    -- Apply zoom on top of aspect ratio crop
     if zoom > 0 then
         local currentWidth = right - left
         local currentHeight = bottom - top
         local visibleSize = 1.0 - (zoom * 2)
-
+        
         local zoomedWidth = currentWidth * visibleSize
         local zoomedHeight = currentHeight * visibleSize
-
+        
         local centerX = (left + right) / 2.0
         local centerY = (top + bottom) / 2.0
-
+        
         left = centerX - (zoomedWidth / 2.0)
         right = centerX + (zoomedWidth / 2.0)
         top = centerY - (zoomedHeight / 2.0)
         bottom = centerY + (zoomedHeight / 2.0)
     end
-
-
+    
+    -- Apply texture coordinates - this zooms/crops instead of stretching
     iconTexture:SetTexCoord(left, right, top, bottom)
-
-
+    
+    -- Use SetWidth and SetHeight separately AND SetSize to ensure both dimensions are set independently
+    -- Wrap in pcall to handle protected frames gracefully
     local sizeSet = pcall(function()
     icon:SetWidth(iconWidth)
     icon:SetHeight(iconHeight)
     icon:SetSize(iconWidth, iconHeight)
     end)
-
-
+    
+    -- If size couldn't be set, reset texture coords to avoid visual mismatch
+    -- and mark icon as NOT skinned so we retry later
     if not sizeSet then
         iconTexture:SetTexCoord(0, 1, 0, 1)
-        icon.__cdmSkinFailed = true
+        icon.__cdmSkinFailed = true  -- Mark for retry
     else
         icon.__cdmSkinFailed = nil
     end
 
-
+    -- Cooldown glow
     if icon.CooldownFlash then
         icon.CooldownFlash:ClearAllPoints()
         icon.CooldownFlash:SetPoint("TOPLEFT", icon, "TOPLEFT", cdPadding, -cdPadding)
         icon.CooldownFlash:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -cdPadding, cdPadding)
     end
 
-
+    -- Cooldown swipe
     if icon.Cooldown then
         icon.Cooldown:ClearAllPoints()
         icon.Cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", cdPadding, -cdPadding)
         icon.Cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -cdPadding, cdPadding)
     end
 
-
+    -- Pandemic icon
     local picon = icon.PandemicIcon or icon.pandemicIcon or icon.Pandemic or icon.pandemic
     if not picon then
         for _, region in ipairs({ icon:GetChildren() }) do
@@ -3706,7 +3772,7 @@ function PREYCore:SkinIcon(icon, settings)
         picon:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -padding, padding)
     end
 
-
+    -- Out of range highlight
     local oor = icon.OutOfRange or icon.outOfRange or icon.oor
     if oor and oor.ClearAllPoints then
         oor:ClearAllPoints()
@@ -3714,14 +3780,14 @@ function PREYCore:SkinIcon(icon, settings)
         oor:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -padding, padding)
     end
 
-
+    -- Charge/stack text
     local fs = GetIconCountFont(icon)
     if fs and fs.ClearAllPoints then
         fs:ClearAllPoints()
 
         local point   = settings.chargeTextAnchor or "BOTTOMRIGHT"
         if point == "MIDDLE" then point = "CENTER" end
-
+        
         local offsetX = settings.countTextOffsetX or 0
         local offsetY = settings.countTextOffsetY or 0
 
@@ -3733,22 +3799,22 @@ function PREYCore:SkinIcon(icon, settings)
             fs:SetFont(font, desiredSize, flags or "OUTLINE")
         end
     end
-
-
+    
+    -- Duration text (cooldown countdown) - find and style the cooldown text
     local cooldown = icon.cooldown or icon.Cooldown
     if cooldown then
-
+        -- Try to find the cooldown's text region
         local durationSize = settings.durationTextSize
         if durationSize and durationSize > 0 then
-
+            -- Method 1: Check for OmniCC text
             if cooldown.text then
                 local font, _, flags = cooldown.text:GetFont()
                 if font then
                     cooldown.text:SetFont(font, durationSize, flags or "OUTLINE")
                 end
             end
-
-
+            
+            -- Method 2: Check for Blizzard's built-in cooldown text (GetRegions)
             for _, region in pairs({cooldown:GetRegions()}) do
                 if region:GetObjectType() == "FontString" then
                     local font, _, flags = region:GetFont()
@@ -3760,10 +3826,11 @@ function PREYCore:SkinIcon(icon, settings)
         end
     end
 
-
+    -- Strip Blizzard overlay
     StripBlizzardOverlay(icon)
 
-
+    -- Border (using BACKGROUND texture to avoid secret value errors during combat)
+    -- BackdropTemplate causes "arithmetic on secret value" crashes when frame is resized during combat
     if icon.IsForbidden and icon:IsForbidden() then
         icon.__cdmSkinned = true
         return
@@ -3789,11 +3856,11 @@ function PREYCore:SkinIcon(icon, settings)
         end
     end
 
-
+    -- Only mark as fully skinned if size was successfully set
     if not icon.__cdmSkinFailed then
     icon.__cdmSkinned = true
     end
-    icon.__cdmSkinPending = nil
+    icon.__cdmSkinPending = nil  -- Clear pending flag
 end
 
 function PREYCore:SkinAllIconsInViewer(viewer)
@@ -3817,34 +3884,36 @@ function PREYCore:SkinAllIconsInViewer(viewer)
     end
 end
 
+-- Viewer Layout
 
+-- Helper: Build row pattern array from settings
 local function BuildRowPattern(settings, viewerName)
     local pattern = {}
-
+    
     if viewerName == "EssentialCooldownViewer" then
-
+        -- Essential has 3 rows
         if (settings.row1Icons or 0) > 0 then table.insert(pattern, settings.row1Icons) end
         if (settings.row2Icons or 0) > 0 then table.insert(pattern, settings.row2Icons) end
         if (settings.row3Icons or 0) > 0 then table.insert(pattern, settings.row3Icons) end
     elseif viewerName == "UtilityCooldownViewer" then
-
+        -- Utility has 2 rows
         if (settings.row1Icons or 0) > 0 then table.insert(pattern, settings.row1Icons) end
         if (settings.row2Icons or 0) > 0 then table.insert(pattern, settings.row2Icons) end
     end
-
-
+    
+    -- If all rows are 0 or pattern is empty, default to unlimited single row
     if #pattern == 0 then
         return nil
     end
-
+    
     return pattern
 end
 
-
+-- Helper: Compute grid from icons and pattern
 local function ComputeGrid(icons, pattern)
     local grid = {}
     local idx = 1
-
+    
     for _, rowSize in ipairs(pattern) do
         if rowSize > 0 then
             local row = {}
@@ -3859,8 +3928,9 @@ local function ComputeGrid(icons, pattern)
             end
         end
     end
-
-
+    
+    -- If there are remaining icons beyond the pattern, add them to extra rows
+    -- using the last row's size as the template
     local lastRowSize = pattern[#pattern] or 6
     while idx <= #icons do
         local row = {}
@@ -3874,11 +3944,11 @@ local function ComputeGrid(icons, pattern)
             grid[#grid + 1] = row
         end
     end
-
+    
     return grid
 end
 
-
+-- Helper: Calculate max row width for centering
 local function MaxRowWidth(grid, iconWidth, spacing)
     local maxW = 0
     for _, row in ipairs(grid) do
@@ -3908,46 +3978,46 @@ function PREYCore:ApplyViewerLayout(viewer)
     local count = #icons
     if count == 0 then return end
 
-
+    -- Sort icons without touching secure cooldown fields.
     table.sort(icons, function(a, b)
         return GetViewerStableFrameOrder(a) < GetViewerStableFrameOrder(b)
     end)
 
-
+    -- Calculate icon dimensions from iconSize and aspectRatio (crop slider)
     local iconSize = settings.iconSize or 32
-    local aspectRatioValue = 1.0
-
-
+    local aspectRatioValue = 1.0 -- Default to square
+    
+    -- Get aspect ratio from crop slider or convert from string format
     if settings.aspectRatioCrop then
         aspectRatioValue = settings.aspectRatioCrop
     elseif settings.aspectRatio then
-
+        -- Convert "16:9" format to numeric ratio
         local aspectW, aspectH = settings.aspectRatio:match("^(%d+%.?%d*):(%d+%.?%d*)$")
         if aspectW and aspectH then
             aspectRatioValue = tonumber(aspectW) / tonumber(aspectH)
         end
     end
-
+    
     local iconWidth = iconSize
     local iconHeight = iconSize
-
-
+    
+    -- Calculate width/height based on aspect ratio value
     if aspectRatioValue and aspectRatioValue ~= 1.0 then
         if aspectRatioValue > 1.0 then
-
+            -- Wider - width is longest, so width = iconSize
             iconWidth = iconSize
             iconHeight = iconSize / aspectRatioValue
         elseif aspectRatioValue < 1.0 then
-
+            -- Taller - height is longest, so height = iconSize
             iconWidth = iconSize * aspectRatioValue
             iconHeight = iconSize
         end
     end
-
+    
     local spacing    = settings.spacing or 4
     local rowLimit   = settings.rowLimit or 0
 
-
+    -- Apply icon sizes
     for _, icon in ipairs(icons) do
         icon:ClearAllPoints()
         icon:SetWidth(iconWidth)
@@ -3955,66 +4025,66 @@ function PREYCore:ApplyViewerLayout(viewer)
         icon:SetSize(iconWidth, iconHeight)
     end
 
-
+    -- Check if we should use row pattern (for Essential/Utility only)
     local useRowPattern = settings.useRowPattern
     local rowPattern = nil
-
+    
     if useRowPattern and (name == "EssentialCooldownViewer" or name == "UtilityCooldownViewer") then
         rowPattern = BuildRowPattern(settings, name)
     end
-
-
+    
+    -- Calculate Y offset if Utility is anchored to Essential
     local yOffset = 0
     if name == "UtilityCooldownViewer" and settings.anchorToEssential then
         local essentialViewer = _G.EssentialCooldownViewer
         if essentialViewer and essentialViewer.__cdmTotalHeight then
             local anchorGap = settings.anchorGap or 10
-
+            -- Offset by Essential's total height plus gap
             yOffset = -(essentialViewer.__cdmTotalHeight + anchorGap)
         end
     end
-
-
+    
+    -- Use row pattern layout if enabled and valid
     if rowPattern and #rowPattern > 0 then
         local grid = ComputeGrid(icons, rowPattern)
         local maxW = MaxRowWidth(grid, iconWidth, spacing)
         local alignment = settings.rowAlignment or "CENTER"
         local rowSpacing = iconHeight + spacing
-
+        
         viewer.__cdmIconWidth = maxW
-
+        -- Store total height for anchoring (number of rows * row height, minus last spacing)
         viewer.__cdmTotalHeight = (#grid * iconHeight) + ((#grid - 1) * spacing)
-
+        
         local y = yOffset
         for rowIdx, row in ipairs(grid) do
             local rowW = (#row * iconWidth) + ((#row - 1) * spacing)
-
-
+            
+            -- Calculate starting X based on alignment
             local startX
             if alignment == "LEFT" then
                 startX = -maxW / 2 + iconWidth / 2
             elseif alignment == "RIGHT" then
                 startX = maxW / 2 - rowW + iconWidth / 2
-            else
+            else -- CENTER
                 startX = -rowW / 2 + iconWidth / 2
             end
-
-
+            
+            -- Position icons in this row
             for idx, icon in ipairs(row) do
                 local x = startX + (idx - 1) * (iconWidth + spacing)
                 icon:SetPoint("CENTER", container, "CENTER", x, y)
             end
-
-
+            
+            -- Move down for next row
             y = y - rowSpacing
         end
-
-
+        
+    -- Legacy rowLimit behavior (for backwards compatibility)
     elseif rowLimit <= 0 then
-
+        -- Single row (original behavior)
         local totalWidth = count * iconWidth + (count - 1) * spacing
         viewer.__cdmIconWidth = totalWidth
-        viewer.__cdmTotalHeight = iconHeight
+        viewer.__cdmTotalHeight = iconHeight  -- Single row height
 
         local startX = -totalWidth / 2 + iconWidth / 2
 
@@ -4023,10 +4093,10 @@ function PREYCore:ApplyViewerLayout(viewer)
             icon:SetPoint("CENTER", container, "CENTER", x, yOffset)
         end
     else
-
+        -- Multi-row layout with centered horizontal growth (legacy rowLimit)
         local numRows = math.ceil(count / rowLimit)
         local rowSpacing = iconHeight + spacing
-
+        
         local maxRowWidth = 0
         for row = 1, numRows do
             local rowStart = (row - 1) * rowLimit + 1
@@ -4039,10 +4109,10 @@ function PREYCore:ApplyViewerLayout(viewer)
                 end
             end
         end
-
+        
         viewer.__cdmIconWidth = maxRowWidth
         viewer.__cdmTotalHeight = (numRows * iconHeight) + ((numRows - 1) * spacing)
-
+        
         local growDirection = "down"
 
         for i, icon in ipairs(icons) do
@@ -4051,18 +4121,18 @@ function PREYCore:ApplyViewerLayout(viewer)
             local rowEnd = math.min(row * rowLimit, count)
             local rowCount = rowEnd - rowStart + 1
             local positionInRow = i - rowStart + 1
-
+            
             local rowWidth = rowCount * iconWidth + (rowCount - 1) * spacing
             local startX = -rowWidth / 2 + iconWidth / 2
             local x = startX + (positionInRow - 1) * (iconWidth + spacing)
-
+            
             local y
             if growDirection == "up" then
                 y = yOffset + (row - 1) * rowSpacing
             else
                 y = yOffset - (row - 1) * rowSpacing
             end
-
+            
             icon:SetPoint("CENTER", container, "CENTER", x, y)
         end
     end
@@ -4083,20 +4153,20 @@ function PREYCore:RescanViewer(viewer)
         if IsCooldownIconFrame(child) and child:IsShown() then
             table.insert(icons, child)
 
-
+            -- Retry skinning if it failed before or hasn't been done
             if not child.__cdmSkinned or child.__cdmSkinFailed then
-
+                -- Mark as pending to avoid multiple attempts
                 if not child.__cdmSkinPending then
                     child.__cdmSkinPending = true
-
+                    
                     if inCombat then
-
+                        -- Defer skinning until out of combat
                         if not self.__cdmPendingIcons then
                             self.__cdmPendingIcons = {}
                         end
                         self.__cdmPendingIcons[child] = { icon = child, settings = settings, viewer = viewer }
-
-
+                        
+                        -- Ensure we have an event frame for combat end
                         if not self.__cdmIconSkinEventFrame then
                             local eventFrame = CreateFrame("Frame")
                             eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -4108,7 +4178,7 @@ function PREYCore:RescanViewer(viewer)
                         end
                         self.__cdmIconSkinEventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
                     else
-
+                        -- Not in combat, try to skin immediately
                         local success = pcall(self.SkinIcon, self, child, settings)
                         if success then
                             child.__cdmSkinPending = nil
@@ -4122,17 +4192,17 @@ function PREYCore:RescanViewer(viewer)
 
     local count = #icons
 
-
+    -- Check if icon count changed
     if count ~= viewer.__cdmIconCount then
         viewer.__cdmIconCount = count
         changed = true
     end
 
     if changed then
-
+        -- Re-apply layout when the viewer's icon set changes
         self:ApplyViewerLayout(viewer)
 
-
+        -- Keep resource bars in sync with the viewer width immediately
         if self.UpdatePowerBar then
             self:UpdatePowerBar()
         end
@@ -4148,13 +4218,13 @@ function PREYCore:ApplyViewerSkin(viewer)
     local settings = self.db.profile.viewers[name]
     if not settings or not settings.enabled then return end
 
-
+    -- Apply layout first to set container sizes, then skin to handle textures
     self:ApplyViewerLayout(viewer)
     self:SkinAllIconsInViewer(viewer)
     self:UpdatePowerBar()
     self:UpdateSecondaryPowerBar()
-
-
+    
+    -- Try to process any pending icons if not in combat
     if not InCombatLockdown() then
         self:ProcessPendingIcons()
     end
@@ -4163,7 +4233,7 @@ end
 function PREYCore:ProcessPendingIcons()
     if not self.__cdmPendingIcons then return end
     if InCombatLockdown() then return end
-
+    
     local processed = {}
     for icon, data in pairs(self.__cdmPendingIcons) do
         if icon and icon:IsShown() and not icon.__cdmSkinned then
@@ -4173,17 +4243,17 @@ function PREYCore:ProcessPendingIcons()
                 processed[icon] = true
             end
         elseif not icon or not icon:IsShown() then
-
+            -- Icon no longer exists or is hidden, remove from pending
             processed[icon] = true
         end
     end
-
-
+    
+    -- Remove processed icons from pending list
     for icon in pairs(processed) do
         self.__cdmPendingIcons[icon] = nil
     end
-
-
+    
+    -- If no more pending icons, clear the table
     if not next(self.__cdmPendingIcons) then
         self.__cdmPendingIcons = nil
     end
@@ -4203,7 +4273,8 @@ function PREYCore:HookViewers()
                 self:ApplyViewerLayout(f)
             end)
 
-
+            -- Reduced update rate - layout operations don't need high frequency
+            -- 1 FPS fallback polling (primary updates via events/hooks)
             local updateInterval = 1.0
 
             viewer:HookScript("OnUpdate", function(f, elapsed)
@@ -4212,7 +4283,7 @@ function PREYCore:HookViewers()
                     f.__cdmElapsed = 0
                     if f:IsShown() then
                         self:RescanViewer(f)
-
+                        -- Only process pending if there actually are pending items
                         if not InCombatLockdown() then
                             if self.__cdmPendingIcons then
                             self:ProcessPendingIcons()
@@ -4235,14 +4306,14 @@ function PREYCore:ForceRefreshBuffIcons()
     if viewer and viewer:IsShown() then
         viewer.__cdmIconCount = nil
         self:RescanViewer(viewer)
-
+        -- Process any pending icons if not in combat
         if not InCombatLockdown() then
             self:ProcessPendingIcons()
         end
     end
 end
 
-
+-- Force re-skin all icons in all viewers (used when Edit Mode changes)
 function PREYCore:ForceReskinAllViewers()
     for _, name in ipairs(self.viewers) do
         local viewer = rawget(_G, name)
@@ -4250,50 +4321,52 @@ function PREYCore:ForceReskinAllViewers()
             local container = viewer.viewerFrame or viewer
             local children = { container:GetChildren() }
             for _, child in ipairs(children) do
-
+                -- Clear skinned flag to force re-skinning
                 child.__cdmSkinned = nil
                 child.__cdmSkinPending = nil
                 child.__cdmSkinFailed = nil
             end
-
+            -- Reset icon count to force layout refresh
             viewer.__cdmIconCount = nil
-
-
+            
+            -- Note: We avoid calling viewer.Layout() directly as it can trigger
+            -- Blizzard's internal code that accesses "secret" values and errors
         end
     end
-
-
+    
+    -- Trigger immediate rescan of all viewers
     for _, name in ipairs(self.viewers) do
         local viewer = rawget(_G, name)
         if viewer and viewer:IsShown() then
             self:RescanViewer(viewer)
-
+            -- Also force apply viewer skin which does layout + skinning
             self:ApplyViewerSkin(viewer)
         end
     end
 end
 
-
+-- Hook Edit Mode to force re-skinning when it opens/closes
 function PREYCore:HookEditMode()
     if self.__editModeHooked then return end
     self.__editModeHooked = true
-
-
+    
+    -- Hook EditModeManagerFrame if it exists
     if EditModeManagerFrame then
-
+        -- Hook when Edit Mode is entered
         hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
             C_Timer.After(0.1, function()
                 self:ForceReskinAllViewers()
             end)
 
-
+            -- Fix BossTargetFrameContainer crash: GetScaledSelectionSides fails when GetRect returns nil
+            -- Apply hook here because the method may not exist at addon init time
             if BossTargetFrameContainer and not BossTargetFrameContainer._preyScaledSidesHooked then
                 if BossTargetFrameContainer.GetScaledSelectionSides then
                     local original = BossTargetFrameContainer.GetScaledSelectionSides
                     BossTargetFrameContainer.GetScaledSelectionSides = function(frame)
                         local left = frame:GetLeft()
                         if left == nil then
-
+                            -- Return off-screen fallback sides (left, right, bottom, top)
                             return -10000, -9999, 10000, 10001
                         end
                         return original(frame)
@@ -4302,13 +4375,13 @@ function PREYCore:HookEditMode()
                 end
             end
         end)
-
-
+        
+        -- Hook when Edit Mode is exited
         hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
             C_Timer.After(0.1, function()
                 self:ForceReskinAllViewers()
 
-
+                -- Hide power bar edit overlays that persist after edit mode exits
                 C_Timer.After(0.15, function()
                     for _, barName in ipairs({"PreyUIPrimaryPowerBar", "PreyUISecondaryPowerBar"}) do
                         local bar = rawget(_G, barName)
@@ -4320,16 +4393,16 @@ function PREYCore:HookEditMode()
             end)
         end)
             end
-
-
+            
+    -- Also hook combat end to retry any failed skinning
     local combatEndFrame = CreateFrame("Frame")
     combatEndFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
     combatEndFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
     combatEndFrame:SetScript("OnEvent", function(frame, event)
         if event == "PLAYER_REGEN_ENABLED" then
-
+            -- Small delay to let things settle after combat
             C_Timer.After(0.2, function()
-
+                -- Check if any icons need re-skinning
                 local needsReskin = false
                 for _, viewerName in ipairs(self.viewers) do
                     local viewer = rawget(_G, viewerName)
@@ -4344,13 +4417,13 @@ function PREYCore:HookEditMode()
             end
                     if needsReskin then break end
                 end
-
+                
                 if needsReskin then
                     self:ForceReskinAllViewers()
                 end
             end)
         elseif event == "PLAYER_ENTERING_WORLD" then
-
+            -- Re-skin after zone changes/loading screens
             C_Timer.After(1, function()
                 if not InCombatLockdown() then
                     self:ForceReskinAllViewers()
@@ -4360,29 +4433,29 @@ function PREYCore:HookEditMode()
         end)
     end
 
-
+-- Process pending backdrops that were deferred due to secret values
 function PREYCore:ProcessPendingBackdrops()
     if not self.__cdmPendingBackdrops then return end
 
     local processed = {}
     for frame, _ in pairs(self.__cdmPendingBackdrops) do
         if frame then
-
+            -- Check if dimensions are now valid (must be able to do arithmetic)
             local ok, isValid = pcall(function()
                 local w = frame:GetWidth()
                 local h = frame:GetHeight()
                 if w and h then
-                    local test = w + h
+                    local test = w + h  -- This will error if secret values
                     return test > 0
                 end
                 return false
             end)
-
+            
             if ok and isValid then
-
+                -- Dimensions are valid, try to set backdrop
                 local pendingInfo = frame.__cdmBackdropPending
                 local pendingSettings = frame.__cdmBackdropSettings
-
+                
                 if pendingSettings then
                     if pendingSettings.backdropInfo then
                         local setOk = pcall(frame.SetBackdrop, frame, pendingSettings.backdropInfo)
@@ -4395,25 +4468,25 @@ end
                 elseif pendingInfo then
                     pcall(frame.SetBackdrop, frame, pendingInfo)
                 end
-
+                
                 frame.__cdmBackdropPending = nil
                 frame.__cdmBackdropSettings = nil
                 table.insert(processed, frame)
                 end
             end
         end
-
-
+        
+    -- Remove processed frames
     for _, frame in ipairs(processed) do
         self.__cdmPendingBackdrops[frame] = nil
             end
         end
-
+        
 function PREY:GetGlobalFont()
     local LSM = LibStub("LibSharedMedia-3.0")
-    local fontName = "Prey"
+    local fontName = "Prey"  -- Default fallback
 
-
+    -- Read font from user settings
     if PREYCore and PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.general then
         fontName = PREYCore.db.profile.general.font or fontName
     end
@@ -4423,7 +4496,7 @@ end
 
 function PREY:GetGlobalTexture()
     local LSM = LibStub("LibSharedMedia-3.0")
-
+    -- For now, return Prey texture. Will be configurable in General Tab (Feature #3)
     local textureName = "Prey"
     return LSM:Fetch("statusbar", textureName) or "Interface\\AddOns\\PreyUI\\assets\\Prey"
 end
@@ -4431,7 +4504,7 @@ end
 function PREY:GetSkinColor()
     local db = PREY.db and PREY.db.profile
     if not db or not db.general then
-        return 0.820, 0.180, 0.220, 1
+        return 0.820, 0.180, 0.220, 1  -- Fallback to blue
     end
 
     if db.general.skinUseClassColor then
@@ -4449,21 +4522,22 @@ end
 function PREY:GetSkinBgColor()
     local db = PREY.db and PREY.db.profile
     if not db or not db.general then
-        return 0.05, 0.05, 0.05, 0.95
+        return 0.05, 0.05, 0.05, 0.95  -- Fallback to neutral dark
     end
 
     local c = db.general.skinBgColor or { 0.05, 0.05, 0.05, 0.95 }
     return c[1], c[2], c[3], c[4] or 0.95
 end
 
-
+-- Safe font setter with fallback for missing font files
+-- LSM:Fetch returns a path even if the file doesn't exist, so SetFont() can silently fail
 function PREYCore:SafeSetFont(fontString, fontPath, size, flags)
     if not fontString then return end
     fontString:SetFont(fontPath, size, flags or "")
-
+    -- Check if font was actually set (GetFont returns nil if failed)
     local actualFont = fontString:GetFont()
     if not actualFont then
-
+        -- Fallback to guaranteed Blizzard font
         fontString:SetFont("Fonts\\FRIZQT__.TTF", size, flags or "")
     end
 end
@@ -4477,41 +4551,45 @@ function PREYCore:RefreshAll()
     end
     self:UpdatePowerBar()
     self:UpdateSecondaryPowerBar()
-
+    -- Also refresh Blizzard UI fonts when global font changes
     if self.ApplyGlobalFont then
         self:ApplyGlobalFont()
     end
-
+    -- Refresh skyriding HUD fonts
     if _G.PreyUI_RefreshSkyriding then
         _G.PreyUI_RefreshSkyriding()
     end
 end
 
+-- ============================================================================
+-- Global Font Override for Blizzard UI
+-- ============================================================================
 
+-- Fallback to bundled Prey font (always available, loaded early in media.lua)
 local PREY_FONT_PATH = [[Interface\AddOns\PreyUI\assets\Prey.ttf]]
 
-
+-- Font objects to override (preserves original size/flags, only changes font file)
 local BLIZZARD_FONT_OBJECTS = {
-
+    -- Game fonts (menus, dialogs, general UI)
     "GameFontNormal", "GameFontHighlight", "GameFontNormalSmall",
     "GameFontHighlightSmall", "GameFontNormalLarge", "GameFontHighlightLarge",
     "GameFontDisable", "GameFontDisableSmall", "GameFontDisableLarge",
-
+    -- Number fonts
     "NumberFontNormal", "NumberFontNormalSmall", "NumberFontNormalLarge",
     "NumberFontNormalHuge", "NumberFontNormalSmallGray",
-
+    -- Quest fonts
     "QuestFont", "QuestFontHighlight", "QuestFontNormalSmall",
     "QuestFontHighlightSmall",
-
+    -- Tooltip fonts
     "GameTooltipHeaderText", "GameTooltipText", "GameTooltipTextSmall",
-
+    -- Chat fonts
     "ChatFontNormal", "ChatFontSmall", "ChatFontLarge",
 }
 
-
+-- Track if hooks are already set up (one-time)
 local globalFontHooksInitialized = false
 
-
+-- Debounce for hook callbacks
 local globalFontPending = false
 
 local function GetGlobalFontPath()
@@ -4523,7 +4601,7 @@ local function GetGlobalFontPath()
     return fontPath or PREY_FONT_PATH
 end
 
-
+-- Apply font to a single FontString (preserving size/flags)
 local function ApplyFontToFontString(fontString, fontPath)
     if not fontString or not fontString.GetFont or not fontString.SetFont then return end
     local _, size, flags = fontString:GetFont()
@@ -4532,11 +4610,11 @@ local function ApplyFontToFontString(fontString, fontPath)
     end
 end
 
-
+-- Recursively apply font to all FontStrings in a frame
 local function ApplyFontToFrameRecursive(frame, fontPath)
     if not frame then return end
 
-
+    -- Apply to direct regions
     local regions = { frame:GetRegions() }
     for _, region in ipairs(regions) do
         if region:IsObjectType("FontString") then
@@ -4544,14 +4622,14 @@ local function ApplyFontToFrameRecursive(frame, fontPath)
         end
     end
 
-
+    -- Recurse into children
     local children = { frame:GetChildren() }
     for _, child in ipairs(children) do
         ApplyFontToFrameRecursive(child, fontPath)
     end
 end
 
-
+-- Schedule debounced font application (for hooks)
 local function ScheduleGlobalFontApply()
     if globalFontPending then return end
     globalFontPending = true
@@ -4564,13 +4642,13 @@ local function ScheduleGlobalFontApply()
 end
 
 function PREYCore:ApplyGlobalFont()
-
+    -- Check if feature is enabled
     if not self.db or not self.db.profile or not self.db.profile.general then return end
     if not self.db.profile.general.applyGlobalFontToBlizzard then return end
 
     local fontPath = GetGlobalFontPath()
 
-
+    -- Override Blizzard font objects
     for _, fontObjName in ipairs(BLIZZARD_FONT_OBJECTS) do
         local fontObj = rawget(_G, fontObjName)
         if fontObj and fontObj.GetFont and fontObj.SetFont then
@@ -4581,11 +4659,11 @@ function PREYCore:ApplyGlobalFont()
         end
     end
 
-
+    -- Set up hooks (one-time)
     if not globalFontHooksInitialized then
         globalFontHooksInitialized = true
 
-
+        -- Hook ObjectiveTracker updates (check if function exists - API varies by expansion)
         if ObjectiveTrackerFrame then
             if type(ObjectiveTracker_Update) == "function" then
                 hooksecurefunc("ObjectiveTracker_Update", function()
@@ -4594,7 +4672,7 @@ function PREYCore:ApplyGlobalFont()
                     ApplyFontToFrameRecursive(ObjectiveTrackerFrame, fp)
                 end)
             else
-
+                -- Fallback: hook frame's OnShow for expansion versions without ObjectiveTracker_Update
                 ObjectiveTrackerFrame:HookScript("OnShow", function(self)
                     if not PREYCore.db.profile.general.applyGlobalFontToBlizzard then return end
                     local fp = GetGlobalFontPath()
@@ -4603,7 +4681,7 @@ function PREYCore:ApplyGlobalFont()
             end
         end
 
-
+        -- Hook Tooltip display
         if GameTooltip then
             hooksecurefunc("GameTooltip_SetDefaultAnchor", function(tooltip)
                 if not PREYCore.db.profile.general.applyGlobalFontToBlizzard then return end
@@ -4612,20 +4690,20 @@ function PREYCore:ApplyGlobalFont()
             end)
         end
 
-
+        -- Hook chat frame font size changes
         if FCF_SetChatWindowFontSize then
             hooksecurefunc("FCF_SetChatWindowFontSize", function(chatFrame, fontSize)
                 if not PREYCore.db.profile.general.applyGlobalFontToBlizzard then return end
                 local fp = GetGlobalFontPath()
                 if chatFrame and chatFrame.SetFont then
-
+                    -- Apply global font directly to ScrollingMessageFrame (not just children)
                     local _, size, flags = chatFrame:GetFont()
                     chatFrame:SetFont(fp, fontSize or size or 14, flags or "")
                 end
             end)
         end
 
-
+        -- Event handler for chat window resets (font persistence across new messages)
         local chatFontEventFrame = CreateFrame("Frame")
         chatFontEventFrame:RegisterEvent("UPDATE_CHAT_WINDOWS")
         chatFontEventFrame:RegisterEvent("UPDATE_FLOATING_CHAT_WINDOWS")
@@ -4647,7 +4725,7 @@ function PREYCore:ApplyGlobalFont()
         end)
     end
 
-
+    -- Apply to existing chat frames (SetFont on the frame itself for new message persistence)
     for i = 1, NUM_CHAT_WINDOWS do
         local chatFrame = rawget(_G, "ChatFrame" .. i)
         if chatFrame and chatFrame.SetFont then
@@ -4658,7 +4736,7 @@ function PREYCore:ApplyGlobalFont()
         end
     end
 
-
+    -- Apply to existing tooltips
     if GameTooltip then
         ApplyFontToFrameRecursive(GameTooltip, fontPath)
     end

@@ -1,4 +1,4 @@
-## Interface: 120001
+## Interface: 120005
 ## Title: |cFFB91C1CPreyUI|r
 ## IconTexture: Interface\AddOns\PreyUI\assets\preyLogo
 ## AddonCompartmentFunc: PreyUI_CompartmentClick
@@ -6,7 +6,7 @@
 ## AddonCompartmentFuncOnLeave: PreyUI_CompartmentOnLeave
 ## Notes: Fully rebuilt modular UI suite for PreyUI
 ## Author: PreyUI Team
-## Version: 3.0.12
+## Version: 3.0.13
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
 ## SavedVariables: PreyUI_DB, PreyUIDB

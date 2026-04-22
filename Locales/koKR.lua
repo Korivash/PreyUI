@@ -1,3 +1,4 @@
+-- Localization file for Korean/Korea
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "koKR", false, true)
 
 if L then

@@ -1,3 +1,4 @@
+-- Localization file for english/United States
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "enUS", true, true)
 
 if L then

@@ -1,3 +1,4 @@
+-- Localization file for Spanish/Mexico
 local L = LibStub("AceLocale-3.0"):NewLocale("PreyUI", "esMX", false, true)
 
 if L then

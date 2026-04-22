@@ -1,27 +1,39 @@
+--[[
+    PREY Action Bars - Button Skinning and Fade System
+    Hooks Blizzard action buttons for visual customization
+]]
+
 local ADDON_NAME, ns = ...
 local LSM = LibStub("LibSharedMedia-3.0")
 
+---------------------------------------------------------------------------
+-- MIDNIGHT (12.0+) DETECTION
+---------------------------------------------------------------------------
 
 local IS_MIDNIGHT = select(4, GetBuildInfo()) >= 120000
 
+---------------------------------------------------------------------------
+-- CONSTANTS
+---------------------------------------------------------------------------
 
+-- In-housed textures (self-contained, no external dependencies)
 local TEXTURE_PATH = [[Interface\AddOns\PreyUI\assets\iconskin\]]
 local TEXTURES = {
-    normal = TEXTURE_PATH .. "Normal",
-    gloss = TEXTURE_PATH .. "Gloss",
-    highlight = TEXTURE_PATH .. "Highlight",
-    pushed = TEXTURE_PATH .. "Pushed",
-    checked = TEXTURE_PATH .. "Checked",
-    flash = TEXTURE_PATH .. "Flash",
+    normal = TEXTURE_PATH .. "Normal",       -- Black border frame
+    gloss = TEXTURE_PATH .. "Gloss",         -- ADD blend shine
+    highlight = TEXTURE_PATH .. "Highlight", -- Hover state
+    pushed = TEXTURE_PATH .. "Pushed",       -- Click state
+    checked = TEXTURE_PATH .. "Checked",     -- Selected state
+    flash = TEXTURE_PATH .. "Flash",         -- Ready flash
 }
 
-
+-- Icon texture coordinates (crop transparent edges)
 local ICON_TEXCOORD = {0.07, 0.93, 0.07, 0.93}
 
-
+-- Blizzard's range indicator placeholder (to detect and hide)
 local RANGE_INDICATOR = RANGE_INDICATOR or "●"
 
-
+-- Bar frame name mappings
 local BAR_FRAMES = {
     bar1 = "MainMenuBar",
     bar2 = "MultiBarBottomLeft",
@@ -33,14 +45,14 @@ local BAR_FRAMES = {
     bar8 = "MultiBar7",
     pet = "PetActionBar",
     stance = "StanceBar",
-
+    -- Non-standard bars (special handling in GetBarButtons)
     microbar = "MicroMenuContainer",
     bags = "BagsBar",
-    extraActionButton = "ExtraActionBarFrame",
-    zoneAbility = "ZoneAbilityFrame",
+    extraActionButton = "ExtraActionBarFrame",  -- Boss encounters, quests
+    zoneAbility = "ZoneAbilityFrame",          -- Garrison, covenant, zone powers
 }
 
-
+-- Button name patterns for each bar
 local BUTTON_PATTERNS = {
     bar1 = "ActionButton%d",
     bar2 = "MultiBarBottomLeftButton%d",
@@ -54,44 +66,51 @@ local BUTTON_PATTERNS = {
     stance = "StanceButton%d",
 }
 
-
+-- Button counts per bar
 local BUTTON_COUNTS = {
     bar1 = 12, bar2 = 12, bar3 = 12, bar4 = 12, bar5 = 12,
     bar6 = 12, bar7 = 12, bar8 = 12, pet = 10, stance = 10,
 }
 
-
+-- Binding command prefixes for LibKeyBound integration
 local BINDING_COMMANDS = {
-    bar1 = "ACTIONBUTTON",
-    bar2 = "MULTIACTIONBAR1BUTTON",
-    bar3 = "MULTIACTIONBAR2BUTTON",
-    bar4 = "MULTIACTIONBAR3BUTTON",
-    bar5 = "MULTIACTIONBAR4BUTTON",
-    bar6 = "MULTIACTIONBAR5BUTTON",
-    bar7 = "MULTIACTIONBAR6BUTTON",
-    bar8 = "MULTIACTIONBAR7BUTTON",
-    pet = "BONUSACTIONBUTTON",
-    stance = "SHAPESHIFTBUTTON",
+    bar1 = "ACTIONBUTTON",           -- ACTIONBUTTON1-12
+    bar2 = "MULTIACTIONBAR1BUTTON",  -- MULTIACTIONBAR1BUTTON1-12
+    bar3 = "MULTIACTIONBAR2BUTTON",  -- MULTIACTIONBAR2BUTTON1-12
+    bar4 = "MULTIACTIONBAR3BUTTON",  -- MULTIACTIONBAR3BUTTON1-12
+    bar5 = "MULTIACTIONBAR4BUTTON",  -- MULTIACTIONBAR4BUTTON1-12
+    bar6 = "MULTIACTIONBAR5BUTTON",  -- MULTIACTIONBAR5BUTTON1-12
+    bar7 = "MULTIACTIONBAR6BUTTON",  -- MULTIACTIONBAR6BUTTON1-12
+    bar8 = "MULTIACTIONBAR7BUTTON",  -- MULTIACTIONBAR7BUTTON1-12
+    pet = "BONUSACTIONBUTTON",       -- BONUSACTIONBUTTON1-10
+    stance = "SHAPESHIFTBUTTON",     -- SHAPESHIFTBUTTON1-10
 }
 
+---------------------------------------------------------------------------
+-- MODULE STATE
+---------------------------------------------------------------------------
 
 local ActionBars = {
     initialized = false,
-    skinnedButtons = {},
-    fadeState = {},
-    fadeFrame = nil,
+    skinnedButtons = {},        -- Track which buttons have been skinned
+    fadeState = {},             -- Per-bar fade state tracking
+    fadeFrame = nil,            -- OnUpdate frame for smooth fading
 }
 
+---------------------------------------------------------------------------
+-- HELPER FUNCTIONS
+---------------------------------------------------------------------------
 
+-- Safe wrapper for HasAction which may return secret values in Midnight
 local function SafeHasAction(action)
     if IS_MIDNIGHT then
         local ok, result = pcall(function()
             local has = HasAction(action)
-
+            -- Force comparison to detect secrets
             if has then return true end
             return false
         end)
-        if not ok then return true end
+        if not ok then return true end  -- Secret value, treat as having action
         return result
     else
         return HasAction(action)
@@ -121,7 +140,7 @@ local function GetFadeSettings()
     return db and db.fade
 end
 
-
+-- Determine bar key from button name
 local function GetBarKeyFromButton(button)
     local name = button and button:GetName()
     if not name then return nil end
@@ -139,14 +158,14 @@ local function GetBarKeyFromButton(button)
     return nil
 end
 
-
+-- Get button index from button name
 local function GetButtonIndex(button)
     local name = button and button:GetName()
     if not name then return nil end
     return tonumber(name:match("%d+$"))
 end
 
-
+-- Add LibKeyBound methods to a button for mousewheel binding support
 local function AddKeybindMethods(button, barKey)
     if not button or button._preyKeybindMethods then return end
 
@@ -160,7 +179,7 @@ local function AddKeybindMethods(button, barKey)
     button._preyBindingCommand = bindingCommand
     button._preyKeybindMethods = true
 
-
+    -- Required method: Returns current keybind text
     function button:GetHotkey()
         local key = GetBindingKey(self._preyBindingCommand)
         if key then
@@ -170,13 +189,13 @@ local function AddKeybindMethods(button, barKey)
         return nil
     end
 
-
+    -- Required method: Binds a key to this button
     function button:SetKey(key)
         if InCombatLockdown() then return end
         SetBinding(key, self._preyBindingCommand)
     end
 
-
+    -- Optional method: Returns all bindings as comma-separated string
     function button:GetBindings()
         local keys = {}
         for i = 1, select("#", GetBindingKey(self._preyBindingCommand)) do
@@ -188,7 +207,7 @@ local function AddKeybindMethods(button, barKey)
         return #keys > 0 and table.concat(keys, ", ") or nil
     end
 
-
+    -- Optional method: Clears all bindings from this button
     function button:ClearBindings()
         if InCombatLockdown() then return end
         while GetBindingKey(self._preyBindingCommand) do
@@ -196,31 +215,31 @@ local function AddKeybindMethods(button, barKey)
         end
     end
 
-
+    -- Optional method: Returns display name for what we're binding
     function button:GetActionName()
         return self._preyBindingCommand
     end
 end
 
-
+-- Get effective settings for a bar (merges global with per-bar overrides)
 local function GetEffectiveSettings(barKey)
     local global = GetGlobalSettings()
     if not global then return nil end
 
     local barSettings = GetBarSettings(barKey)
 
-
+    -- If overrides are disabled or bar doesn't support overrides, use global
     if not barSettings or not barSettings.overrideEnabled then
         return global
     end
 
-
+    -- Merge: global as base, bar-specific overrides non-nil values
     local effective = {}
     for key, value in pairs(global) do
         effective[key] = value
     end
 
-
+    -- Override with bar-specific values (only if not nil)
     local overrideKeys = {
         "iconZoom", "showBackdrop", "backdropAlpha", "showGloss", "glossAlpha",
         "showKeybinds", "hideEmptyKeybinds", "keybindFontSize", "keybindColor",
@@ -240,13 +259,13 @@ local function GetEffectiveSettings(barKey)
     return effective
 end
 
-
+-- Get buttons for a specific bar
 local function GetBarButtons(barKey)
     local buttons = {}
 
-
+    -- Special handling for non-standard bars
     if barKey == "microbar" then
-
+        -- MicroMenu contains the micro buttons (Character, Spellbook, etc.)
         if MicroMenu then
             for _, child in ipairs({MicroMenu:GetChildren()}) do
                 if child.IsObjectType and child:IsObjectType("Button") then
@@ -256,7 +275,7 @@ local function GetBarButtons(barKey)
         end
         return buttons
     elseif barKey == "bags" then
-
+        -- Bag slots: backpack + 4 bag slots + reagent bag
         if MainMenuBarBackpackButton then
             table.insert(buttons, MainMenuBarBackpackButton)
         end
@@ -269,13 +288,13 @@ local function GetBarButtons(barKey)
         end
         return buttons
     elseif barKey == "extraActionButton" then
-
+        -- Extra Action Button (boss encounters, quests)
         if ExtraActionBarFrame and ExtraActionBarFrame.button then
             table.insert(buttons, ExtraActionBarFrame.button)
         end
         return buttons
     elseif barKey == "zoneAbility" then
-
+        -- Zone Ability buttons (garrison, covenant, zone powers)
         if ZoneAbilityFrame and ZoneAbilityFrame.SpellButtonContainer then
             for button in ZoneAbilityFrame.SpellButtonContainer:EnumerateActive() do
                 table.insert(buttons, button)
@@ -284,7 +303,7 @@ local function GetBarButtons(barKey)
         return buttons
     end
 
-
+    -- Standard bars with numbered buttons
     local pattern = BUTTON_PATTERNS[barKey]
     local count = BUTTON_COUNTS[barKey] or 12
 
@@ -301,12 +320,15 @@ local function GetBarButtons(barKey)
     return buttons
 end
 
-
+-- Get the bar container frame
 local function GetBarFrame(barKey)
     local frameName = BAR_FRAMES[barKey]
     return frameName and rawget(_G, frameName)
 end
 
+---------------------------------------------------------------------------
+-- EXTRA BUTTON CUSTOMIZATION (Extra Action Button & Zone Ability)
+---------------------------------------------------------------------------
 
 local extraActionHolder = nil
 local extraActionMover = nil
@@ -314,7 +336,7 @@ local zoneAbilityHolder = nil
 local zoneAbilityMover = nil
 local extraButtonMoversVisible = false
 
-
+-- Get settings for a specific extra button type
 local function GetExtraButtonDB(buttonType)
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
     if not PREYCore or not PREYCore.db or not PREYCore.db.profile then return nil end
@@ -322,23 +344,23 @@ local function GetExtraButtonDB(buttonType)
         and PREYCore.db.profile.actionBars.bars[buttonType]
 end
 
-
+-- Create holder frame and mover overlay for an extra button type
 local function CreateExtraButtonHolder(buttonType, displayName)
     local settings = GetExtraButtonDB(buttonType)
     if not settings then return nil, nil end
 
-
+    -- Create holder frame
     local holder = CreateFrame("Frame", "PREY_" .. buttonType .. "Holder", UIParent)
     holder:SetSize(64, 64)
     holder:SetMovable(true)
     holder:SetClampedToScreen(true)
 
-
+    -- Load saved position or default to center-bottom
     local pos = settings.position
     if pos and pos.point then
         holder:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, pos.x or 0, pos.y or 0)
     else
-
+        -- Default positions: Extra Action left of center, Zone Ability right of center
         if buttonType == "extraActionButton" then
             holder:SetPoint("CENTER", UIParent, "CENTER", -100, -200)
         else
@@ -346,7 +368,7 @@ local function CreateExtraButtonHolder(buttonType, displayName)
         end
     end
 
-
+    -- Create mover overlay (visible only when toggled)
     local mover = CreateFrame("Frame", "PREY_" .. buttonType .. "Mover", holder, "BackdropTemplate")
     mover:SetAllPoints(holder)
     mover:SetBackdrop({
@@ -354,7 +376,7 @@ local function CreateExtraButtonHolder(buttonType, displayName)
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 2,
     })
-    mover:SetBackdropColor(0.2, 0.8, 0.6, 0.5)
+    mover:SetBackdropColor(0.2, 0.8, 0.6, 0.5)  -- PREY mint color
     mover:SetBackdropBorderColor(0.820, 0.180, 0.220, 1)
     mover:EnableMouse(true)
     mover:SetMovable(true)
@@ -362,13 +384,13 @@ local function CreateExtraButtonHolder(buttonType, displayName)
     mover:SetFrameStrata("FULLSCREEN_DIALOG")
     mover:Hide()
 
-
+    -- Label text
     local text = mover:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     text:SetPoint("CENTER")
     text:SetText(displayName)
     mover.text = text
 
-
+    -- Drag handlers
     mover:SetScript("OnDragStart", function(self)
         holder:StartMoving()
     end)
@@ -385,7 +407,7 @@ local function CreateExtraButtonHolder(buttonType, displayName)
     return holder, mover
 end
 
-
+-- Apply settings (scale, position, artwork) to an extra button frame
 local function ApplyExtraButtonSettings(buttonType)
     if InCombatLockdown() then
         ActionBars.pendingExtraButtonRefresh = true
@@ -410,25 +432,25 @@ local function ApplyExtraButtonSettings(buttonType)
 
     if not blizzFrame or not holder then return end
 
-
+    -- Apply scale
     local scale = settings.scale or 1.0
     blizzFrame:SetScale(scale)
 
-
+    -- Apply offsets (relative to holder position)
     local offsetX = settings.offsetX or 0
     local offsetY = settings.offsetY or 0
 
-
+    -- Reparent to our holder and position
     blizzFrame:SetParent(holder)
     blizzFrame:ClearAllPoints()
     blizzFrame:SetPoint("CENTER", holder, "CENTER", offsetX, offsetY)
 
-
+    -- Update holder size to match scaled frame
     local width = (blizzFrame:GetWidth() or 64) * scale
     local height = (blizzFrame:GetHeight() or 64) * scale
     holder:SetSize(math.max(width, 64), math.max(height, 64))
 
-
+    -- Hide artwork if enabled
     if settings.hideArtwork then
         if buttonType == "extraActionButton" and blizzFrame.button and blizzFrame.button.style then
             blizzFrame.button.style:SetAlpha(0)
@@ -437,7 +459,7 @@ local function ApplyExtraButtonSettings(buttonType)
             blizzFrame.Style:SetAlpha(0)
         end
     else
-
+        -- Restore artwork
         if buttonType == "extraActionButton" and blizzFrame.button and blizzFrame.button.style then
             blizzFrame.button.style:SetAlpha(1)
         end
@@ -446,13 +468,15 @@ local function ApplyExtraButtonSettings(buttonType)
         end
     end
 
-
+    -- Reset frame alpha if fade is not enabled (fixes toggling fade off without reload)
     if not settings.fadeEnabled then
         blizzFrame:SetAlpha(1)
     end
 end
 
-
+-- Hook Blizzard extra buttons only on safe visibility changes.
+-- Do not hook SetPoint or mutate Blizzard managed-frame tables here:
+-- both patterns taint UIParent panel management in modern clients.
 local function HookExtraButtonPositioning()
     if ExtraActionBarFrame and not ExtraActionBarFrame._preyHooked then
         ExtraActionBarFrame._preyHooked = true
@@ -485,7 +509,7 @@ local function HookExtraButtonPositioning()
     end
 end
 
-
+-- Show/hide mover overlays
 local function ShowExtraButtonMovers()
     extraButtonMoversVisible = true
     if extraActionMover then extraActionMover:Show() end
@@ -506,18 +530,18 @@ local function ToggleExtraButtonMovers()
     end
 end
 
-
+-- Initialize extra button holders
 local function InitializeExtraButtons()
     if InCombatLockdown() then
         ActionBars.pendingExtraButtonInit = true
         return
     end
 
-
+    -- Create holder frames
     extraActionHolder, extraActionMover = CreateExtraButtonHolder("extraActionButton", "Extra Action Button")
     zoneAbilityHolder, zoneAbilityMover = CreateExtraButtonHolder("zoneAbility", "Zone Ability")
 
-
+    -- Apply settings with delay to ensure Blizzard frames exist
     C_Timer.After(0.5, function()
         ApplyExtraButtonSettings("extraActionButton")
         ApplyExtraButtonSettings("zoneAbility")
@@ -525,7 +549,7 @@ local function InitializeExtraButtons()
     end)
 end
 
-
+-- Refresh extra button settings (called from options)
 local function RefreshExtraButtons()
     if InCombatLockdown() then
         ActionBars.pendingExtraButtonRefresh = true
@@ -535,17 +559,17 @@ local function RefreshExtraButtons()
     ApplyExtraButtonSettings("zoneAbility")
 end
 
-
+-- Expose global functions for options panel
 _G.PreyUI_ToggleExtraButtonMovers = ToggleExtraButtonMovers
 _G.PreyUI_RefreshExtraButtons = RefreshExtraButtons
 
-
+-- Strip WoW color codes from text
 local function StripColorCodes(text)
     if not text then return "" end
     return text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
 end
 
-
+-- Check if keybind text is valid (not empty or placeholder)
 local function IsValidKeybindText(text)
     if not text or text == "" then return false end
 
@@ -557,12 +581,16 @@ local function IsValidKeybindText(text)
     return true
 end
 
+---------------------------------------------------------------------------
+-- BUTTON SKINNING
+---------------------------------------------------------------------------
 
+-- Remove Blizzard's default textures and masks
 local function StripBlizzardArtwork(button)
     if button._preyStripped then return end
     button._preyStripped = true
 
-
+    -- Hide NormalTexture (Blizzard's border)
     local normalTex = button:GetNormalTexture()
     if normalTex then
         normalTex:SetAlpha(0)
@@ -571,7 +599,7 @@ local function StripBlizzardArtwork(button)
         button.NormalTexture:SetAlpha(0)
     end
 
-
+    -- Remove mask textures from icon
     local icon = button.icon or button.Icon
     if icon and icon.GetMaskTexture and icon.RemoveMaskTexture then
         for i = 1, 10 do
@@ -582,27 +610,31 @@ local function StripBlizzardArtwork(button)
         end
     end
 
-
+    -- Hide FloatingBG if present
     if button.FloatingBG then
         button.FloatingBG:SetAlpha(0)
     end
 
-
+    -- Hide SlotBackground if present
     if button.SlotBackground then
         button.SlotBackground:SetAlpha(0)
     end
 
-
+    -- Hide SlotArt if present
     if button.SlotArt then
         button.SlotArt:SetAlpha(0)
     end
 end
 
+---------------------------------------------------------------------------
+-- BUTTON SKINNING
+---------------------------------------------------------------------------
 
+-- Apply PREY skin to a single button
 local function SkinButton(button, settings)
     if not button or not settings or not settings.skinEnabled then return end
 
-
+    -- Skip if already skinned with same settings
     local settingsKey = string.format("%d_%.2f_%s_%.2f_%s_%.2f",
         settings.iconSize or 36,
         settings.iconZoom or 0.07,
@@ -614,13 +646,13 @@ local function SkinButton(button, settings)
     if button._preySkinKey == settingsKey then return end
     button._preySkinKey = settingsKey
 
-
+    -- Strip Blizzard artwork first
     StripBlizzardArtwork(button)
 
     local iconSize = settings.iconSize or 36
     local zoom = settings.iconZoom or 0.07
 
-
+    -- Apply icon TexCoords (crop transparent edges)
     local icon = button.icon or button.Icon
     if icon then
         icon:SetTexCoord(zoom, 1 - zoom, zoom, 1 - zoom)
@@ -628,7 +660,7 @@ local function SkinButton(button, settings)
         icon:SetAllPoints(button)
     end
 
-
+    -- Create or update backdrop (behind icon, configurable opacity)
     if settings.showBackdrop then
         if not button._preyBackdrop then
             button._preyBackdrop = button:CreateTexture(nil, "BACKGROUND", nil, -8)
@@ -636,13 +668,13 @@ local function SkinButton(button, settings)
         end
         button._preyBackdrop:SetAlpha(settings.backdropAlpha or 0.8)
         button._preyBackdrop:ClearAllPoints()
-        button._preyBackdrop:SetAllPoints(button)
+        button._preyBackdrop:SetAllPoints(button)  -- Same size as button, not extending beyond
         button._preyBackdrop:Show()
     elseif button._preyBackdrop then
         button._preyBackdrop:Hide()
     end
 
-
+    -- Create or update Normal overlay (border frame texture)
     if settings.showBorders ~= false then
         if not button._preyNormal then
             button._preyNormal = button:CreateTexture(nil, "OVERLAY", nil, 1)
@@ -657,7 +689,7 @@ local function SkinButton(button, settings)
         button._preyNormal:Hide()
     end
 
-
+    -- Create or update Gloss overlay (ADD blend shine)
     if settings.showGloss then
         if not button._preyGloss then
             button._preyGloss = button:CreateTexture(nil, "OVERLAY", nil, 2)
@@ -671,7 +703,7 @@ local function SkinButton(button, settings)
         button._preyGloss:Hide()
     end
 
-
+    -- Fix Cooldown frame positioning
     local cooldown = button.cooldown or button.Cooldown
     if cooldown then
         cooldown:ClearAllPoints()
@@ -681,19 +713,24 @@ local function SkinButton(button, settings)
     ActionBars.skinnedButtons[button] = true
 end
 
+---------------------------------------------------------------------------
+-- TEXT VISIBILITY
+---------------------------------------------------------------------------
 
+-- Update keybind/hotkey text visibility and styling
+-- Directly modifies Blizzard's HotKey element with abbreviated text
 local function UpdateKeybindText(button, settings)
     local hotkey = button.HotKey or button.hotKey
     if not hotkey then return end
 
-
+    -- Determine if keybinds should be shown
     if not settings.showKeybinds then
         hotkey:SetAlpha(0)
         hotkey:Hide()
         return
     end
 
-
+    -- Get abbreviated keybind text
     local buttonName = button:GetName()
     local bindingName = nil
     local abbreviated = nil
@@ -701,7 +738,7 @@ local function UpdateKeybindText(button, settings)
     if buttonName then
         local num
 
-
+        -- Map button frame names to WoW binding names
         num = buttonName:match("^ActionButton(%d+)$")
         if num then bindingName = "ACTIONBUTTON" .. num end
 
@@ -725,7 +762,7 @@ local function UpdateKeybindText(button, settings)
             if num then bindingName = "MULTIACTIONBAR4BUTTON" .. num end
         end
 
-
+        -- MultiBar5-7 (Midnight bars)
         if not bindingName then
             num = buttonName:match("^MultiBar5Button(%d+)$")
             if num then bindingName = "MULTIACTIONBAR5BUTTON" .. num end
@@ -741,7 +778,7 @@ local function UpdateKeybindText(button, settings)
             if num then bindingName = "MULTIACTIONBAR7BUTTON" .. num end
         end
 
-
+        -- Get keybind and abbreviate
         if bindingName then
             local key = GetBindingKey(bindingName)
             if key and ns and ns.FormatKeybind then
@@ -750,10 +787,10 @@ local function UpdateKeybindText(button, settings)
         end
     end
 
-
+    -- Determine visibility
     local shouldShow = abbreviated and abbreviated ~= ""
 
-
+    -- Only hide keybinds on empty action slots when hideEmptyKeybinds is enabled
     if shouldShow and settings.hideEmptyKeybinds then
         if button.action then
             local hasAction = SafeHasAction(button.action)
@@ -769,12 +806,12 @@ local function UpdateKeybindText(button, settings)
         return
     end
 
-
+    -- Set the abbreviated text and show
     hotkey:SetText(abbreviated)
     hotkey:Show()
     hotkey:SetAlpha(1)
 
-
+    -- Apply styling
     local fontPath = "Fonts\\FRIZQT__.TTF"
     local outline = "OUTLINE"
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
@@ -795,13 +832,13 @@ local function UpdateKeybindText(button, settings)
     local a = color and color[4] or 1
     hotkey:SetTextColor(r, g, b, a)
 
-
+    -- Reposition with configurable anchor and offsets
     hotkey:ClearAllPoints()
     local anchor = settings.keybindAnchor or "TOPRIGHT"
     hotkey:SetPoint(anchor, button, anchor, (settings.keybindOffsetX or 0), (settings.keybindOffsetY or 0))
 end
 
-
+-- Update macro name text visibility and styling
 local function UpdateMacroText(button, settings)
     local name = button.Name
     if not name then return end
@@ -813,7 +850,7 @@ local function UpdateMacroText(button, settings)
 
     name:SetAlpha(1)
 
-
+    -- Apply styling
     local fontPath = "Fonts\\FRIZQT__.TTF"
     local outline = "OUTLINE"
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
@@ -834,13 +871,13 @@ local function UpdateMacroText(button, settings)
     local a = color and color[4] or 1
     name:SetTextColor(r, g, b, a)
 
-
+    -- Reposition with configurable anchor and offsets
     name:ClearAllPoints()
     local anchor = settings.macroNameAnchor or "BOTTOM"
     name:SetPoint(anchor, button, anchor, (settings.macroNameOffsetX or 0), (settings.macroNameOffsetY or 0))
 end
 
-
+-- Update count/charge text visibility and styling
 local function UpdateCountText(button, settings)
     local count = button.Count
     if not count then return end
@@ -852,7 +889,7 @@ local function UpdateCountText(button, settings)
 
     count:SetAlpha(1)
 
-
+    -- Apply styling
     local fontPath = "Fonts\\FRIZQT__.TTF"
     local outline = "OUTLINE"
     local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
@@ -873,35 +910,40 @@ local function UpdateCountText(button, settings)
     local a = color and color[4] or 1
     count:SetTextColor(r, g, b, a)
 
-
+    -- Reposition with configurable anchor and offsets
     count:ClearAllPoints()
     local anchor = settings.countAnchor or "BOTTOMRIGHT"
     count:SetPoint(anchor, button, anchor, (settings.countOffsetX or 0), (settings.countOffsetY or 0))
 end
 
-
+-- Update all text elements on a button
 local function UpdateButtonText(button, settings)
     UpdateKeybindText(button, settings)
     UpdateMacroText(button, settings)
     UpdateCountText(button, settings)
 end
 
+---------------------------------------------------------------------------
+-- BAR LAYOUT FEATURES
+---------------------------------------------------------------------------
 
+-- Apply global scale to all action bar container frames
+-- NOTE: Disabled - action bar scaling should be done via Edit Mode for consistency
 local function ApplyBarScale()
-
+    -- No-op: Users should scale action bars via Edit Mode
 end
 
-
+-- Update empty slot visibility for a single button
 local function UpdateEmptySlotVisibility(button, settings)
     if not settings then return end
 
-
+    -- Get the bar's current fade alpha (respects mouseover hide)
     local barKey = GetBarKeyFromButton(button)
     local fadeState = barKey and ActionBars.fadeState and ActionBars.fadeState[barKey]
     local targetAlpha = fadeState and fadeState.currentAlpha or 1
 
     if not settings.hideEmptySlots then
-
+        -- Restore visibility if setting is off (respect fade state)
         if button._preyHiddenEmpty then
             button:SetAlpha(targetAlpha)
             button._preyHiddenEmpty = nil
@@ -909,7 +951,7 @@ local function UpdateEmptySlotVisibility(button, settings)
         return
     end
 
-
+    -- Only applies to action buttons with action property
     if button.action then
         local hasAction = SafeHasAction(button.action)
         if hasAction then
@@ -922,29 +964,31 @@ local function UpdateEmptySlotVisibility(button, settings)
     end
 end
 
-
+-- One-time migration: if PREY lockButtons was true, apply it to Blizzard CVar
+-- This preserves existing user settings after the fix that stops PREY from overwriting Blizzard's setting
 local function MigrateLockSetting()
     local settings = GetGlobalSettings()
     if not settings then return end
 
-
+    -- Only migrate once, and only if the user had lockButtons enabled
     if settings.lockButtons and not settings._lockMigrated then
         SetCVar('lockActionBars', '1')
         settings._lockMigrated = true
     end
 end
 
-
+-- Apply button lock - syncs LOCK_ACTIONBAR global from Blizzard's CVar
+-- NOTE: No longer overwrites Blizzard's CVar - PREY options panel now syncs directly with it
 local function ApplyButtonLock()
     local locked = GetCVar('lockActionBars') == '1'
     LOCK_ACTIONBAR = locked and '1' or '0'
 end
 
-
+-- Usability indicator state tracking
 local usabilityCheckFrame = nil
-
-local RANGE_CHECK_INTERVAL_NORMAL = 0.25
-local RANGE_CHECK_INTERVAL_FAST = 0.05
+-- Range check interval (only used when range indicator is enabled)
+local RANGE_CHECK_INTERVAL_NORMAL = 0.25  -- 250ms = 4 FPS (CPU-friendly)
+local RANGE_CHECK_INTERVAL_FAST = 0.05    -- 50ms = 20 FPS (responsive)
 
 local function GetUpdateInterval()
     local settings = GetGlobalSettings()
@@ -954,19 +998,19 @@ local function GetUpdateInterval()
     return RANGE_CHECK_INTERVAL_NORMAL
 end
 
-
+-- Safe wrapper for APIs that may return secret values in Midnight
 local function SafeIsActionInRange(action)
     if IS_MIDNIGHT then
-
-
+        -- In Midnight, IsActionInRange can return secret values
+        -- Use pcall to safely check the result
         local ok, result = pcall(function()
             local inRange = IsActionInRange(action)
-
+            -- Try to compare - this will fail if inRange is a secret value
             if inRange == false then return false end
             if inRange == true then return true end
-            return nil
+            return nil  -- No range check needed
         end)
-        if not ok then return nil end
+        if not ok then return nil end  -- Secret value, treat as in range
         return result
     else
         return IsActionInRange(action)
@@ -975,23 +1019,23 @@ end
 
 local function SafeIsUsableAction(action)
     if IS_MIDNIGHT then
-
-
+        -- In Midnight, IsUsableAction can return secret values
+        -- We must convert to actual booleans INSIDE pcall before returning
         local ok, isUsable, notEnoughMana = pcall(function()
             local usable, noMana = IsUsableAction(action)
-
+            -- Convert to actual booleans - if secret, comparison fails and pcall catches it
             local boolUsable = usable and true or false
             local boolNoMana = noMana and true or false
             return boolUsable, boolNoMana
         end)
-        if not ok then return true, false end
+        if not ok then return true, false end  -- Secret value detected, treat as usable
         return isUsable, notEnoughMana
     else
         return IsUsableAction(action)
     end
 end
 
-
+-- Update range and usability indicators for a single button
 local function UpdateButtonUsability(button, settings)
     if not settings then return end
     if not button.action then return end
@@ -999,7 +1043,7 @@ local function UpdateButtonUsability(button, settings)
     local icon = button.icon or button.Icon
     if not icon then return end
 
-
+    -- Reset state if both features disabled
     if not settings.rangeIndicator and not settings.usabilityIndicator then
         if button._preyTinted then
             icon:SetVertexColor(1, 1, 1, 1)
@@ -1009,10 +1053,10 @@ local function UpdateButtonUsability(button, settings)
         return
     end
 
-
+    -- Priority 1: Out of Range check (if enabled)
     if settings.rangeIndicator then
         local inRange = SafeIsActionInRange(button.action)
-        if inRange == false then
+        if inRange == false then  -- false = out of range, nil = no range check needed
             local c = settings.rangeColor
             local r = c and c[1] or 0.8
             local g = c and c[2] or 0.1
@@ -1025,12 +1069,12 @@ local function UpdateButtonUsability(button, settings)
         end
     end
 
-
+    -- Priority 2: Usability check (if enabled)
     if settings.usabilityIndicator then
         local isUsable, notEnoughMana = SafeIsUsableAction(button.action)
 
         if notEnoughMana then
-
+            -- Out of mana/resources - blue tint
             local c = settings.manaColor
             local r = c and c[1] or 0.5
             local g = c and c[2] or 0.5
@@ -1041,10 +1085,10 @@ local function UpdateButtonUsability(button, settings)
             button._preyTinted = "mana"
             return
         elseif not isUsable then
-
+            -- Not usable - desaturate or apply grey tint
             if settings.usabilityDesaturate then
                 icon:SetDesaturated(true)
-                icon:SetVertexColor(0.6, 0.6, 0.6, 1)
+                icon:SetVertexColor(0.6, 0.6, 0.6, 1)  -- Slight brightness reduction with desaturation
             else
                 local c = settings.usabilityColor
                 local r = c and c[1] or 0.4
@@ -1059,7 +1103,7 @@ local function UpdateButtonUsability(button, settings)
         end
     end
 
-
+    -- Normal state - reset to full brightness
     if button._preyTinted then
         icon:SetVertexColor(1, 1, 1, 1)
         icon:SetDesaturated(false)
@@ -1067,13 +1111,13 @@ local function UpdateButtonUsability(button, settings)
     end
 end
 
-
+-- Update all visible action buttons
 local function UpdateAllButtonUsability()
     local globalSettings = GetGlobalSettings()
     if not globalSettings then return end
     if not globalSettings.rangeIndicator and not globalSettings.usabilityIndicator then return end
 
-
+    -- Only check action bars 1-8 (not pet/stance/micro/bags)
     for i = 1, 8 do
         local barKey = "bar" .. i
         local buttons = GetBarButtons(barKey)
@@ -1085,7 +1129,7 @@ local function UpdateAllButtonUsability()
     end
 end
 
-
+-- Debounced event handler (prevents rapid-fire updates)
 local usabilityUpdatePending = false
 local function ScheduleUsabilityUpdate()
     if usabilityUpdatePending then return end
@@ -1096,7 +1140,7 @@ local function ScheduleUsabilityUpdate()
     end)
 end
 
-
+-- Reset all button tints
 local function ResetAllButtonTints()
     for i = 1, 8 do
         local barKey = "bar" .. i
@@ -1112,19 +1156,19 @@ local function ResetAllButtonTints()
     end
 end
 
-
+-- Start/stop usability indicator system (event-driven + optional range polling)
 local function UpdateUsabilityPolling()
     local settings = GetGlobalSettings()
     local usabilityEnabled = settings and settings.usabilityIndicator
     local rangeEnabled = settings and settings.rangeIndicator
 
-
+    -- Create frame if needed
     if not usabilityCheckFrame then
         usabilityCheckFrame = CreateFrame("Frame")
         usabilityCheckFrame.elapsed = 0
     end
 
-
+    -- Event-driven usability updates (very efficient)
     if usabilityEnabled or rangeEnabled then
         usabilityCheckFrame:RegisterEvent("ACTIONBAR_UPDATE_USABLE")
         usabilityCheckFrame:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
@@ -1137,14 +1181,15 @@ local function UpdateUsabilityPolling()
             ScheduleUsabilityUpdate()
         end)
 
-
+        -- Initial update
         ScheduleUsabilityUpdate()
     else
         usabilityCheckFrame:UnregisterAllEvents()
         usabilityCheckFrame:SetScript("OnEvent", nil)
     end
 
-
+    -- Range requires slow polling (no "player moved" event exists)
+    -- Only poll when range indicator is enabled, at 250ms (was 100ms)
     if rangeEnabled then
         usabilityCheckFrame:SetScript("OnUpdate", function(self, elapsed)
             self.elapsed = self.elapsed + elapsed
@@ -1156,7 +1201,7 @@ local function UpdateUsabilityPolling()
     else
         usabilityCheckFrame:SetScript("OnUpdate", nil)
         usabilityCheckFrame.elapsed = 0
-
+        -- Don't hide - events still need to work if usability is enabled
         if not usabilityEnabled then
             usabilityCheckFrame:Hide()
             ResetAllButtonTints()
@@ -1164,13 +1209,13 @@ local function UpdateUsabilityPolling()
     end
 end
 
-
+-- Apply all bar layout settings
 local function ApplyBarLayoutSettings()
     ApplyBarScale()
     ApplyButtonLock()
     UpdateUsabilityPolling()
 
-
+    -- Apply empty slot visibility to all action buttons
     local settings = GetGlobalSettings()
     if settings then
         for barKey, _ in pairs(BUTTON_PATTERNS) do
@@ -1182,7 +1227,11 @@ local function ApplyBarLayoutSettings()
     end
 end
 
+---------------------------------------------------------------------------
+-- MOUSEOVER FADE SYSTEM
+---------------------------------------------------------------------------
 
+-- Get or create fade state for a bar
 local function GetBarFadeState(barKey)
     if not ActionBars.fadeState[barKey] then
         ActionBars.fadeState[barKey] = {
@@ -1200,14 +1249,14 @@ local function GetBarFadeState(barKey)
     return ActionBars.fadeState[barKey]
 end
 
-
+-- Apply alpha to all buttons in a bar
 local function SetBarAlpha(barKey, alpha)
     local buttons = GetBarButtons(barKey)
     local settings = GetGlobalSettings()
     local hideEmptyEnabled = settings and settings.hideEmptySlots
 
     for _, button in ipairs(buttons) do
-
+        -- Respect hide empty slots setting - keep empty buttons hidden
         if hideEmptyEnabled and button._preyHiddenEmpty then
             button:SetAlpha(0)
         else
@@ -1223,7 +1272,7 @@ local function SetBarAlpha(barKey, alpha)
     GetBarFadeState(barKey).currentAlpha = alpha
 end
 
-
+-- Start smooth fade animation for a bar
 local function StartBarFade(barKey, targetAlpha)
     local state = GetBarFadeState(barKey)
     local fadeSettings = GetFadeSettings()
@@ -1232,7 +1281,7 @@ local function StartBarFade(barKey, targetAlpha)
         and (fadeSettings and fadeSettings.fadeInDuration or 0.2)
         or (fadeSettings and fadeSettings.fadeOutDuration or 0.3)
 
-
+    -- Skip if already at target
     if math.abs(state.currentAlpha - targetAlpha) < 0.01 then
         state.isFading = false
         return
@@ -1244,7 +1293,7 @@ local function StartBarFade(barKey, targetAlpha)
     state.fadeStartAlpha = state.currentAlpha
     state.fadeDuration = duration
 
-
+    -- Create fade frame if needed
     if not ActionBars.fadeFrame then
         ActionBars.fadeFrame = CreateFrame("Frame")
         ActionBars.fadeFrame:SetScript("OnUpdate", function(self, elapsed)
@@ -1257,7 +1306,7 @@ local function StartBarFade(barKey, targetAlpha)
                     local elapsedTime = now - bState.fadeStart
                     local progress = math.min(elapsedTime / bState.fadeDuration, 1)
 
-
+                    -- Smooth easing
                     local easedProgress = progress * (2 - progress)
 
                     local alpha = bState.fadeStartAlpha +
@@ -1280,14 +1329,14 @@ local function StartBarFade(barKey, targetAlpha)
     ActionBars.fadeFrame:Show()
 end
 
-
+-- Check if mouse is over bar area or any of its buttons
 local function IsMouseOverBar(barKey)
     local barFrame = GetBarFrame(barKey)
     if barFrame and barFrame:IsMouseOver() then
         return true
     end
 
-
+    -- Also check individual buttons
     local buttons = GetBarButtons(barKey)
     for _, button in ipairs(buttons) do
         if button:IsMouseOver() then
@@ -1298,7 +1347,11 @@ local function IsMouseOverBar(barKey)
     return false
 end
 
+---------------------------------------------------------------------------
+-- LINKED ACTION BARS (1-8) MOUSEOVER
+---------------------------------------------------------------------------
 
+-- Bars that participate in linked mouseover behavior
 local LINKED_BAR_KEYS = {"bar1", "bar2", "bar3", "bar4", "bar5", "bar6", "bar7", "bar8"}
 
 local function IsLinkedBar(barKey)
@@ -1317,7 +1370,7 @@ local function IsMouseOverAnyLinkedBar()
     return false
 end
 
-
+-- Show a linked bar without triggering recursion
 local function ShowLinkedBarDirect(barKey)
     local barSettings = GetBarSettings(barKey)
     local fadeSettings = GetFadeSettings()
@@ -1333,7 +1386,7 @@ local function ShowLinkedBarDirect(barKey)
 
     local state = GetBarFadeState(barKey)
 
-
+    -- Cancel pending fade-out timers
     if state.delayTimer then
         state.delayTimer:Cancel()
         state.delayTimer = nil
@@ -1346,7 +1399,7 @@ local function ShowLinkedBarDirect(barKey)
     StartBarFade(barKey, 1)
 end
 
-
+-- Start fade-out for a linked bar
 local function FadeLinkedBarDirect(barKey)
     local barSettings = GetBarSettings(barKey)
     local fadeSettings = GetFadeSettings()
@@ -1376,23 +1429,23 @@ local function FadeLinkedBarDirect(barKey)
 
     state.delayTimer = C_Timer.NewTimer(delay, function()
         state.delayTimer = nil
-
+        -- Re-check at fade time in case mouse moved back
         if not IsMouseOverAnyLinkedBar() then
             StartBarFade(barKey, fadeOutAlpha)
         end
     end)
 end
 
-
+-- Handle mouse entering the bar area (event-based, no polling)
 local function OnBarMouseEnter(barKey)
     local state = GetBarFadeState(barKey)
     local fadeSettings = GetFadeSettings()
     local barSettings = GetBarSettings(barKey)
 
-
+    -- If bar should always be visible, skip fade logic entirely
     if barSettings and barSettings.alwaysShow then return end
 
-
+    -- Check if fade is enabled
     local fadeEnabled = barSettings and barSettings.fadeEnabled
     if fadeEnabled == nil then
         fadeEnabled = fadeSettings and fadeSettings.enabled
@@ -1401,7 +1454,7 @@ local function OnBarMouseEnter(barKey)
 
     state.isMouseOver = true
 
-
+    -- LINKED BARS: If enabled and this is a linked bar, show ALL linked bars
     if fadeSettings and fadeSettings.linkBars1to8 and IsLinkedBar(barKey) then
         for _, linkedKey in ipairs(LINKED_BAR_KEYS) do
             if linkedKey ~= barKey then
@@ -1410,7 +1463,7 @@ local function OnBarMouseEnter(barKey)
         end
     end
 
-
+    -- Cancel any pending fade-out
     if state.delayTimer then
         state.delayTimer:Cancel()
         state.delayTimer = nil
@@ -1423,55 +1476,55 @@ local function OnBarMouseEnter(barKey)
     StartBarFade(barKey, 1)
 end
 
-
+-- Handle mouse leaving a bar element (with delay to check if still over bar)
 local function OnBarMouseLeave(barKey)
     local state = GetBarFadeState(barKey)
     local fadeSettings = GetFadeSettings()
     local barSettings = GetBarSettings(barKey)
 
-
+    -- If bar should always be visible, skip fade logic entirely
     if barSettings and barSettings.alwaysShow then return end
 
-
+    -- If in combat and "always show in combat" is enabled, don't fade out (bars 1-8 only)
     local isMainBar = barKey and barKey:match("^bar%d$")
     if isMainBar and InCombatLockdown() and fadeSettings and fadeSettings.alwaysShowInCombat then
         return
     end
 
-
+    -- Check if fade is enabled
     local fadeEnabled = barSettings and barSettings.fadeEnabled
     if fadeEnabled == nil then
         fadeEnabled = fadeSettings and fadeSettings.enabled
     end
     if not fadeEnabled then return end
 
-
+    -- Cancel any existing leave check timer
     if state.leaveCheckTimer then
         state.leaveCheckTimer:Cancel()
     end
 
-
+    -- Short delay to check if mouse moved to another element in the bar
     state.leaveCheckTimer = C_Timer.NewTimer(0.066, function()
         state.leaveCheckTimer = nil
 
-
+        -- If mouse is still over the bar somewhere, don't fade
         if IsMouseOverBar(barKey) then return end
 
-
+        -- LINKED BARS: If enabled and this is a linked bar, check if over ANY linked bar
         if fadeSettings and fadeSettings.linkBars1to8 and IsLinkedBar(barKey) then
             if IsMouseOverAnyLinkedBar() then
-                return
+                return  -- Mouse moved to another linked bar, don't fade any
             end
-
+            -- Mouse left all linked bars - fade them all
             for _, linkedKey in ipairs(LINKED_BAR_KEYS) do
                 FadeLinkedBarDirect(linkedKey)
             end
-            return
+            return  -- Skip normal single-bar fade logic
         end
 
         state.isMouseOver = false
 
-
+        -- Get fade out alpha
         local fadeOutAlpha = barSettings and barSettings.fadeOutAlpha
         if fadeOutAlpha == nil then
             fadeOutAlpha = fadeSettings and fadeSettings.fadeOutAlpha or 0
@@ -1485,7 +1538,7 @@ local function OnBarMouseLeave(barKey)
 
         state.delayTimer = C_Timer.NewTimer(delay, function()
             if not state.isMouseOver then
-
+                -- Read fresh value at fade time in case settings changed
                 local freshBarSettings = GetBarSettings(barKey)
                 local freshFadeSettings = GetFadeSettings()
                 local freshFadeOutAlpha = freshBarSettings and freshBarSettings.fadeOutAlpha
@@ -1499,7 +1552,7 @@ local function OnBarMouseLeave(barKey)
     end)
 end
 
-
+-- Hook OnEnter/OnLeave on a frame for bar mouseover detection
 local function HookFrameForMouseover(frame, barKey)
     if not frame or frame._preyMouseoverHooked then return end
     frame._preyMouseoverHooked = true
@@ -1513,7 +1566,7 @@ local function HookFrameForMouseover(frame, barKey)
     end)
 end
 
-
+-- Setup mouseover detection for a bar (event-based, no polling)
 local function SetupBarMouseover(barKey)
     local barSettings = GetBarSettings(barKey)
     local fadeSettings = GetFadeSettings()
@@ -1521,7 +1574,8 @@ local function SetupBarMouseover(barKey)
 
     if not db or not db.enabled then return end
 
-
+    -- Extra button bars (Zone Ability, Extra Action) should never inherit global fade
+    -- They only fade if explicitly enabled for that specific bar
     if barKey == "extraActionButton" or barKey == "zoneAbility" then
         if not barSettings or barSettings.fadeEnabled ~= true then
             return
@@ -1530,46 +1584,46 @@ local function SetupBarMouseover(barKey)
 
     local state = GetBarFadeState(barKey)
 
-
+    -- Check if bar should always be visible (overrides fade)
     if barSettings and barSettings.alwaysShow then
         SetBarAlpha(barKey, 1)
         return
     end
 
-
+    -- Check if fade is enabled for this bar
     local fadeEnabled = barSettings and barSettings.fadeEnabled
     if fadeEnabled == nil then
         fadeEnabled = fadeSettings and fadeSettings.enabled
     end
 
     if not fadeEnabled then
-
+        -- Ensure bar is fully visible
         SetBarAlpha(barKey, 1)
         return
     end
 
-
+    -- Get target alpha for this bar when faded out
     local fadeOutAlpha = barSettings and barSettings.fadeOutAlpha
     if fadeOutAlpha == nil then
         fadeOutAlpha = fadeSettings and fadeSettings.fadeOutAlpha or 0
     end
 
-
+    -- Hook bar frame for mouseover
     local barFrame = GetBarFrame(barKey)
     if barFrame then
         HookFrameForMouseover(barFrame, barKey)
     end
 
-
+    -- Hook all buttons in the bar for mouseover
     local buttons = GetBarButtons(barKey)
     for _, button in ipairs(buttons) do
         HookFrameForMouseover(button, barKey)
     end
 
-
+    -- Update target alpha state to match current settings
     state.targetAlpha = fadeOutAlpha
 
-
+    -- Cancel any ongoing fade animation for this bar (so new settings take effect)
     state.isFading = false
     if state.delayTimer then
         state.delayTimer:Cancel()
@@ -1580,21 +1634,26 @@ local function SetupBarMouseover(barKey)
         state.leaveCheckTimer = nil
     end
 
-
+    -- Initialize to faded state if not moused over
     if not IsMouseOverBar(barKey) then
         SetBarAlpha(barKey, fadeOutAlpha)
     end
 end
 
+---------------------------------------------------------------------------
+-- COMBAT VISIBILITY HANDLER
+---------------------------------------------------------------------------
 
+-- Combat event handler for "always show in combat" feature
+-- Only applies to main action bars (1-8), not microbar, bags, pet, stance
 local COMBAT_FADE_BARS = {
     bar1 = true, bar2 = true, bar3 = true, bar4 = true,
     bar5 = true, bar6 = true, bar7 = true, bar8 = true,
 }
 
 local combatFadeFrame = CreateFrame("Frame")
-combatFadeFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
-combatFadeFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+combatFadeFrame:RegisterEvent("PLAYER_REGEN_DISABLED")  -- Enter combat
+combatFadeFrame:RegisterEvent("PLAYER_REGEN_ENABLED")   -- Leave combat
 
 combatFadeFrame:SetScript("OnEvent", function(self, event)
     local fadeSettings = GetFadeSettings()
@@ -1602,10 +1661,10 @@ combatFadeFrame:SetScript("OnEvent", function(self, event)
     if not fadeSettings.alwaysShowInCombat then return end
 
     if event == "PLAYER_REGEN_DISABLED" then
-
+        -- Entering combat: Force action bars 1-8 to full opacity
         for barKey, _ in pairs(COMBAT_FADE_BARS) do
             local state = GetBarFadeState(barKey)
-
+            -- Cancel any pending fade timers
             if state.delayTimer then
                 state.delayTimer:Cancel()
                 state.delayTimer = nil
@@ -1614,18 +1673,22 @@ combatFadeFrame:SetScript("OnEvent", function(self, event)
                 state.leaveCheckTimer:Cancel()
                 state.leaveCheckTimer = nil
             end
-
+            -- Fade to full opacity
             StartBarFade(barKey, 1)
         end
     else
-
+        -- Leaving combat: Resume normal mouseover behavior for bars 1-8
         for barKey, _ in pairs(COMBAT_FADE_BARS) do
             SetupBarMouseover(barKey)
         end
     end
 end)
 
+---------------------------------------------------------------------------
+-- BAR PROCESSING
+---------------------------------------------------------------------------
 
+-- Skin all buttons for a specific bar
 local function SkinBar(barKey)
     local db = GetDB()
     if not db or not db.enabled then return end
@@ -1633,7 +1696,7 @@ local function SkinBar(barKey)
     local barSettings = GetBarSettings(barKey)
     if not barSettings or not barSettings.enabled then return end
 
-
+    -- Use effective settings (global merged with per-bar overrides)
     local effectiveSettings = GetEffectiveSettings(barKey)
     if not effectiveSettings then return end
 
@@ -1643,10 +1706,12 @@ local function SkinBar(barKey)
         SkinButton(button, effectiveSettings)
         UpdateButtonText(button, effectiveSettings)
 
-
+        -- Add LibKeyBound methods for mousewheel binding support
         AddKeybindMethods(button, barKey)
 
-
+        -- Hook OnEnter to register with LibKeyBound when in keybind mode
+        -- Use HookScript to avoid tainting Blizzard's secure execution context
+        -- (SetScript + calling old handler causes ADDON_ACTION_BLOCKED during combat)
         if not button._preyOnEnterHooked then
             button._preyOnEnterHooked = true
             button:HookScript("OnEnter", function(self)
@@ -1659,22 +1724,25 @@ local function SkinBar(barKey)
     end
 end
 
-
+-- Skin all enabled bars
 local function SkinAllBars()
     local db = GetDB()
     if not db or not db.enabled then return end
 
-
+    -- Iterate over all bars (including non-standard ones like microbar, bags, etc.)
     for barKey, _ in pairs(BAR_FRAMES) do
-
+        -- Only skin bars that have button patterns (standard action bars)
         if BUTTON_PATTERNS[barKey] then
             SkinBar(barKey)
         end
-
+        -- Setup mouseover fade for ALL bars
         SetupBarMouseover(barKey)
     end
 end
 
+---------------------------------------------------------------------------
+-- PAGE ARROW VISIBILITY
+---------------------------------------------------------------------------
 
 local function ApplyPageArrowVisibility(hide)
     local pageNum = MainActionBar and MainActionBar.ActionBarPageNumber
@@ -1698,11 +1766,15 @@ end
 
 _G.PreyUI_ApplyPageArrowVisibility = ApplyPageArrowVisibility
 
+---------------------------------------------------------------------------
+-- INITIALIZATION
+---------------------------------------------------------------------------
 
+-- Refresh all action bar styling (called from options)
 function ActionBars:Refresh()
     if not ActionBars.initialized then return end
 
-
+    -- Clear skinned cache to force re-skin
     for button, _ in pairs(ActionBars.skinnedButtons) do
         button._preySkinKey = nil
     end
@@ -1710,18 +1782,18 @@ function ActionBars:Refresh()
     SkinAllBars()
     ApplyBarLayoutSettings()
 
-
+    -- Apply page arrow visibility
     local db = GetDB()
     if db and db.bars and db.bars.bar1 then
         ApplyPageArrowVisibility(db.bars.bar1.hidePageArrow)
     end
 end
 
-
+-- Initialize the module
 function ActionBars:Initialize()
     if ActionBars.initialized then return end
 
-
+    -- Defer initialization if in combat (protects SetScale calls on action bars)
     if InCombatLockdown() then
         ActionBars.pendingInitialize = true
         return
@@ -1732,24 +1804,24 @@ function ActionBars:Initialize()
 
     ActionBars.initialized = true
 
-
+    -- One-time migration for lock setting (preserves user setting after CVar sync fix)
     MigrateLockSetting()
 
-
+    -- Initial skin pass
     SkinAllBars()
 
-
+    -- Apply bar layout settings (scale, lock, range indicator, empty slots)
     ApplyBarLayoutSettings()
 
-
+    -- Apply page arrow visibility
     if db.bars and db.bars.bar1 then
         ApplyPageArrowVisibility(db.bars.bar1.hidePageArrow)
     end
 
-
+    -- Initialize extra button holders (Extra Action Button & Zone Ability)
     InitializeExtraButtons()
 
-
+    -- Debounced button update system (prevents rapid-fire during combat)
     local pendingButtonUpdates = {}
     local buttonUpdatePending = false
 
@@ -1784,9 +1856,16 @@ function ActionBars:Initialize()
         end
     end
 
-
+    -- NOTE: Direct hooks on ActionButton_Update and ActionButton_UpdateHotkeys have been
+    -- removed as they cause taint in Midnight (12.0+). These hooks run during Blizzard's
+    -- update cycle and can cause SetAttribute() calls to be blocked.
+    -- Instead, we rely purely on event-driven updates (ACTIONBAR_SLOT_CHANGED,
+    -- UPDATE_BINDINGS) which are already handled in the event frame below.
 end
 
+---------------------------------------------------------------------------
+-- EVENT HANDLING
+---------------------------------------------------------------------------
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
@@ -1796,13 +1875,13 @@ eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
-
+        -- Delay initialization to ensure all frames exist
         C_Timer.After(0.5, function()
             ActionBars:Initialize()
         end)
 
     elseif event == "ACTIONBAR_SLOT_CHANGED" then
-
+        -- Re-apply text styling when actions change
         C_Timer.After(0.1, function()
             for barKey, _ in pairs(BUTTON_PATTERNS) do
                 local effectiveSettings = GetEffectiveSettings(barKey)
@@ -1816,7 +1895,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end)
 
     elseif event == "UPDATE_BINDINGS" then
-
+        -- Re-apply keybind styling when bindings change
         C_Timer.After(0.1, function()
             for barKey, _ in pairs(BUTTON_PATTERNS) do
                 local effectiveSettings = GetEffectiveSettings(barKey)
@@ -1830,17 +1909,17 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end)
 
     elseif event == "PLAYER_REGEN_ENABLED" then
-
+        -- Process pending initialization (from /reload during combat)
         if ActionBars.pendingInitialize then
             ActionBars.pendingInitialize = false
             ActionBars:Initialize()
         end
-
+        -- Process any pending refresh operations
         if ActionBars.pendingRefresh then
             ActionBars.pendingRefresh = false
             ActionBars:Refresh()
         end
-
+        -- Process pending extra button operations
         if ActionBars.pendingExtraButtonInit then
             ActionBars.pendingExtraButtonInit = false
             InitializeExtraButtons()
@@ -1852,6 +1931,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
+---------------------------------------------------------------------------
+-- GLOBAL REFRESH FUNCTION
+---------------------------------------------------------------------------
 
 _G.PreyUI_RefreshActionBars = function()
     if InCombatLockdown() then
@@ -1861,29 +1943,36 @@ _G.PreyUI_RefreshActionBars = function()
     ActionBars:Refresh()
 end
 
+---------------------------------------------------------------------------
+-- EDIT MODE INTEGRATION
+-- Show/hide extra button movers when Edit Mode is entered/exited
+---------------------------------------------------------------------------
 
 local function SetupEditModeHooks()
     if not EditModeManagerFrame then return end
 
-
+    -- Show movers when entering Edit Mode
     hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
         local extraSettings = GetExtraButtonDB("extraActionButton")
         local zoneSettings = GetExtraButtonDB("zoneAbility")
-
+        -- Only show movers if at least one extra button feature is enabled
         if (extraSettings and extraSettings.enabled) or (zoneSettings and zoneSettings.enabled) then
             ShowExtraButtonMovers()
         end
     end)
 
-
+    -- Hide movers when exiting Edit Mode
     hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
         HideExtraButtonMovers()
     end)
 end
 
-
+-- Call setup after a short delay to ensure EditModeManagerFrame exists
 C_Timer.After(1, SetupEditModeHooks)
 
+---------------------------------------------------------------------------
+-- EXPOSE MODULE
+---------------------------------------------------------------------------
 
 local PREYCore = _G.PreyUI and _G.PreyUI.PREYCore
 if PREYCore then

@@ -1,3 +1,7 @@
+---------------------------------------------------------------------------
+-- PreyUI Blizzard Options Integration
+-- Registers PreyUI in Settings > AddOns panel
+---------------------------------------------------------------------------
 local ADDON_NAME, ns = ...
 local PREY = PreyUI
 
@@ -13,7 +17,7 @@ local function OpenPreyUI()
 end
 
 local function CreateSettingsPanel()
-
+    -- Check API availability (TWW/Midnight)
     if not (Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory) then
         return
     end
@@ -21,29 +25,29 @@ local function CreateSettingsPanel()
     local panel = CreateFrame("Frame", "PreyUI_BlizzardSettingsPanel")
     panel.name = ADDON_DISPLAY_NAME
 
-
+    -- Title
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText(ADDON_DISPLAY_NAME)
 
-
+    -- Description
     local desc = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
     desc:SetWidth(520)
     desc:SetJustifyH("LEFT")
     desc:SetText("Open the PreyUI configuration window.")
 
-
+    -- Button (using Blizzard template for consistency in Blizzard's UI)
     local btn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     btn:SetSize(180, 32)
     btn:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -16)
     btn:SetText("Open PreyUI")
     btn:SetScript("OnClick", OpenPreyUI)
 
-
+    -- Register with Blizzard Settings
     local category = Settings.RegisterCanvasLayoutCategory(panel, ADDON_DISPLAY_NAME)
     Settings.RegisterAddOnCategory(category)
 end
 
-
+-- Create panel after a short delay to ensure all systems are ready
 C_Timer.After(0.1, CreateSettingsPanel)

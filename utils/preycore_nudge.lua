@@ -2,7 +2,8 @@ local ADDON_NAME, ns = ...
 local PREYCore = ns.Addon
 local LibEditModeOverride = LibStub("LibEditModeOverride-1.0", true)
 
-
+-- Extra nudge targets: Blizzard Edit Mode unit frame anchors
+-- These are the invisible movers that our reskinned unit frames use.
 local UNIT_ANCHOR_FRAMES = {
     PlayerFrame = "Player",
     TargetFrame = "Target",
@@ -10,7 +11,7 @@ local UNIT_ANCHOR_FRAMES = {
     PetFrame    = "Pet",
 }
 
-
+-- Blizzard Edit Mode frame names lookup (defined early for IsNudgeTargetFrameName)
 local BLIZZARD_FRAME_LABELS = {
     BuffFrame = "Buff Frame",
     DebuffFrame = "Debuff Frame",
@@ -21,7 +22,7 @@ local BLIZZARD_FRAME_LABELS = {
 local function IsNudgeTargetFrameName(frameName)
     if not frameName then return false end
 
-
+    -- Our cooldown viewers
     if PREYCore.viewers then
         for _, viewerName in ipairs(PREYCore.viewers) do
             if frameName == viewerName then
@@ -30,12 +31,12 @@ local function IsNudgeTargetFrameName(frameName)
         end
     end
 
-
+    -- Blizzard unit-frame anchors
     if UNIT_ANCHOR_FRAMES[frameName] then
         return true
     end
 
-
+    -- Blizzard Edit Mode frames
     if BLIZZARD_FRAME_LABELS[frameName] then
         return true
     end
@@ -48,35 +49,37 @@ local function GetNudgeDisplayName(frameName)
         return ""
     end
 
-
+    -- Friendly names for unit-frame anchors
     local unitLabel = UNIT_ANCHOR_FRAMES[frameName]
     if unitLabel then
         return unitLabel
     end
 
-
+    -- Friendly names for Blizzard Edit Mode frames
     local blizzLabel = BLIZZARD_FRAME_LABELS[frameName]
     if blizzLabel then
         return blizzLabel
     end
 
-
+    -- Fallback: prettify viewer names
     return frameName
         :gsub("CooldownViewer", "")
         :gsub("Icon", " Icon")
 end
 
+-- Nudge Frame for Viewer / Anchor Positioning
+-- LAZY LOADED: Frame is only created when Edit Mode is first entered
 
-local NudgeFrame = nil
+local NudgeFrame = nil  -- Created on first use
 
-
+-- Create the NudgeFrame UI on first use (saves CPU on /reload)
 local function CreateNudgeUI()
     if NudgeFrame then return NudgeFrame end
 
     NudgeFrame = CreateFrame("Frame", ADDON_NAME .. "NudgeFrame", UIParent, "BackdropTemplate")
     PREYCore.nudgeFrame = NudgeFrame
 
-
+    -- Frame properties
     NudgeFrame:SetSize(200, 320)
     NudgeFrame:SetFrameStrata("DIALOG")
     NudgeFrame:SetClampedToScreen(true)
@@ -84,7 +87,7 @@ local function CreateNudgeUI()
     NudgeFrame:SetMovable(false)
     NudgeFrame:Hide()
 
-
+    -- Backdrop
     NudgeFrame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
         edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -94,7 +97,7 @@ local function CreateNudgeUI()
         insets = { left = 8, right = 8, top = 8, bottom = 8 }
     })
 
-
+    -- Position docked to Edit Mode frame
     function NudgeFrame:UpdatePosition()
         if EditModeManagerFrame then
             self:ClearAllPoints()
@@ -102,37 +105,37 @@ local function CreateNudgeUI()
         end
     end
 
-
+    -- Title text
     local title = NudgeFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -12)
     title:SetText("Viewer Position")
 
-
+    -- Info text showing current selection
     local infoText = NudgeFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     infoText:SetPoint("TOP", title, "BOTTOM", 0, -8)
     infoText:SetWidth(180)
     infoText:SetWordWrap(true)
     NudgeFrame.infoText = infoText
 
-
+    -- Position display
     local posText = NudgeFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     posText:SetPoint("TOP", infoText, "BOTTOM", 0, -8)
     posText:SetWidth(180)
     posText:SetJustifyH("CENTER")
     NudgeFrame.posText = posText
 
-
+    -- Helper function to create arrow buttons
     local function CreateArrowButton(parent, direction, x, yFromTop)
         local button = CreateFrame("Button", nil, parent)
         button:SetSize(32, 32)
         button:SetPoint("TOP", parent, "TOP", x, yFromTop)
 
-
+        -- Button background
         button:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
         button:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
         button:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
 
-
+        -- Rotate texture based on direction
         local texture = button:GetNormalTexture()
         if direction == "UP" then
             texture:SetRotation(math.rad(90))
@@ -153,7 +156,7 @@ local function CreateNudgeUI()
             PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
         end)
 
-
+        -- Tooltip
         button:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText("Nudge " .. direction:lower())
@@ -168,20 +171,20 @@ local function CreateNudgeUI()
         return button
     end
 
-
+    -- Create directional buttons
     NudgeFrame.upButton = CreateArrowButton(NudgeFrame, "UP", 0, -90)
     NudgeFrame.downButton = CreateArrowButton(NudgeFrame, "DOWN", 0, -150)
     NudgeFrame.leftButton = CreateArrowButton(NudgeFrame, "LEFT", -25, -120)
     NudgeFrame.rightButton = CreateArrowButton(NudgeFrame, "RIGHT", 25, -120)
 
-
+    -- Close button
     local closeButton = CreateFrame("Button", nil, NudgeFrame, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", -5, -5)
     closeButton:SetScript("OnClick", function()
         NudgeFrame:Hide()
     end)
 
-
+    -- Nudge amount slider
     local amountSlider = CreateFrame("Slider", nil, NudgeFrame, "OptionsSliderTemplate")
     amountSlider:SetPoint("BOTTOM", 0, 60)
     amountSlider:SetMinMaxValues(0.1, 10)
@@ -191,41 +194,41 @@ local function CreateNudgeUI()
     amountSlider:SetHeight(15)
     NudgeFrame.amountSlider = amountSlider
 
-
+    -- Slider label
     local amountLabel = NudgeFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     amountLabel:SetPoint("BOTTOM", amountSlider, "TOP", 0, 2)
     amountLabel:SetText("Nudge Amount: 1px")
     NudgeFrame.amountLabel = amountLabel
 
-
+    -- Slider min/max labels
     amountSlider.Low:SetText("0.1")
     amountSlider.High:SetText("10")
 
-
+    -- Slider value change handler
     amountSlider:SetScript("OnValueChanged", function(self, value)
-
+        -- Round to 1 decimal place
         value = math.floor(value * 10 + 0.5) / 10
         PREYCore.db.profile.nudgeAmount = value
-
+        -- Format to show 1 decimal place for fractional values
         local displayValue = (value % 1 == 0) and tostring(math.floor(value)) or string.format("%.1f", value)
         amountLabel:SetText("Nudge Amount: " .. displayValue .. "px")
     end)
 
-
+    -- Viewer selector dropdown
     local viewerDropdown = CreateFrame("Frame", ADDON_NAME .. "ViewerDropdown", NudgeFrame, "UIDropDownMenuTemplate")
     viewerDropdown:SetPoint("BOTTOM", 0, 20)
     NudgeFrame.viewerDropdown = viewerDropdown
 
-
+    -- Dropdown label
     local dropdownLabel = NudgeFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     dropdownLabel:SetPoint("BOTTOM", viewerDropdown, "TOP", 0, 0)
     dropdownLabel:SetText("Select Viewer:")
 
-
+    -- Initialize dropdown
     local function ViewerDropdown_Initialize(self, level)
         local info = UIDropDownMenu_CreateInfo()
 
-
+        -- Cooldown viewers
         if PREYCore.viewers then
             for _, viewerName in ipairs(PREYCore.viewers) do
                 local displayName = GetNudgeDisplayName(viewerName)
@@ -242,7 +245,7 @@ local function CreateNudgeUI()
             end
         end
 
-
+        -- Blizzard unit-frame anchors
         for frameName, label in pairs(UNIT_ANCHOR_FRAMES) do
             local displayName = label
 
@@ -262,7 +265,7 @@ local function CreateNudgeUI()
     UIDropDownMenu_SetWidth(viewerDropdown, 150)
     UIDropDownMenu_SetText(viewerDropdown, "Select...")
 
-
+    -- Update info display
     function NudgeFrame:UpdateInfo()
         local viewerName = PREYCore.selectedViewer
         local viewer = viewerName and rawget(_G, viewerName)
@@ -272,7 +275,7 @@ local function CreateNudgeUI()
             self.infoText:SetText(displayName)
             self.infoText:SetTextColor(0, 1, 0)
 
-
+            -- Show position
             local point, relativeTo, relativePoint, xOfs, yOfs = viewer:GetPoint(1)
             if point then
                 self.posText:SetFormattedText("Position: %.1f, %.1f", xOfs or 0, yOfs or 0)
@@ -282,7 +285,7 @@ local function CreateNudgeUI()
                 self.posText:SetTextColor(0.7, 0.7, 0.7)
             end
 
-
+            -- Enable controls
             self.upButton:Enable()
             self.downButton:Enable()
             self.leftButton:Enable()
@@ -293,7 +296,7 @@ local function CreateNudgeUI()
             self.infoText:SetTextColor(0.7, 0.7, 0.7)
             self.posText:SetText("")
 
-
+            -- Disable controls
             self.upButton:Disable()
             self.downButton:Disable()
             self.leftButton:Disable()
@@ -302,21 +305,22 @@ local function CreateNudgeUI()
         end
     end
 
-
+    -- Update amount slider
     function NudgeFrame:UpdateAmountSlider()
         local amount = PREYCore.db.profile.nudgeAmount or 1
         self.amountSlider:SetValue(amount)
-
+        -- Format to show 1 decimal place for fractional values
         local displayAmount = (amount % 1 == 0) and tostring(math.floor(amount)) or string.format("%.1f", amount)
         self.amountLabel:SetText("Nudge Amount: " .. displayAmount .. "px")
     end
 
-
+    -- Update visibility
+    -- Panel disabled - nudge arrows now appear directly on viewers
     function NudgeFrame:UpdateVisibility()
         self:Hide()
     end
 
-
+    -- Update on show
     NudgeFrame:SetScript("OnShow", function(self)
         self:UpdatePosition()
         self:UpdateInfo()
@@ -324,9 +328,9 @@ local function CreateNudgeUI()
     end)
 
     return NudgeFrame
-end
+end  -- End of CreateNudgeUI()
 
-
+-- Helper to ensure NudgeFrame exists before using it
 local function EnsureNudgeFrame()
     if not NudgeFrame then
         CreateNudgeUI()
@@ -334,17 +338,21 @@ local function EnsureNudgeFrame()
     return NudgeFrame
 end
 
+---------------------------------------------------------------------------
+-- CDM VIEWER EDIT MODE OVERLAYS
+-- Nudge arrows directly on cooldown viewers during Edit Mode
+---------------------------------------------------------------------------
 
 local viewerOverlays = {}
 
-
+-- All CDM viewers that should get nudge overlays
 local CDM_VIEWERS = {
     "EssentialCooldownViewer",
     "UtilityCooldownViewer",
     "BuffIconCooldownViewer",
 }
 
-
+-- Blizzard Edit Mode frames that should get nudge overlays
 local BLIZZARD_EDITMODE_FRAMES = {
     { name = "BuffFrame", label = "Buff Frame" },
     { name = "DebuffFrame", label = "Debuff Frame" },
@@ -354,19 +362,19 @@ local BLIZZARD_EDITMODE_FRAMES = {
 
 local blizzardOverlays = {}
 
-
+-- Create a nudge button with chevron arrows (same style as unit frames)
 local function CreateViewerNudgeButton(parent, direction, viewerName)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(18, 18)
 
-
+    -- Background - dark grey at 70% for visibility over any game content
     local bg = btn:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetTexture("Interface\\Buttons\\WHITE8x8")
     bg:SetVertexColor(0.1, 0.1, 0.1, 0.7)
     btn.bg = bg
 
-
+    -- Chevron lines - white for high contrast
     local line1 = btn:CreateTexture(nil, "ARTWORK")
     line1:SetColorTexture(1, 1, 1, 0.9)
     line1:SetSize(7, 2)
@@ -375,7 +383,7 @@ local function CreateViewerNudgeButton(parent, direction, viewerName)
     line2:SetColorTexture(1, 1, 1, 0.9)
     line2:SetSize(7, 2)
 
-
+    -- Direction-specific angles and positions
     if direction == "DOWN" then
         line1:SetPoint("CENTER", btn, "CENTER", -2, 1)
         line1:SetRotation(math.rad(-45))
@@ -401,7 +409,7 @@ local function CreateViewerNudgeButton(parent, direction, viewerName)
     btn.line1 = line1
     btn.line2 = line2
 
-
+    -- Hover highlight - yellow
     btn:SetScript("OnEnter", function(self)
         self.line1:SetVertexColor(1, 0.8, 0, 1)
         self.line2:SetVertexColor(1, 0.8, 0, 1)
@@ -412,7 +420,7 @@ local function CreateViewerNudgeButton(parent, direction, viewerName)
     end)
 
     btn:SetScript("OnClick", function()
-
+        -- Select this viewer and nudge it
         PREYCore:SelectViewer(viewerName)
         PREYCore:NudgeSelectedViewer(direction)
     end)
@@ -420,22 +428,22 @@ local function CreateViewerNudgeButton(parent, direction, viewerName)
     return btn
 end
 
-
+-- Minimap overlay storage
 local minimapOverlay = nil
 
-
+-- Create a nudge button specifically for the minimap
 local function CreateMinimapNudgeButton(parent, direction)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(18, 18)
 
-
+    -- Background - dark grey at 70% for visibility
     local bg = btn:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetTexture("Interface\\Buttons\\WHITE8x8")
     bg:SetVertexColor(0.1, 0.1, 0.1, 0.7)
     btn.bg = bg
 
-
+    -- Chevron lines - white for high contrast
     local line1 = btn:CreateTexture(nil, "ARTWORK")
     line1:SetColorTexture(1, 1, 1, 0.9)
     line1:SetSize(7, 2)
@@ -444,7 +452,7 @@ local function CreateMinimapNudgeButton(parent, direction)
     line2:SetColorTexture(1, 1, 1, 0.9)
     line2:SetSize(7, 2)
 
-
+    -- Direction-specific angles and positions (same as viewer nudge buttons)
     if direction == "DOWN" then
         line1:SetPoint("CENTER", btn, "CENTER", -2, 1)
         line1:SetRotation(math.rad(-45))
@@ -470,7 +478,7 @@ local function CreateMinimapNudgeButton(parent, direction)
     btn.line1 = line1
     btn.line2 = line2
 
-
+    -- Hover highlight - yellow
     btn:SetScript("OnEnter", function(self)
         self.line1:SetVertexColor(1, 0.8, 0, 1)
         self.line2:SetVertexColor(1, 0.8, 0, 1)
@@ -480,7 +488,7 @@ local function CreateMinimapNudgeButton(parent, direction)
         self.line2:SetVertexColor(1, 1, 1, 0.9)
     end)
 
-
+    -- Click handler - nudge minimap position
     btn:SetScript("OnClick", function()
         PREYCore:SelectEditModeElement("minimap", "minimap")
         PREYCore:NudgeMinimap(direction)
@@ -489,7 +497,7 @@ local function CreateMinimapNudgeButton(parent, direction)
     return btn
 end
 
-
+-- Create overlay for a single CDM viewer
 local function CreateViewerOverlay(viewerName)
     local viewer = rawget(_G, viewerName)
     if not viewer then return nil end
@@ -504,16 +512,16 @@ local function CreateViewerOverlay(viewerName)
     })
     overlay:SetBackdropColor(0.2, 0.8, 1, 0.3)
     overlay:SetBackdropBorderColor(0.2, 0.8, 1, 1)
-    overlay:EnableMouse(false)
+    overlay:EnableMouse(false)  -- Don't block clicks to the viewer itself
 
-
+    -- Label showing viewer name
     local displayName = GetNudgeDisplayName(viewerName)
     local label = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("TOP", overlay, "TOP", 0, -4)
     label:SetText(displayName)
     label:SetTextColor(0.2, 0.8, 1, 1)
 
-
+    -- Nudge buttons around the overlay (same positioning as unit frames)
     local nudgeUp = CreateViewerNudgeButton(overlay, "UP", viewerName)
     nudgeUp:SetPoint("BOTTOM", overlay, "TOP", 0, 4)
 
@@ -531,10 +539,10 @@ local function CreateViewerOverlay(viewerName)
     overlay.nudgeLeft = nudgeLeft
     overlay.nudgeRight = nudgeRight
 
-
+    -- Store viewerName for selection manager
     overlay.elementKey = viewerName
 
-
+    -- Hide nudge buttons initially (will show on click/selection)
     nudgeUp:Hide()
     nudgeDown:Hide()
     nudgeLeft:Hide()
@@ -544,7 +552,7 @@ local function CreateViewerOverlay(viewerName)
     return overlay
 end
 
-
+-- Create overlay for a Blizzard Edit Mode frame
 local function CreateBlizzardFrameOverlay(frameInfo)
     local frameName = frameInfo.name
     local label = frameInfo.label
@@ -563,13 +571,13 @@ local function CreateBlizzardFrameOverlay(frameInfo)
     overlay:SetBackdropBorderColor(0.2, 0.8, 1, 1)
     overlay:EnableMouse(false)
 
-
+    -- Label showing frame name
     local labelText = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     labelText:SetPoint("TOP", overlay, "TOP", 0, -4)
     labelText:SetText(label)
     labelText:SetTextColor(0.2, 0.8, 1, 1)
 
-
+    -- Nudge buttons around the overlay (same positioning as CDM viewers)
     local nudgeUp = CreateViewerNudgeButton(overlay, "UP", frameName)
     nudgeUp:SetPoint("BOTTOM", overlay, "TOP", 0, 4)
 
@@ -587,10 +595,10 @@ local function CreateBlizzardFrameOverlay(frameInfo)
     overlay.nudgeLeft = nudgeLeft
     overlay.nudgeRight = nudgeRight
 
-
+    -- Store frameName for selection manager
     overlay.elementKey = frameName
 
-
+    -- Hide nudge buttons initially (will show on click/selection)
     nudgeUp:Hide()
     nudgeDown:Hide()
     nudgeLeft:Hide()
@@ -600,7 +608,7 @@ local function CreateBlizzardFrameOverlay(frameInfo)
     return overlay
 end
 
-
+-- Create overlay for the PREY minimap
 local function CreateMinimapOverlay()
     if not Minimap then return nil end
 
@@ -616,18 +624,18 @@ local function CreateMinimapOverlay()
     overlay:SetBackdropBorderColor(0.2, 0.8, 1, 1)
     overlay:EnableMouse(false)
 
-
+    -- Label showing "Minimap"
     local labelText = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     labelText:SetPoint("TOP", overlay, "TOP", 0, -4)
     labelText:SetText("Minimap")
     labelText:SetTextColor(0.2, 0.8, 1, 1)
 
-
+    -- Info text showing X/Y position (above UP arrow)
     local infoText = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     infoText:SetTextColor(0.7, 0.7, 0.7, 1)
     overlay.infoText = infoText
 
-
+    -- Nudge buttons around the overlay
     local nudgeUp = CreateMinimapNudgeButton(overlay, "UP")
     nudgeUp:SetPoint("BOTTOM", overlay, "TOP", 0, 4)
 
@@ -640,7 +648,7 @@ local function CreateMinimapOverlay()
     local nudgeRight = CreateMinimapNudgeButton(overlay, "RIGHT")
     nudgeRight:SetPoint("LEFT", overlay, "RIGHT", 4, 0)
 
-
+    -- Position info text above the UP arrow
     infoText:SetPoint("BOTTOM", nudgeUp, "TOP", 0, 2)
 
     overlay.nudgeUp = nudgeUp
@@ -648,10 +656,10 @@ local function CreateMinimapOverlay()
     overlay.nudgeLeft = nudgeLeft
     overlay.nudgeRight = nudgeRight
 
-
+    -- Store element key for selection manager
     overlay.elementKey = "minimap"
 
-
+    -- Hide nudge buttons initially (will show on click/selection)
     nudgeUp:Hide()
     nudgeDown:Hide()
     nudgeLeft:Hide()
@@ -662,7 +670,7 @@ local function CreateMinimapOverlay()
     return overlay
 end
 
-
+-- Show overlays on all CDM viewers
 function PREYCore:ShowViewerOverlays()
     for _, viewerName in ipairs(CDM_VIEWERS) do
         if not viewerOverlays[viewerName] then
@@ -672,15 +680,16 @@ function PREYCore:ShowViewerOverlays()
         if overlay then
             overlay:Show()
 
-
+            -- Enable mouse on OVERLAY and handle clicks there
+            -- (Icons inside viewer intercept clicks to the viewer frame itself)
             overlay:EnableMouse(true)
             overlay:SetScript("OnMouseDown", function(self, button)
                 if button == "LeftButton" then
                     PREYCore:SelectViewer(viewerName)
-
+                    -- Start drag on the viewer
                     local viewer = rawget(_G, viewerName)
                     if viewer then
-                        viewer:SetMovable(true)
+                        viewer:SetMovable(true)  -- Enable movable for Blizzard CDM viewers
                         viewer:StartMoving()
                     end
                 end
@@ -689,7 +698,7 @@ function PREYCore:ShowViewerOverlays()
                 local viewer = rawget(_G, viewerName)
                 if viewer then
                     viewer:StopMovingOrSizing()
-
+                    -- Save position via LibEditModeOverride
                     if LibEditModeOverride and EnsureEditModeReady() and LibEditModeOverride:HasEditModeSettings(viewer) then
                         local point, relativeTo, relativePoint, x, y = viewer:GetPoint(1)
                         pcall(function()
@@ -700,11 +709,11 @@ function PREYCore:ShowViewerOverlays()
             end)
         end
     end
-
+    -- Store reference for selection manager access
     self.cdmOverlays = viewerOverlays
 end
 
-
+-- Hide all viewer overlays
 function PREYCore:HideViewerOverlays()
     for _, viewerName in ipairs(CDM_VIEWERS) do
         local overlay = viewerOverlays[viewerName]
@@ -717,13 +726,13 @@ function PREYCore:HideViewerOverlays()
     end
 end
 
-
+-- Show overlays on all Blizzard Edit Mode frames
 function PREYCore:ShowBlizzardFrameOverlays()
     for _, frameInfo in ipairs(BLIZZARD_EDITMODE_FRAMES) do
         local frameName = frameInfo.name
         local frame = rawget(_G, frameName)
 
-
+        -- Skip if frame doesn't exist (e.g., DamageMeter not in combat)
         if frame then
             if not blizzardOverlays[frameName] then
                 blizzardOverlays[frameName] = CreateBlizzardFrameOverlay(frameInfo)
@@ -732,20 +741,20 @@ function PREYCore:ShowBlizzardFrameOverlays()
             if overlay then
                 overlay:Show()
 
-
+                -- Enable mouse on OVERLAY and handle clicks there
                 overlay:EnableMouse(true)
                 overlay:SetScript("OnMouseDown", function(self, button)
                     if button == "LeftButton" then
                         PREYCore:SelectViewer(frameName)
-
-                        frame:SetMovable(true)
+                        -- Start drag on the frame
+                        frame:SetMovable(true)  -- Enable movable for Blizzard Edit Mode frames
                         frame:StartMoving()
                     end
                 end)
                 overlay:SetScript("OnMouseUp", function(self, button)
                     if frame then
                         frame:StopMovingOrSizing()
-
+                        -- Save position via LibEditModeOverride
                         if LibEditModeOverride and EnsureEditModeReady() and LibEditModeOverride:HasEditModeSettings(frame) then
                             local point, relativeTo, relativePoint, x, y = frame:GetPoint(1)
                             pcall(function()
@@ -757,11 +766,11 @@ function PREYCore:ShowBlizzardFrameOverlays()
             end
         end
     end
-
+    -- Store reference for selection manager access
     self.blizzardOverlays = blizzardOverlays
 end
 
-
+-- Hide all Blizzard frame overlays
 function PREYCore:HideBlizzardFrameOverlays()
     for _, frameInfo in ipairs(BLIZZARD_EDITMODE_FRAMES) do
         local overlay = blizzardOverlays[frameInfo.name]
@@ -774,7 +783,7 @@ function PREYCore:HideBlizzardFrameOverlays()
     end
 end
 
-
+-- Show minimap overlay
 function PREYCore:ShowMinimapOverlay()
     if not minimapOverlay then
         minimapOverlay = CreateMinimapOverlay()
@@ -782,12 +791,12 @@ function PREYCore:ShowMinimapOverlay()
     if minimapOverlay then
         minimapOverlay:Show()
 
-
+        -- Enable mouse for click detection, pass drag to Minimap
         minimapOverlay:EnableMouse(true)
         minimapOverlay:SetScript("OnMouseDown", function(self, button)
             if button == "LeftButton" then
                 PREYCore:SelectEditModeElement("minimap", "minimap")
-
+                -- Start drag on the Minimap
                 if Minimap:IsMovable() then
                     Minimap:StartMoving()
                 end
@@ -795,13 +804,13 @@ function PREYCore:ShowMinimapOverlay()
         end)
         minimapOverlay:SetScript("OnMouseUp", function(self, button)
             Minimap:StopMovingOrSizing()
-
+            -- Save position to DB
             local settings = PREYCore.db and PREYCore.db.profile and PREYCore.db.profile.minimap
             if settings then
                 local point, _, relPoint, x, y = Minimap:GetPoint()
                 settings.position = {point, relPoint, x, y}
             end
-
+            -- Update info text
             if minimapOverlay and minimapOverlay.infoText and settings and settings.position then
                 minimapOverlay.infoText:SetText(string.format("Minimap  X:%d Y:%d",
                     math.floor(settings.position[3] or 0),
@@ -809,12 +818,12 @@ function PREYCore:ShowMinimapOverlay()
             end
         end)
 
-
+        -- Store reference for selection manager access
         self.minimapOverlay = minimapOverlay
     end
 end
 
-
+-- Hide minimap overlay
 function PREYCore:HideMinimapOverlay()
     if minimapOverlay then
         minimapOverlay:Hide()
@@ -824,6 +833,7 @@ function PREYCore:HideMinimapOverlay()
     end
 end
 
+-- Edit Mode Click Detection
 
 local clickDetector = CreateFrame("Frame")
 clickDetector:Hide()
@@ -834,7 +844,7 @@ function PREYCore:EnableClickDetection()
     clickDetector._elapsed = 0
     clickDetector:SetScript("OnUpdate", function(self, elapsed)
         self._elapsed = self._elapsed + elapsed
-        if self._elapsed < 0.033 then return end
+        if self._elapsed < 0.033 then return end -- ~30 FPS throttle
         self._elapsed = 0
         if IsMouseButtonDown("LeftButton") then
             local frames = GetMouseFoci()
@@ -843,7 +853,7 @@ function PREYCore:EnableClickDetection()
                     if frame and frame ~= WorldFrame then
                         local frameName = frame:GetName()
 
-
+                        -- Check if this is one of our viewers or unit-frame anchors
                         if IsNudgeTargetFrameName(frameName) then
                             if lastClickedFrame ~= frame then
                                 lastClickedFrame = frame
@@ -852,7 +862,8 @@ function PREYCore:EnableClickDetection()
                             return
                         end
 
-
+                        -- Also check parent frame (for overlay clicks that pass through)
+                        -- Overlays have no name but their parent is the viewer
                         if not frameName and frame:GetParent() then
                             local parentName = frame:GetParent():GetName()
                             if IsNudgeTargetFrameName(parentName) then
@@ -878,7 +889,9 @@ function PREYCore:DisableClickDetection()
     lastClickedFrame = nil
 end
 
+-- Viewer Selection & Nudging
 
+-- Select a viewer for nudging
 function PREYCore:SelectViewer(viewerName)
     if not viewerName or not rawget(_G, viewerName) then
         self.selectedViewer = nil
@@ -890,7 +903,8 @@ function PREYCore:SelectViewer(viewerName)
 
     self.selectedViewer = viewerName
 
-
+    -- Use central selection manager for click-to-select arrows
+    -- Determine element type: "blizzard" for Blizzard Edit Mode frames, "cdm" for CDM viewers
     if self.SelectEditModeElement then
         local elementType = BLIZZARD_FRAME_LABELS[viewerName] and "blizzard" or "cdm"
         self:SelectEditModeElement(elementType, viewerName)
@@ -900,37 +914,37 @@ function PREYCore:SelectViewer(viewerName)
         self.nudgeFrame:UpdateInfo()
         local displayName = GetNudgeDisplayName(viewerName)
         UIDropDownMenu_SetText(self.nudgeFrame.viewerDropdown, displayName)
-
+        -- Panel disabled - nudge arrows now on viewers directly
     end
 end
 
-
+-- Ensure LibEditModeOverride is ready and layouts are loaded
 local function EnsureEditModeReady()
     if not LibEditModeOverride then
         return false
     end
-
+    
     if not LibEditModeOverride:IsReady() then
         return false
     end
-
+    
     if not LibEditModeOverride:AreLayoutsLoaded() then
         LibEditModeOverride:LoadLayouts()
     end
-
+    
     return LibEditModeOverride:CanEditActiveLayout()
 end
 
-
+-- Nudge the selected viewer
 function PREYCore:NudgeSelectedViewer(direction)
     if not self.selectedViewer then return false end
 
     local viewer = rawget(_G, self.selectedViewer)
     if not viewer then return false end
 
-    local amount = 1
+    local amount = 1  -- Always 1px nudge
 
-
+    -- Get current point from the Edit Mode system frame
     local point, relativeTo, relativePoint, xOfs, yOfs = viewer:GetPoint(1)
     if not point then return false end
 
@@ -947,15 +961,15 @@ function PREYCore:NudgeSelectedViewer(direction)
         newX = newX + amount
     end
 
-
+    -- Use LibEditModeOverride if available (cleaner, more reliable)
     if LibEditModeOverride and EnsureEditModeReady() and LibEditModeOverride:HasEditModeSettings(viewer) then
-
+        -- Use the library's ReanchorFrame method which properly registers with Edit Mode
         local success, err = pcall(function()
             LibEditModeOverride:ReanchorFrame(viewer, point, relativeTo, relativePoint, newX, newY)
         end)
-
+        
         if success then
-
+            -- Update the display in your nudge panel
             if self.nudgeFrame and self.nudgeFrame:IsShown() then
                 self.nudgeFrame:UpdateInfo()
             end
@@ -963,22 +977,22 @@ function PREYCore:NudgeSelectedViewer(direction)
         end
     end
 
-
+    -- Fallback to manual method if library isn't available or frame isn't registered
     viewer:ClearAllPoints()
     viewer:SetPoint(point, relativeTo, relativePoint, newX, newY)
 
-
+    -- Tell Edit Mode that THIS system's position changed
     if EditModeManagerFrame and EditModeManagerFrame.editModeActive then
         if EditModeManagerFrame.OnSystemPositionChange then
-
+            -- Properly register that this Edit Mode system has a new position
             EditModeManagerFrame:OnSystemPositionChange(viewer)
         elseif EditModeManagerFrame.SetHasActiveChanges then
-
+            -- Fallback: at least mark as dirty
             EditModeManagerFrame:SetHasActiveChanges(true)
         end
     end
 
-
+    -- Update the display in your nudge panel
     if self.nudgeFrame and self.nudgeFrame:IsShown() then
         self.nudgeFrame:UpdateInfo()
     end
@@ -986,7 +1000,7 @@ function PREYCore:NudgeSelectedViewer(direction)
     return true
 end
 
-
+-- Nudge the minimap
 function PREYCore:NudgeMinimap(direction)
     local db = self.db and self.db.profile and self.db.profile.minimap
     if not db or not db.position then return end
@@ -994,7 +1008,7 @@ function PREYCore:NudgeMinimap(direction)
     local amount = self.nudgeAmount or 1
     if IsShiftKeyDown() then amount = amount * 10 end
 
-
+    -- position = {point, relativePoint, xOffset, yOffset}
     local xOfs = db.position[3] or 0
     local yOfs = db.position[4] or 0
 
@@ -1011,60 +1025,63 @@ function PREYCore:NudgeMinimap(direction)
     db.position[3] = xOfs
     db.position[4] = yOfs
 
-
+    -- Apply position
     Minimap:ClearAllPoints()
     Minimap:SetPoint(db.position[1], UIParent, db.position[2], xOfs, yOfs)
 
-
+    -- Update info text
     if minimapOverlay and minimapOverlay.infoText then
         minimapOverlay.infoText:SetText(string.format("Minimap  X:%d Y:%d", math.floor(xOfs), math.floor(yOfs)))
     end
 end
 
-
+-- Hook Edit Mode enter/exit
 local function SetupEditModeHooks()
     if not EditModeManagerFrame then return end
-
+    
     hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
-
+        -- Ensure LibEditModeOverride layouts are loaded when entering Edit Mode
         if LibEditModeOverride and LibEditModeOverride:IsReady() then
             if not LibEditModeOverride:AreLayoutsLoaded() then
                 LibEditModeOverride:LoadLayouts()
             end
         end
 
-
+        -- NudgeFrame is lazy-loaded, only update if it exists
         if PREYCore.nudgeFrame then
             PREYCore.nudgeFrame:UpdateVisibility()
         end
         PREYCore:EnableClickDetection()
-
-
-        PREYCore:ShowMinimapOverlay()
-        PREYCore:EnableMinimapEditMode()
+        -- Let Blizzard's native Edit Mode handle CDM viewers and standard Edit Mode frames
+        -- PREYCore:ShowViewerOverlays()
+        -- PREYCore:ShowBlizzardFrameOverlays()
+        PREYCore:ShowMinimapOverlay()  -- Show nudge overlay on PREY minimap
+        PREYCore:EnableMinimapEditMode()  -- Temporarily allow minimap movement
     end)
 
     hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
-
+        -- NudgeFrame is lazy-loaded, only hide if it exists
         if PREYCore.nudgeFrame then
             PREYCore.nudgeFrame:Hide()
         end
         PREYCore:DisableClickDetection()
-
-
-        PREYCore:HideMinimapOverlay()
-        PREYCore:DisableMinimapEditMode()
+        -- PREYCore:HideViewerOverlays()
+        -- PREYCore:HideBlizzardFrameOverlays()
+        PREYCore:HideMinimapOverlay()  -- Hide minimap overlay
+        PREYCore:DisableMinimapEditMode()  -- Restore minimap lock setting
         PREYCore.selectedViewer = nil
-
+        -- Clear central selection (in case a CDM viewer was selected)
         if PREYCore.ClearEditModeSelection then
             PREYCore:ClearEditModeSelection()
         end
-
-
+        
+        -- Fix for arrow-key positioning bug: Convert TOPLEFT anchoring to CENTER anchoring
+        -- Arrow keys in Edit Mode use TOPLEFT anchor, mouse drag uses CENTER anchor
+        -- Uses GetCenter() for exact center position directly from WoW
         C_Timer.After(0.066, function()
             local uiCenterX, uiCenterY = UIParent:GetCenter()
 
-
+            -- Fix BuffIconCooldownViewer
             local buffViewer = rawget(_G, "BuffIconCooldownViewer")
             if buffViewer then
                 local point = buffViewer:GetPoint(1)
@@ -1074,7 +1091,7 @@ local function SetupEditModeHooks()
                         local offsetX = frameCenterX - uiCenterX
                         local offsetY = frameCenterY - uiCenterY
 
-
+                        -- Try LibEditModeOverride first (proper way - saves to Edit Mode db)
                         local success = false
                         if LibEditModeOverride and LibEditModeOverride:HasEditModeSettings(buffViewer) then
                             success = pcall(function()
@@ -1082,7 +1099,7 @@ local function SetupEditModeHooks()
                             end)
                         end
 
-
+                        -- Fallback: Direct reanchor
                         if not success then
                             buffViewer:ClearAllPoints()
                             buffViewer:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
@@ -1091,7 +1108,7 @@ local function SetupEditModeHooks()
                 end
             end
 
-
+            -- Fix BuffBarCooldownViewer (tracked bars)
             local barViewer = rawget(_G, "BuffBarCooldownViewer")
             if barViewer then
                 local point = barViewer:GetPoint(1)
@@ -1101,7 +1118,7 @@ local function SetupEditModeHooks()
                         local offsetX = frameCenterX - uiCenterX
                         local offsetY = frameCenterY - uiCenterY
 
-
+                        -- Try LibEditModeOverride first (proper way - saves to Edit Mode db)
                         local success = false
                         if LibEditModeOverride and LibEditModeOverride:HasEditModeSettings(barViewer) then
                             success = pcall(function()
@@ -1109,7 +1126,7 @@ local function SetupEditModeHooks()
                             end)
                         end
 
-
+                        -- Fallback: Direct reanchor
                         if not success then
                             barViewer:ClearAllPoints()
                             barViewer:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
@@ -1124,7 +1141,7 @@ end
 if EditModeManagerFrame then
     SetupEditModeHooks()
 else
-
+    -- Wait for EditModeManagerFrame to load
     local waitFrame = CreateFrame("Frame")
     waitFrame:RegisterEvent("ADDON_LOADED")
     waitFrame:SetScript("OnEvent", function(self, event, addon)
@@ -1135,38 +1152,39 @@ else
     end)
 end
 
-
+-- Fix anchor mismatch on startup (for /reload scenarios)
+-- Uses GetCenter() for exact center position directly from WoW
 local viewerAnchorFixFrame = CreateFrame("Frame")
 viewerAnchorFixFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 viewerAnchorFixFrame:SetScript("OnEvent", function(self, event, isInitialLogin, isReloadingUi)
-
+    -- Only run on reload, not fresh launch (fresh launch has correct anchors)
     if not isReloadingUi then return end
 
-
+    -- Delay to ensure Edit Mode data is loaded and viewers exist
     C_Timer.After(0.5, function()
-
+        -- Get UIParent center for reference
         local uiCenterX, uiCenterY = UIParent:GetCenter()
 
-
+        -- Fix BuffBarCooldownViewer anchor using GetCenter() for exact position
         local barViewer = rawget(_G, "BuffBarCooldownViewer")
         if barViewer then
             local point = barViewer:GetPoint(1)
             if point == "TOPLEFT" then
-
+                -- Get exact center position directly from WoW
                 local frameCenterX, frameCenterY = barViewer:GetCenter()
                 if frameCenterX and frameCenterY then
-
+                    -- Calculate offset from UIParent center
                     local offsetX = frameCenterX - uiCenterX
                     local offsetY = frameCenterY - uiCenterY
 
-
+                    -- Apply the fix
                     barViewer:ClearAllPoints()
                     barViewer:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
                 end
             end
         end
 
-
+        -- Same fix for BuffIconCooldownViewer
         local iconViewer = rawget(_G, "BuffIconCooldownViewer")
         if iconViewer then
             local point = iconViewer:GetPoint(1)
@@ -1184,14 +1202,14 @@ viewerAnchorFixFrame:SetScript("OnEvent", function(self, event, isInitialLogin, 
     end)
 end)
 
-
+-- Add nudgeamount
 local oldOnInitialize = PREYCore.OnInitialize
 function PREYCore:OnInitialize()
     if oldOnInitialize then
         oldOnInitialize(self)
     end
-
-
+    
+    -- Add nudgeAmount default
     if not self.db.profile.nudgeAmount then
         self.db.profile.nudgeAmount = 1
     end

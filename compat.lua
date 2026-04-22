@@ -1,3 +1,6 @@
+-- WoW 12.0.x compatibility shims for legacy addon and library code.
+-- Define removed globals only when Blizzard no longer provides them.
+
 if not GetSpellInfo and C_Spell and C_Spell.GetSpellInfo then
     function GetSpellInfo(spellID)
         if not spellID then
